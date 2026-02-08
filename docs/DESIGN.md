@@ -135,6 +135,7 @@ interface ProductEntry {
 
 ```typescript
 interface MasterData {
+  manufacturerNames: string[];     // メーカー名リスト
   shelfNames: string[];           // 棚割名リスト
   riskClassifications: string[];  // リスク分類リスト
   specificIngredients: string[];  // 特定成分リスト
@@ -142,6 +143,7 @@ interface MasterData {
 ```
 
 **初期データ:**
+- メーカー名: `['メディコム', '大江戸製薬', '富士ファーマ']`
 - 棚割名: `['胃腸薬', '風邪薬', '鎮痛剤', 'ビタミン剤', '目薬', '皮膚用薬']`
 - リスク分類: `['第1類医薬品', '指定第2類医薬品', '第2類医薬品', '第3類医薬品', '医薬部外品', '指定医薬部外品']`
 - 特定成分: `['イブプロフェン', 'ロキソプロフェン', 'コデイン', 'カフェイン', '抗ヒスタミン成分', '濫用成分']`

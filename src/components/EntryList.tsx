@@ -113,6 +113,7 @@ export const EntryList: React.FC<EntryListProps> = ({ sheets, currentUser, onCre
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
     setShowExportModal(false);
   };
 

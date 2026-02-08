@@ -33,9 +33,37 @@ npm install
 
 # 2. 開発サーバーの起動
 npm run dev
+
+# 3. UI + 型チェック監視を同時起動
+npm run dev:all
 ```
 
 アプリケーションは http://localhost:3000 で起動します。
+
+### データソース切り替え（AWS移行準備）
+
+`.env.local` でデータ取得先を切り替えできます。
+
+```bash
+# 既定値: local
+VITE_DATA_SOURCE=local
+
+# API接続に切り替える場合
+VITE_DATA_SOURCE=api
+VITE_API_BASE=http://localhost:3000
+```
+
+APIモードでCookieセッションを使う場合は、サーバー側で `SESSION_SECRET` を設定してください。
+
+APIモードでローカル確認する場合（`api/` のモックAPI利用）は、Vercel CLIで起動します。
+
+```bash
+# APIのみ起動
+npm run dev:api
+
+# API + 型チェック監視
+npm run dev:api:all
+```
 
 ### ビルド
 
@@ -73,6 +101,7 @@ npm run preview
 - 権限制御（管理者/一般）
 
 #### 3. マスターデータ管理（管理者のみ）
+- メーカー名の管理
 - 棚割名の管理
 - リスク分類の管理
 - 特定成分の管理
@@ -85,18 +114,20 @@ npm run preview
 ├── docs/                     # ドキュメント
 │   ├── DESIGN.md            # システム設計書
 │   └── PERMISSIONS.md       # 権限設計書
-├── components/              # Reactコンポーネント
-│   ├── Layout.tsx           # 共通レイアウト
-│   ├── Login.tsx            # ログイン画面
-│   ├── EntryList.tsx        # エントリーシート一覧
-│   ├── EntryForm.tsx        # エントリーシート編集
-│   ├── AccountManage.tsx    # アカウント管理
-│   └── MasterManage.tsx     # マスターデータ管理
-├── services/                # ビジネスロジック
-│   └── storage.ts           # データ永続化層
-├── types.ts                 # TypeScript型定義
-├── App.tsx                  # メインアプリケーション
-└── index.tsx                # エントリーポイント
+├── src/
+│   ├── components/          # Reactコンポーネント
+│   │   ├── Layout.tsx       # 共通レイアウト
+│   │   ├── Login.tsx        # ログイン画面
+│   │   ├── EntryList.tsx    # エントリーシート一覧
+│   │   ├── EntryForm.tsx    # エントリーシート編集
+│   │   ├── AccountManage.tsx # アカウント管理
+│   │   └── MasterManage.tsx # マスターデータ管理
+│   ├── services/            # ビジネスロジック
+│   │   ├── storage.ts       # ローカル永続化層
+│   │   └── dataService.ts   # local/api 切り替え層
+│   ├── types.ts             # TypeScript型定義
+│   ├── App.tsx              # メインアプリケーション
+│   └── index.tsx            # エントリーポイント
 ```
 
 ## ドキュメント
@@ -105,6 +136,8 @@ npm run preview
 
 - [システム設計書](docs/DESIGN.md) - データモデル、アーキテクチャ、技術仕様
 - [権限設計書](docs/PERMISSIONS.md) - ロール定義、アクセス権限、セキュリティ
+- [最小API設計（AWS向け）](docs/API_MINIMAL_AWS.md) - 低運用コストでのAPI・認証・運用方針
+- [セキュリティ設計書](docs/SECURITY.md) - 脅威モデル、認証/認可、運用チェック
 
 ## 権限設計
 
@@ -123,9 +156,9 @@ npm run preview
 
 ### コード構成
 
-- **コンポーネント**: `components/` - UIコンポーネント
-- **ビジネスロジック**: `services/` - データ操作ロジック
-- **型定義**: `types.ts` - TypeScript型定義
+- **コンポーネント**: `src/components/` - UIコンポーネント
+- **ビジネスロジック**: `src/services/` - データ操作ロジック
+- **型定義**: `src/types.ts` - TypeScript型定義
 
 ### スタイルガイド
 

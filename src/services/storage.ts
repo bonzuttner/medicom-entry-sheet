@@ -42,6 +42,7 @@ const INITIAL_USERS: User[] = [
 ];
 
 const INITIAL_MASTER: MasterData = {
+  manufacturerNames: ['メディコム', '大江戸製薬', '富士ファーマ'],
   shelfNames: ['胃腸薬', '風邪薬', '鎮痛剤', 'ビタミン剤', '目薬', '皮膚用薬'],
   riskClassifications: ['第1類医薬品', '指定第2類医薬品', '第2類医薬品', '第3類医薬品', '医薬部外品', '指定医薬部外品'],
   specificIngredients: ['イブプロフェン', 'ロキソプロフェン', 'コデイン', 'カフェイン', '抗ヒスタミン成分', '濫用成分'],
@@ -180,6 +181,42 @@ const generateTestSheets = (): EntrySheet[] => {
 };
 
 const INITIAL_SHEETS = generateTestSheets();
+const HISTORY_RETENTION_YEARS = 3;
+
+const sanitizeUser = (user: User): User => {
+  const { password, ...safeUser } = user;
+  return safeUser;
+};
+
+const getRetentionCutoff = (): Date => {
+  const cutoff = new Date();
+  cutoff.setFullYear(cutoff.getFullYear() - HISTORY_RETENTION_YEARS);
+  return cutoff;
+};
+
+const getSheetBaseDate = (sheet: EntrySheet): Date | null => {
+  const base = sheet.createdAt || sheet.updatedAt;
+  if (!base) return null;
+  const parsed = new Date(base);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+};
+
+const pruneSheetsByRetention = (sheets: EntrySheet[]): EntrySheet[] => {
+  const cutoff = getRetentionCutoff();
+  return sheets.filter((sheet) => {
+    const baseDate = getSheetBaseDate(sheet);
+    if (!baseDate) return true;
+    return baseDate >= cutoff;
+  });
+};
+
+const normalizeMasterData = (data?: Partial<MasterData>): MasterData => ({
+  manufacturerNames: data?.manufacturerNames ?? INITIAL_MASTER.manufacturerNames,
+  shelfNames: data?.shelfNames ?? INITIAL_MASTER.shelfNames,
+  riskClassifications: data?.riskClassifications ?? INITIAL_MASTER.riskClassifications,
+  specificIngredients: data?.specificIngredients ?? INITIAL_MASTER.specificIngredients,
+});
 
 export const storage = {
   // Users
@@ -196,17 +233,17 @@ export const storage = {
     const users = storage.getUsers();
     const user = users.find(u => u.username === username);
     if (user && user.password === password) {
-      return user;
+      return sanitizeUser(user);
     }
     return null;
   },
   getCurrentUser: (): User | null => {
     const data = localStorage.getItem(KEYS.CURRENT_USER);
-    return data ? JSON.parse(data) : null;
+    return data ? sanitizeUser(JSON.parse(data)) : null;
   },
   setCurrentUser: (user: User | null) => {
     if (user) {
-      localStorage.setItem(KEYS.CURRENT_USER, JSON.stringify(user));
+      localStorage.setItem(KEYS.CURRENT_USER, JSON.stringify(sanitizeUser(user)));
     } else {
       localStorage.removeItem(KEYS.CURRENT_USER);
     }
@@ -215,7 +252,12 @@ export const storage = {
   // Sheets
   getSheets: (): EntrySheet[] => {
     const data = localStorage.getItem(KEYS.SHEETS);
-    return data ? JSON.parse(data) : INITIAL_SHEETS;
+    const sheets = data ? (JSON.parse(data) as EntrySheet[]) : INITIAL_SHEETS;
+    const prunedSheets = pruneSheetsByRetention(sheets);
+    if (prunedSheets.length !== sheets.length) {
+      localStorage.setItem(KEYS.SHEETS, JSON.stringify(prunedSheets));
+    }
+    return prunedSheets;
   },
   saveSheet: (sheet: EntrySheet) => {
     const sheets = storage.getSheets();
@@ -225,19 +267,26 @@ export const storage = {
     } else {
       sheets.push(sheet);
     }
-    localStorage.setItem(KEYS.SHEETS, JSON.stringify(sheets));
+    const prunedSheets = pruneSheetsByRetention(sheets);
+    localStorage.setItem(KEYS.SHEETS, JSON.stringify(prunedSheets));
   },
   deleteSheet: (id: string) => {
     const sheets = storage.getSheets().filter(s => s.id !== id);
-    localStorage.setItem(KEYS.SHEETS, JSON.stringify(sheets));
+    const prunedSheets = pruneSheetsByRetention(sheets);
+    localStorage.setItem(KEYS.SHEETS, JSON.stringify(prunedSheets));
   },
 
   // Master Data
   getMasterData: (): MasterData => {
     const data = localStorage.getItem(KEYS.MASTER);
-    return data ? JSON.parse(data) : INITIAL_MASTER;
+    const parsed = data ? (JSON.parse(data) as Partial<MasterData>) : INITIAL_MASTER;
+    const normalized = normalizeMasterData(parsed);
+    if (data && JSON.stringify(parsed) !== JSON.stringify(normalized)) {
+      localStorage.setItem(KEYS.MASTER, JSON.stringify(normalized));
+    }
+    return normalized;
   },
   saveMasterData: (data: MasterData) => {
-    localStorage.setItem(KEYS.MASTER, JSON.stringify(data));
+    localStorage.setItem(KEYS.MASTER, JSON.stringify(normalizeMasterData(data)));
   },
 };

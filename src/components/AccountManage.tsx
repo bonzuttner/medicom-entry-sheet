@@ -1,17 +1,36 @@
-import React, { useState } from 'react';
-import { User, UserRole } from '../types';
+import React, { useMemo, useState } from 'react';
+import { MasterData, User, UserRole } from '../types';
 import { Plus, Edit, Trash2, AlertCircle } from 'lucide-react';
 
 interface AccountManageProps {
   users: User[];
+  masterData: MasterData;
   currentUser: User;
   onSaveUser: (user: User) => void;
   onDeleteUser: (id: string) => void;
 }
 
-export const AccountManage: React.FC<AccountManageProps> = ({ users, currentUser, onSaveUser, onDeleteUser }) => {
+export const AccountManage: React.FC<AccountManageProps> = ({
+  users,
+  masterData,
+  currentUser,
+  onSaveUser,
+  onDeleteUser,
+}) => {
   const [editingUser, setEditingUser] = useState<Partial<User> | null>(null);
   const [validationError, setValidationError] = useState<string>('');
+  const manufacturerOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...masterData.manufacturerNames,
+          ...users.map((u) => u.manufacturerName),
+          currentUser.manufacturerName,
+          editingUser?.manufacturerName || '',
+        ].filter(Boolean))
+      ),
+    [masterData.manufacturerNames, users, currentUser.manufacturerName, editingUser?.manufacturerName]
+  );
 
   // Permission check: Can the current user edit/delete this user?
   const canModifyUser = (targetUser: User): boolean => {
@@ -25,11 +44,23 @@ export const AccountManage: React.FC<AccountManageProps> = ({ users, currentUser
       return;
     }
 
+    const hasDuplicateUsername = users.some(
+      u => u.username === editingUser.username && u.id !== editingUser.id
+    );
+    if (hasDuplicateUsername) {
+      setValidationError(`ログインID「${editingUser.username}」は既に使用されています`);
+      return;
+    }
+
     // Permission validation: STAFF can only create/edit users in their own manufacturer
     if (currentUser.role === UserRole.STAFF && editingUser.manufacturerName !== currentUser.manufacturerName) {
       setValidationError(`他社（${editingUser.manufacturerName}）のアカウントは作成・編集できません`);
       return;
     }
+
+    const existingUser = users.find(u => u.id === editingUser.id);
+    const isNewUser = !editingUser.id;
+    const hasPasswordInput = Boolean(editingUser.password && editingUser.password.length > 0);
 
     const newUser: User = {
         id: editingUser.id || Date.now().toString(),
@@ -39,7 +70,9 @@ export const AccountManage: React.FC<AccountManageProps> = ({ users, currentUser
         email: editingUser.email || '',
         phoneNumber: editingUser.phoneNumber || '',
         role: editingUser.role || UserRole.STAFF,
-        password: 'password', // Default
+        password: hasPasswordInput
+          ? editingUser.password
+          : (isNewUser ? 'password' : existingUser?.password),
     };
     onSaveUser(newUser);
     setEditingUser(null);
@@ -48,7 +81,9 @@ export const AccountManage: React.FC<AccountManageProps> = ({ users, currentUser
 
   const handleAddNew = () => {
     // STAFF users: Default to their manufacturer name
-    const defaultManufacturer = currentUser.role === UserRole.STAFF ? currentUser.manufacturerName : '';
+    const defaultManufacturer = currentUser.role === UserRole.STAFF
+      ? currentUser.manufacturerName
+      : (masterData.manufacturerNames[0] || '');
     setEditingUser({
       role: UserRole.STAFF,
       manufacturerName: defaultManufacturer
@@ -90,13 +125,21 @@ export const AccountManage: React.FC<AccountManageProps> = ({ users, currentUser
                     </div>
                      <div>
                         <label className="block text-sm font-medium text-slate-700">メーカー名 <span className="text-red-500">*</span></label>
-                        <input
-                            className="w-full border p-2 rounded"
+                        <select
+                            className="w-full border p-2 rounded bg-white"
                             value={editingUser.manufacturerName || ''}
                             onChange={e => setEditingUser({...editingUser, manufacturerName: e.target.value})}
                             disabled={currentUser.role === UserRole.STAFF}
                             title={currentUser.role === UserRole.STAFF ? '自社メーカー名のみ設定可能です' : ''}
-                        />
+                        >
+                            {manufacturerOptions.length === 0 ? (
+                                <option value="">メーカー名をマスタ管理で登録してください</option>
+                            ) : (
+                                manufacturerOptions.map((name) => (
+                                    <option key={name} value={name}>{name}</option>
+                                ))
+                            )}
+                        </select>
                         {currentUser.role === UserRole.STAFF && (
                             <p className="text-xs text-slate-500 mt-1">※ 自社アカウントのみ作成できます</p>
                         )}
@@ -108,6 +151,22 @@ export const AccountManage: React.FC<AccountManageProps> = ({ users, currentUser
                      <div>
                         <label className="block text-sm font-medium text-slate-700">電話番号</label>
                         <input className="w-full border p-2 rounded" value={editingUser.phoneNumber || ''} onChange={e => setEditingUser({...editingUser, phoneNumber: e.target.value})} />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700">パスワード</label>
+                        <input
+                            type="password"
+                            className="w-full border p-2 rounded"
+                            value={editingUser.password || ''}
+                            onChange={e => setEditingUser({ ...editingUser, password: e.target.value })}
+                            placeholder={editingUser.id ? '変更する場合のみ入力' : '未入力なら password'}
+                            autoComplete="new-password"
+                        />
+                        <p className="text-xs text-slate-500 mt-1">
+                            {editingUser.id
+                              ? '※ 空欄の場合は現在のパスワードを維持します'
+                              : '※ 空欄の場合は初期パスワード password になります'}
+                        </p>
                     </div>
                 </div>
                 <div className="mt-4 flex gap-2 justify-end">
@@ -143,7 +202,11 @@ export const AccountManage: React.FC<AccountManageProps> = ({ users, currentUser
                                 </td>
                                 <td className="p-4 text-right flex justify-end gap-2">
                                     <button
-                                        onClick={() => canEdit && setEditingUser(u)}
+                                        onClick={() => {
+                                          if (!canEdit) return;
+                                          const { password: _password, ...safeUser } = u;
+                                          setEditingUser(safeUser);
+                                        }}
                                         disabled={!canEdit}
                                         className={`p-2 rounded ${canEdit ? 'text-primary hover:bg-blue-50' : 'text-slate-300 cursor-not-allowed'}`}
                                         title={canEdit ? '編集' : '編集権限がありません'}

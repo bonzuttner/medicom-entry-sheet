@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { storage } from '../services/storage';
+import { dataService } from '../services/dataService';
 import { User } from '../types';
 import { LogIn, Lock } from 'lucide-react';
 
 interface LoginProps {
-  onLogin: (user: User) => void;
+  onLogin: (user: User) => void | Promise<void>;
 }
 
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
@@ -12,13 +12,19 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const user = storage.login(username, password);
-    if (user) {
-      onLogin(user);
-    } else {
-      setError('IDまたはパスワードが正しくありません (demo: admin/password, satou/password)');
+    setError('');
+    try {
+      const user = await dataService.login(username, password);
+      if (user) {
+        await onLogin(user);
+      } else {
+        setError('IDまたはパスワードが正しくありません');
+      }
+    } catch (err) {
+      console.error('Login failed:', err);
+      setError('ログイン処理に失敗しました。時間をおいて再試行してください。');
     }
   };
 
@@ -40,7 +46,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
               type="text"
               required
               className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
-              placeholder="例: admin または satou"
+              placeholder="ログインIDを入力"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
             />
@@ -72,12 +78,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             ログイン
           </button>
         </form>
-
-        <div className="mt-8 pt-6 border-t border-slate-100 text-center text-xs text-slate-400">
-          <p>Demo Accounts:</p>
-          <p className="mt-1">ID: <span className="font-mono bg-slate-100 px-1 rounded">admin</span> / Pass: <span className="font-mono bg-slate-100 px-1 rounded">password</span></p>
-          <p className="mt-1">ID: <span className="font-mono bg-slate-100 px-1 rounded">satou</span> / Pass: <span className="font-mono bg-slate-100 px-1 rounded">password</span></p>
-        </div>
       </div>
     </div>
   );

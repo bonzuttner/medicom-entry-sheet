@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { EntrySheet, MasterData, ProductEntry } from '../types';
 import { Save, ArrowLeft, Plus, Trash2, AlertTriangle, Image as ImageIcon } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
@@ -7,13 +7,35 @@ interface EntryFormProps {
   initialData: EntrySheet;
   initialActiveTab?: number;
   masterData: MasterData;
+  reusableProductTemplates: Record<string, ProductEntry>;
   onSave: (sheet: EntrySheet) => void;
   onCancel: () => void;
 }
 
-export const EntryForm: React.FC<EntryFormProps> = ({ initialData, initialActiveTab = 0, masterData, onSave, onCancel }) => {
+const normalizeProductName = (value: string): string => value.trim().toLowerCase();
+
+export const EntryForm: React.FC<EntryFormProps> = ({
+  initialData,
+  initialActiveTab = 0,
+  masterData,
+  reusableProductTemplates,
+  onSave,
+  onCancel,
+}) => {
   const [formData, setFormData] = useState<EntrySheet>(initialData);
   const [activeTab, setActiveTab] = useState<number>(initialActiveTab); // Index of the product being edited
+  const askedPrefillByProductRef = useRef<Map<number, string>>(new Map());
+
+  const parseRequiredNumber = (value: string): number => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const parseOptionalNumber = (value: string): number | undefined => {
+    if (value === '') return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  };
 
   // Sync update time
   useEffect(() => {
@@ -27,10 +49,111 @@ export const EntryForm: React.FC<EntryFormProps> = ({ initialData, initialActive
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const findReusableProductByName = (
+    productName: string,
+    currentIndex: number,
+    products: ProductEntry[] = formData.products
+  ): ProductEntry | undefined => {
+    const normalized = normalizeProductName(productName);
+    if (!normalized) return undefined;
+
+    for (let i = products.length - 1; i >= 0; i -= 1) {
+      if (i === currentIndex) continue;
+      const product = products[i];
+      if (normalizeProductName(product.productName || '') === normalized) {
+        return product;
+      }
+    }
+
+    return reusableProductTemplates[normalized];
+  };
+
   const handleProductChange = (index: number, field: keyof ProductEntry, value: any) => {
     const newProducts = [...formData.products];
     newProducts[index] = { ...newProducts[index], [field]: value };
     setFormData(prev => ({ ...prev, products: newProducts }));
+  };
+
+  const toComparableProduct = (product: ProductEntry) => ({
+    shelfName: product.shelfName,
+    manufacturerName: product.manufacturerName,
+    janCode: product.janCode,
+    productName: normalizeProductName(product.productName || ''),
+    productImage: product.productImage || '',
+    riskClassification: product.riskClassification,
+    specificIngredients: [...product.specificIngredients].sort(),
+    catchCopy: product.catchCopy,
+    productMessage: product.productMessage,
+    width: product.width,
+    height: product.height,
+    depth: product.depth,
+    facingCount: product.facingCount,
+    arrivalDate: product.arrivalDate || '',
+    hasPromoMaterial: product.hasPromoMaterial,
+    promoSample: product.promoSample || '',
+    specialFixture: product.specialFixture || '',
+    promoWidth: product.promoWidth ?? '',
+    promoHeight: product.promoHeight ?? '',
+    promoDepth: product.promoDepth ?? '',
+    promoImage: product.promoImage || '',
+  });
+
+  const applyReusableProduct = (index: number, candidate: ProductEntry) => {
+    setFormData((prev) => {
+      const newProducts = [...prev.products];
+      const current = newProducts[index];
+
+      newProducts[index] = {
+        ...current,
+        ...candidate,
+        id: current.id,
+        manufacturerName: current.manufacturerName,
+        productName: current.productName,
+        specificIngredients: [...candidate.specificIngredients],
+      };
+
+      return {
+        ...prev,
+        products: newProducts,
+      };
+    });
+  };
+
+  const maybeSuggestReusableProduct = (index: number, productName: string) => {
+    const normalized = normalizeProductName(productName);
+    if (!normalized) return;
+
+    const askedName = askedPrefillByProductRef.current.get(index);
+    if (askedName === normalized) return;
+
+    const candidate = findReusableProductByName(productName, index);
+    if (!candidate) return;
+
+    const current = formData.products[index];
+    const hasDifference =
+      JSON.stringify(toComparableProduct(current)) !== JSON.stringify(toComparableProduct(candidate));
+    if (!hasDifference) return;
+
+    askedPrefillByProductRef.current.set(index, normalized);
+    const shouldApply = window.confirm(
+      `同名商品「${productName}」の過去データが見つかりました。商品情報を反映しますか？`
+    );
+    if (!shouldApply) return;
+
+    applyReusableProduct(index, candidate);
+  };
+
+  const handleProductNameChange = (index: number, productName: string) => {
+    askedPrefillByProductRef.current.delete(index);
+    setFormData((prev) => {
+      const newProducts = [...prev.products];
+      newProducts[index] = {
+        ...newProducts[index],
+        productName,
+      };
+
+      return { ...prev, products: newProducts };
+    });
   };
 
   const handleSpecificIngredientsChange = (index: number, ingredient: string) => {
@@ -51,7 +174,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({ initialData, initialActive
       manufacturerName: formData.manufacturerName,
       janCode: '',
       productName: '',
-      riskClassification: masterData.riskClassifications[3], // Default to Class 3 (safe bet)
+      riskClassification: masterData.riskClassifications[0] || '',
       specificIngredients: [],
       catchCopy: '',
       productMessage: '',
@@ -207,6 +330,12 @@ export const EntryForm: React.FC<EntryFormProps> = ({ initialData, initialActive
 
       {/* Products Tabs */}
       <div className="flex items-center overflow-x-auto gap-2 mb-0 pb-2 no-scrollbar">
+        <button 
+            onClick={addProduct}
+            className="flex items-center gap-1 px-4 py-2 text-sm text-primary font-bold hover:bg-sky-50 rounded-lg transition-colors flex-shrink-0"
+        >
+            <Plus size={16} /> 商品追加
+        </button>
         {formData.products.map((prod, idx) => (
             <button
                 key={prod.id}
@@ -222,12 +351,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({ initialData, initialActive
                 {!prod.productName && <span className="ml-2 text-warning">●</span>}
             </button>
         ))}
-        <button 
-            onClick={addProduct}
-            className="flex items-center gap-1 px-4 py-2 text-sm text-primary font-bold hover:bg-sky-50 rounded-lg transition-colors flex-shrink-0"
-        >
-            <Plus size={16} /> 商品追加
-        </button>
       </div>
 
       {/* Product Form Area */}
@@ -249,6 +372,17 @@ export const EntryForm: React.FC<EntryFormProps> = ({ initialData, initialActive
                 商品情報
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                 <div className="md:col-span-2">
+                     <label className="block text-sm font-bold text-slate-700 mb-2">商品名 <span className="text-danger">*</span></label>
+                     <input 
+                        type="text" 
+                        className="w-full border-slate-300 rounded-lg py-3 px-3 focus:ring-primary focus:border-primary"
+                        placeholder="例：〇〇胃薬 A 30錠"
+                        value={activeProduct.productName}
+                        onChange={(e) => handleProductNameChange(activeTab, e.target.value)}
+                        onBlur={(e) => maybeSuggestReusableProduct(activeTab, e.target.value)}
+                     />
+                 </div>
                  {/* Product Image - Prominent */}
                  <div className="md:col-span-2 bg-slate-50 p-4 sm:p-6 rounded-xl border border-slate-200 mb-2">
                     <label className="block text-base font-bold text-slate-700 mb-3">
@@ -303,16 +437,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({ initialData, initialActive
                     >
                         {masterData.riskClassifications.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                     </select>
-                </div>
-                <div className="md:col-span-2">
-                     <label className="block text-sm font-bold text-slate-700 mb-2">商品名 <span className="text-danger">*</span></label>
-                     <input 
-                        type="text" 
-                        className="w-full border-slate-300 rounded-lg py-3 px-3 focus:ring-primary focus:border-primary"
-                        placeholder="例：〇〇胃薬 A 30錠"
-                        value={activeProduct.productName}
-                        onChange={(e) => handleProductChange(activeTab, 'productName', e.target.value)}
-                     />
                 </div>
                  <div>
                      <label className="block text-sm font-bold text-slate-700 mb-2">JANコード <span className="text-danger">*</span> <span className="text-xs font-normal text-slate-500">(8, 13, 16桁)</span></label>
@@ -400,7 +524,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({ initialData, initialActive
                         type="number" 
                         className="w-full border-slate-300 rounded-lg p-3"
                         value={activeProduct.width || ''}
-                        onChange={(e) => handleProductChange(activeTab, 'width', parseInt(e.target.value))}
+                        onChange={(e) => handleProductChange(activeTab, 'width', parseRequiredNumber(e.target.value))}
                      />
                 </div>
                 <div>
@@ -409,7 +533,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({ initialData, initialActive
                         type="number" 
                         className="w-full border-slate-300 rounded-lg p-3"
                         value={activeProduct.height || ''}
-                        onChange={(e) => handleProductChange(activeTab, 'height', parseInt(e.target.value))}
+                        onChange={(e) => handleProductChange(activeTab, 'height', parseRequiredNumber(e.target.value))}
                      />
                 </div>
                 <div>
@@ -418,7 +542,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({ initialData, initialActive
                         type="number" 
                         className="w-full border-slate-300 rounded-lg p-3"
                         value={activeProduct.depth || ''}
-                        onChange={(e) => handleProductChange(activeTab, 'depth', parseInt(e.target.value))}
+                        onChange={(e) => handleProductChange(activeTab, 'depth', parseRequiredNumber(e.target.value))}
                      />
                 </div>
                 <div>
@@ -427,7 +551,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({ initialData, initialActive
                         type="number" 
                         className="w-full border-slate-300 rounded-lg p-3 bg-slate-50 font-bold"
                         value={activeProduct.facingCount || ''}
-                        onChange={(e) => handleProductChange(activeTab, 'facingCount', parseInt(e.target.value))}
+                        onChange={(e) => handleProductChange(activeTab, 'facingCount', parseRequiredNumber(e.target.value))}
                      />
                 </div>
             </div>
@@ -501,17 +625,17 @@ export const EntryForm: React.FC<EntryFormProps> = ({ initialData, initialActive
                                 <input 
                                     type="number" placeholder="幅" className="border-slate-300 rounded-lg p-3"
                                     value={activeProduct.promoWidth || ''}
-                                    onChange={(e) => handleProductChange(activeTab, 'promoWidth', parseInt(e.target.value))}
+                                    onChange={(e) => handleProductChange(activeTab, 'promoWidth', parseOptionalNumber(e.target.value))}
                                 />
                                 <input 
                                     type="number" placeholder="高さ" className="border-slate-300 rounded-lg p-3"
                                     value={activeProduct.promoHeight || ''}
-                                    onChange={(e) => handleProductChange(activeTab, 'promoHeight', parseInt(e.target.value))}
+                                    onChange={(e) => handleProductChange(activeTab, 'promoHeight', parseOptionalNumber(e.target.value))}
                                 />
                                 <input 
                                     type="number" placeholder="奥行" className="border-slate-300 rounded-lg p-3"
                                     value={activeProduct.promoDepth || ''}
-                                    onChange={(e) => handleProductChange(activeTab, 'promoDepth', parseInt(e.target.value))}
+                                    onChange={(e) => handleProductChange(activeTab, 'promoDepth', parseOptionalNumber(e.target.value))}
                                 />
                              </div>
                         </div>

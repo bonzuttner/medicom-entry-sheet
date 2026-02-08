@@ -15,6 +15,7 @@ export interface User {
 }
 
 export interface MasterData {
+  manufacturerNames: string[];
   shelfNames: string[];
   riskClassifications: string[];
   specificIngredients: string[];

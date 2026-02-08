@@ -6,7 +6,7 @@ interface LayoutProps {
   currentUser: User;
   currentPage: Page;
   onNavigate: (page: Page) => void;
-  onLogout: () => void;
+  onLogout: () => void | Promise<void>;
   children: React.ReactNode;
 }
 
@@ -31,7 +31,9 @@ export const Layout: React.FC<LayoutProps> = ({ currentUser, currentPage, onNavi
             </div>
             
             <button 
-              onClick={onLogout}
+              onClick={() => {
+                void onLogout();
+              }}
               className="p-2 text-slate-500 hover:text-danger hover:bg-red-50 rounded-full transition-colors"
               title="ログアウト"
             >

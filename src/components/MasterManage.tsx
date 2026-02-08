@@ -30,6 +30,13 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
         <p className="text-slate-500">エントリーシートのプルダウン選択肢を編集します。</p>
 
         <MasterSection 
+            title="メーカー名" 
+            items={localData.manufacturerNames} 
+            onAdd={(v) => addItem('manufacturerNames', v)} 
+            onRemove={(v) => removeItem('manufacturerNames', v)} 
+        />
+
+        <MasterSection 
             title="棚割名" 
             items={localData.shelfNames} 
             onAdd={(v) => addItem('shelfNames', v)} 

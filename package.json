@@ -5,6 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "typecheck:watch": "tsc --noEmit --watch",
+    "dev:all": "sh -c 'npm run typecheck:watch & TSC_PID=$!; npm run dev; kill $TSC_PID'",
+    "dev:api": "vercel dev",
+    "dev:api:all": "sh -c 'npm run typecheck:watch & TSC_PID=$!; npm run dev:api; kill $TSC_PID'",
     "build": "vite build",
     "preview": "vite preview"
   },
