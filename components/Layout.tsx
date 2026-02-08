@@ -51,16 +51,13 @@ export const Layout: React.FC<LayoutProps> = ({ currentUser, currentPage, onNavi
             label="エントリーシート一覧"
           />
           
-          {/* Account Management (Likely admin only, but explicit request was only for Master) 
-              Decided to hide for Staff as well based on 'Unnecessary features' rule */}
-          {currentUser.role === UserRole.ADMIN && (
-            <NavButton 
-               active={currentPage === Page.ACCOUNTS} 
-               onClick={() => onNavigate(Page.ACCOUNTS)}
-               icon={<Users size={18} />}
-               label="アカウント管理"
-            />
-          )}
+          {/* Account Management - All users can manage accounts in their own company */}
+          <NavButton
+             active={currentPage === Page.ACCOUNTS}
+             onClick={() => onNavigate(Page.ACCOUNTS)}
+             icon={<Users size={18} />}
+             label="アカウント管理"
+          />
 
           {/* Master Management - Explicitly Admin Only */}
           {currentUser.role === UserRole.ADMIN && (

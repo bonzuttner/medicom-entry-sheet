@@ -132,16 +132,26 @@ const App: React.FC = () => {
     return <Login onLogin={handleLogin} />;
   }
 
+  // Filter sheets based on user role and manufacturer
+  const visibleSheets = currentUser.role === UserRole.ADMIN
+    ? sheets
+    : sheets.filter(sheet => sheet.manufacturerName === currentUser.manufacturerName);
+
+  // Filter users based on user role and manufacturer
+  const visibleUsers = currentUser.role === UserRole.ADMIN
+    ? users
+    : users.filter(user => user.manufacturerName === currentUser.manufacturerName);
+
   return (
-    <Layout 
-        currentUser={currentUser} 
-        currentPage={currentPage} 
-        onNavigate={setCurrentPage} 
+    <Layout
+        currentUser={currentUser}
+        currentPage={currentPage}
+        onNavigate={setCurrentPage}
         onLogout={handleLogout}
     >
         {currentPage === Page.LIST && (
-            <EntryList 
-                sheets={sheets} 
+            <EntryList
+                sheets={visibleSheets}
                 currentUser={currentUser}
                 onCreate={handleCreateSheet}
                 onEdit={handleEditSheet}
@@ -149,9 +159,9 @@ const App: React.FC = () => {
                 onDelete={handleDeleteSheet}
             />
         )}
-        
+
         {currentPage === Page.EDIT && editingSheet && (
-            <EntryForm 
+            <EntryForm
                 initialData={editingSheet}
                 initialActiveTab={initialProductIndex}
                 masterData={masterData}
@@ -164,15 +174,16 @@ const App: React.FC = () => {
         )}
 
         {currentPage === Page.ACCOUNTS && (
-            <AccountManage 
-                users={users} 
-                onSaveUser={handleSaveUser} 
-                onDeleteUser={handleDeleteUser} 
+            <AccountManage
+                users={visibleUsers}
+                currentUser={currentUser}
+                onSaveUser={handleSaveUser}
+                onDeleteUser={handleDeleteUser}
             />
         )}
 
-        {currentPage === Page.MASTERS && (
-            <MasterManage 
+        {currentPage === Page.MASTERS && currentUser.role === UserRole.ADMIN && (
+            <MasterManage
                 data={masterData}
                 onSave={handleSaveMaster}
             />

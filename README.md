@@ -1,20 +1,142 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# PharmaPOP Entry System
 
-# Run and deploy your AI Studio app
+薬局向けPOP入力シート管理システム。従来のExcelベースの管理から脱却し、Webインターフェースで直感的に操作できるアプリケーションです。
 
-This contains everything you need to run your app locally.
+## 特徴
 
-View your app in AI Studio: https://ai.studio/apps/drive/1lHhgmvTkNc2lYbAaeYAs04vXsJoUpqWF
+- **直感的なUI**: React + Tailwind CSS による使いやすいインターフェース
+- **マルチテナント対応**: メーカーごとにデータを分離し、権限管理を実装
+- **レスポンシブデザイン**: PC・タブレット・スマートフォンに対応
+- **リアルタイムバリデーション**: 入力ミスを即座に検出
+- **CSV出力**: エントリーシートをCSV形式でエクスポート可能
 
-## Run Locally
+## 技術スタック
 
-**Prerequisites:**  Node.js
+- **フロントエンド**: React 19.2.4 + TypeScript 5.8.2
+- **ビルドツール**: Vite 6.2.0
+- **スタイリング**: Tailwind CSS
+- **アイコン**: Lucide React
+- **データ永続化**: LocalStorage（プロトタイプ）
 
+## セットアップ
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### 前提条件
+
+- Node.js 18 以上
+- npm または yarn
+
+### インストール
+
+```bash
+# 1. 依存関係のインストール
+npm install
+
+# 2. 開発サーバーの起動
+npm run dev
+```
+
+アプリケーションは http://localhost:3000 で起動します。
+
+### ビルド
+
+```bash
+# プロダクションビルド
+npm run build
+
+# ビルドのプレビュー
+npm run preview
+```
+
+## 使い方
+
+### ログイン
+
+初期ユーザー:
+
+| ユーザー名 | パスワード | メーカー | 権限 |
+|----------|----------|---------|------|
+| **admin** | password | メディコム | 管理者 |
+| **satou** | password | 大江戸製薬 | 一般 |
+| **tanaka** | password | 富士ファーマ | 一般 |
+
+### 主要機能
+
+#### 1. エントリーシート管理
+- エントリーシートの作成・編集・削除
+- 複数商品を1つのシートで管理
+- ステータス管理（下書き/完了）
+- CSV出力
+
+#### 2. アカウント管理
+- ユーザーアカウントの作成・編集・削除
+- メーカーごとのアカウント管理
+- 権限制御（管理者/一般）
+
+#### 3. マスターデータ管理（管理者のみ）
+- 棚割名の管理
+- リスク分類の管理
+- 特定成分の管理
+
+## ディレクトリ構成
+
+```
+/medicom-entry-sheet/
+├── README.md                 # プロジェクト概要（本ファイル）
+├── docs/                     # ドキュメント
+│   ├── DESIGN.md            # システム設計書
+│   └── PERMISSIONS.md       # 権限設計書
+├── components/              # Reactコンポーネント
+│   ├── Layout.tsx           # 共通レイアウト
+│   ├── Login.tsx            # ログイン画面
+│   ├── EntryList.tsx        # エントリーシート一覧
+│   ├── EntryForm.tsx        # エントリーシート編集
+│   ├── AccountManage.tsx    # アカウント管理
+│   └── MasterManage.tsx     # マスターデータ管理
+├── services/                # ビジネスロジック
+│   └── storage.ts           # データ永続化層
+├── types.ts                 # TypeScript型定義
+├── App.tsx                  # メインアプリケーション
+└── index.tsx                # エントリーポイント
+```
+
+## ドキュメント
+
+詳細な設計情報は以下のドキュメントを参照してください:
+
+- [システム設計書](docs/DESIGN.md) - データモデル、アーキテクチャ、技術仕様
+- [権限設計書](docs/PERMISSIONS.md) - ロール定義、アクセス権限、セキュリティ
+
+## 権限設計
+
+### 管理者 (ADMIN)
+- 全メーカーのエントリーシート・アカウントを管理可能
+- マスターデータの編集が可能
+
+### 一般ユーザー (STAFF)
+- 自社メーカーのエントリーシート・アカウントのみ管理可能
+- 自社アカウントの新規作成が可能
+- マスターデータの閲覧・編集は不可
+
+詳細は [docs/PERMISSIONS.md](docs/PERMISSIONS.md) を参照。
+
+## 開発
+
+### コード構成
+
+- **コンポーネント**: `components/` - UIコンポーネント
+- **ビジネスロジック**: `services/` - データ操作ロジック
+- **型定義**: `types.ts` - TypeScript型定義
+
+### スタイルガイド
+
+- Tailwind CSS のユーティリティクラスを使用
+- レスポンシブデザインは `sm:`, `md:`, `lg:` プレフィックスで制御
+- カラーパレット: `primary` (sky-500), `danger` (red-500), `warning` (yellow-500)
+
+## ライセンス
+
+Proprietary - メディコム社内用
+
+## サポート
+
+問題が発生した場合は、開発チームまでお問い合わせください。

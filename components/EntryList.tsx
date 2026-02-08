@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { EntrySheet, User } from '../types';
+import { EntrySheet, User, UserRole } from '../types';
 import { Plus, Copy, Edit3, Trash2, Search, FileWarning, ChevronDown, ChevronUp, Download, CheckSquare, Square, Image as ImageIcon, X, AlertCircle, AlertTriangle, MoreHorizontal } from 'lucide-react';
 
 interface EntryListProps {
@@ -11,15 +11,21 @@ interface EntryListProps {
   onDelete: (id: string) => void;
 }
 
-export const EntryList: React.FC<EntryListProps> = ({ sheets, onCreate, onEdit, onDuplicate, onDelete }) => {
+export const EntryList: React.FC<EntryListProps> = ({ sheets, currentUser, onCreate, onEdit, onDuplicate, onDelete }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedSheets, setExpandedSheets] = useState<Set<string>>(new Set());
   const [selectedSheets, setSelectedSheets] = useState<Set<string>>(new Set());
   const [showExportModal, setShowExportModal] = useState(false);
 
+  // Permission check: Can the current user edit/delete this sheet?
+  const canModifySheet = (sheet: EntrySheet): boolean => {
+    if (currentUser.role === UserRole.ADMIN) return true;
+    return sheet.manufacturerName === currentUser.manufacturerName;
+  };
+
   // Search Filter
-  const filteredSheets = sheets.filter(sheet => 
-    sheet.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+  const filteredSheets = sheets.filter(sheet =>
+    sheet.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     sheet.manufacturerName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -148,12 +154,13 @@ export const EntryList: React.FC<EntryListProps> = ({ sheets, onCreate, onEdit, 
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         {sheet.products.map((prod, idx) => {
             const status = getProductStatusStyle(prod);
+            const canEdit = canModifySheet(sheet);
             return (
-                <div 
-                    key={prod.id} 
-                    className={`${status.className} rounded-lg p-3 flex gap-4 items-center shadow-sm cursor-pointer transition-all`}
-                    onClick={() => onEdit(sheet, idx)}
-                    title={status.statusText ? `${status.statusText} - クリックして編集` : "クリックして編集"}
+                <div
+                    key={prod.id}
+                    className={`${status.className} rounded-lg p-3 flex gap-4 items-center shadow-sm transition-all ${canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                    onClick={() => canEdit && onEdit(sheet, idx)}
+                    title={canEdit ? (status.statusText ? `${status.statusText} - クリックして編集` : "クリックして編集") : "編集権限がありません"}
                 >
                     <div className="w-16 h-16 bg-slate-100 rounded flex-shrink-0 flex items-center justify-center border border-slate-100 overflow-hidden relative">
                         {prod.productImage ? (
@@ -279,18 +286,29 @@ export const EntryList: React.FC<EntryListProps> = ({ sheets, onCreate, onEdit, 
                         {/* Card Actions Footer */}
                         <div className="bg-slate-50 border-t border-slate-100 px-4 py-2 flex items-center justify-between">
                             <div className="flex gap-1">
-                                <button onClick={() => onEdit(sheet)} className="p-2 text-primary hover:bg-white rounded-full border border-transparent hover:border-slate-200 shadow-sm" title="編集">
+                                <button
+                                    onClick={() => onEdit(sheet)}
+                                    disabled={!canModifySheet(sheet)}
+                                    className={`p-2 rounded-full border border-transparent shadow-sm ${canModifySheet(sheet) ? 'text-primary hover:bg-white hover:border-slate-200' : 'text-slate-300 cursor-not-allowed'}`}
+                                    title={canModifySheet(sheet) ? "編集" : "編集権限がありません"}
+                                >
                                     <Edit3 size={18} />
                                 </button>
-                                <button onClick={() => onDuplicate(sheet)} className="p-2 text-slate-500 hover:bg-white rounded-full border border-transparent hover:border-slate-200 shadow-sm" title="複製">
+                                <button
+                                    onClick={() => onDuplicate(sheet)}
+                                    disabled={!canModifySheet(sheet)}
+                                    className={`p-2 rounded-full border border-transparent shadow-sm ${canModifySheet(sheet) ? 'text-slate-500 hover:bg-white hover:border-slate-200' : 'text-slate-300 cursor-not-allowed'}`}
+                                    title={canModifySheet(sheet) ? "複製" : "複製権限がありません"}
+                                >
                                     <Copy size={18} />
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => {
                                         if(window.confirm('本当に削除しますか？')) onDelete(sheet.id);
-                                    }} 
-                                    className="p-2 text-slate-400 hover:text-danger hover:bg-white rounded-full border border-transparent hover:border-slate-200 shadow-sm" 
-                                    title="削除"
+                                    }}
+                                    disabled={!canModifySheet(sheet)}
+                                    className={`p-2 rounded-full border border-transparent shadow-sm ${canModifySheet(sheet) ? 'text-slate-400 hover:text-danger hover:bg-white hover:border-slate-200' : 'text-slate-300 cursor-not-allowed'}`}
+                                    title={canModifySheet(sheet) ? "削除" : "削除権限がありません"}
                                 >
                                     <Trash2 size={18} />
                                 </button>
@@ -309,11 +327,12 @@ export const EntryList: React.FC<EntryListProps> = ({ sheets, onCreate, onEdit, 
                             <div className="border-t border-slate-200 p-3 bg-slate-50/50">
                                 <ProductGrid sheet={sheet} />
                                 <div className="mt-3 text-center">
-                                     <button 
+                                     <button
                                         onClick={() => onEdit(sheet)}
-                                        className="w-full py-2 bg-white border border-primary text-primary rounded-lg text-sm font-bold shadow-sm"
+                                        disabled={!canModifySheet(sheet)}
+                                        className={`w-full py-2 rounded-lg text-sm font-bold shadow-sm ${canModifySheet(sheet) ? 'bg-white border border-primary text-primary' : 'bg-slate-100 border border-slate-300 text-slate-400 cursor-not-allowed'}`}
                                      >
-                                        詳細編集画面へ
+                                        {canModifySheet(sheet) ? '詳細編集画面へ' : '編集権限がありません'}
                                      </button>
                                 </div>
                             </div>
@@ -382,28 +401,31 @@ export const EntryList: React.FC<EntryListProps> = ({ sheets, onCreate, onEdit, 
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onClick={e => e.stopPropagation()}>
                             <div className="flex justify-end gap-2">
-                              <button 
+                              <button
                                   onClick={() => onEdit(sheet)}
-                                  className="text-primary hover:text-sky-700 p-2 hover:bg-sky-100 rounded"
-                                  title="編集"
+                                  disabled={!canModifySheet(sheet)}
+                                  className={`p-2 rounded ${canModifySheet(sheet) ? 'text-primary hover:text-sky-700 hover:bg-sky-100' : 'text-slate-300 cursor-not-allowed'}`}
+                                  title={canModifySheet(sheet) ? "編集" : "編集権限がありません"}
                               >
                                   <Edit3 size={18} />
                               </button>
-                              <button 
+                              <button
                                   onClick={() => onDuplicate(sheet)}
-                                  className="text-slate-500 hover:text-slate-700 p-2 hover:bg-slate-200 rounded"
-                                  title="複製"
+                                  disabled={!canModifySheet(sheet)}
+                                  className={`p-2 rounded ${canModifySheet(sheet) ? 'text-slate-500 hover:text-slate-700 hover:bg-slate-200' : 'text-slate-300 cursor-not-allowed'}`}
+                                  title={canModifySheet(sheet) ? "複製" : "複製権限がありません"}
                               >
                                   <Copy size={18} />
                               </button>
-                              <button 
+                              <button
                                   onClick={() => {
                                       if(window.confirm('本当に削除しますか？この操作は取り消せません。')) {
                                           onDelete(sheet.id);
                                       }
                                   }}
-                                  className="text-slate-400 hover:text-danger p-2 hover:bg-red-50 rounded"
-                                  title="削除"
+                                  disabled={!canModifySheet(sheet)}
+                                  className={`p-2 rounded ${canModifySheet(sheet) ? 'text-slate-400 hover:text-danger hover:bg-red-50' : 'text-slate-300 cursor-not-allowed'}`}
+                                  title={canModifySheet(sheet) ? "削除" : "削除権限がありません"}
                               >
                                   <Trash2 size={18} />
                               </button>
@@ -420,11 +442,12 @@ export const EntryList: React.FC<EntryListProps> = ({ sheets, onCreate, onEdit, 
                               <td colSpan={7} className="px-4 sm:px-6 py-4">
                                   <ProductGrid sheet={sheet} />
                                   <div className="mt-4 text-right">
-                                       <button 
+                                       <button
                                           onClick={() => onEdit(sheet)}
-                                          className="text-sm text-primary hover:underline font-bold"
+                                          disabled={!canModifySheet(sheet)}
+                                          className={`text-sm font-bold ${canModifySheet(sheet) ? 'text-primary hover:underline' : 'text-slate-400 cursor-not-allowed'}`}
                                        >
-                                          すべての詳細を確認・編集する &rarr;
+                                          {canModifySheet(sheet) ? 'すべての詳細を確認・編集する →' : '編集権限がありません'}
                                        </button>
                                   </div>
                               </td>

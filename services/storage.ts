@@ -14,8 +14,8 @@ const INITIAL_USERS: User[] = [
     username: 'admin',
     password: 'password',
     displayName: 'システム管理者',
-    manufacturerName: '本部',
-    email: 'admin@pharma.com',
+    manufacturerName: 'メディコム',
+    email: 'admin@medicom.com',
     phoneNumber: '03-0000-0000',
     role: UserRole.ADMIN,
   },
@@ -27,6 +27,16 @@ const INITIAL_USERS: User[] = [
     manufacturerName: '大江戸製薬',
     email: 'k.satou@oedo-pharma.com',
     phoneNumber: '090-1234-5678',
+    role: UserRole.STAFF,
+  },
+  {
+    id: 'user2',
+    username: 'tanaka',
+    password: 'password',
+    displayName: '田中 美咲',
+    manufacturerName: '富士ファーマ',
+    email: 'm.tanaka@fuji-pharma.com',
+    phoneNumber: '080-9876-5432',
     role: UserRole.STAFF,
   },
 ];
@@ -115,6 +125,54 @@ const generateTestSheets = (): EntrySheet[] => {
           promoDepth: 100,
           promoImage: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', // Dummy
           productImage: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' // Dummy
+        }
+      ]
+    },
+    {
+      id: 'test-sheet-3',
+      updatedAt: now,
+      createdAt: now,
+      creatorId: 'user2',
+      creatorName: '田中 美咲',
+      manufacturerName: '富士ファーマ',
+      email: 'm.tanaka@fuji-pharma.com',
+      phoneNumber: '080-9876-5432',
+      title: '【富士ファーマ】夏季キャンペーン 2025',
+      status: 'completed',
+      products: [
+        {
+          id: 'prod-test-3-1',
+          shelfName: 'ビタミン剤',
+          manufacturerName: '富士ファーマ',
+          janCode: '4900000001234',
+          productName: 'ビタミンC 1000mg',
+          riskClassification: '第3類医薬品',
+          specificIngredients: [],
+          catchCopy: '毎日の健康習慣に',
+          productMessage: '夏の紫外線対策にもおすすめです。',
+          width: 90,
+          height: 120,
+          depth: 35,
+          facingCount: 2,
+          hasPromoMaterial: 'no',
+          productImage: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+        },
+        {
+          id: 'prod-test-3-2',
+          shelfName: '目薬',
+          manufacturerName: '富士ファーマ',
+          janCode: '4900000005678',
+          productName: 'スッキリ目薬 クール',
+          riskClassification: '第2類医薬品',
+          specificIngredients: [],
+          catchCopy: '疲れ目に効く',
+          productMessage: 'PC作業の多い方に人気の商品です。',
+          width: 50,
+          height: 100,
+          depth: 25,
+          facingCount: 3,
+          hasPromoMaterial: 'no',
+          productImage: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
         }
       ]
     }
