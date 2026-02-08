@@ -1,0 +1,5 @@
+{
+  "name": "PharmaPOP Entry System",
+  "description": "A simplified POP entry sheet management system for pharmacy staff. Replaces Excel with a user-friendly web interface.",
+  "requestFramePermissions": []
+}
