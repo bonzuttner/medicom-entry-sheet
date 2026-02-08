@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import JSZip from 'jszip';
 import { EntrySheet, User, UserRole } from '../types';
 import { Plus, Copy, Edit3, Trash2, Search, FileWarning, ChevronDown, ChevronUp, Download, CheckSquare, Square, Image as ImageIcon, X, AlertCircle, AlertTriangle, MoreHorizontal } from 'lucide-react';
 
@@ -16,6 +17,7 @@ export const EntryList: React.FC<EntryListProps> = ({ sheets, currentUser, onCre
   const [expandedSheets, setExpandedSheets] = useState<Set<string>>(new Set());
   const [selectedSheets, setSelectedSheets] = useState<Set<string>>(new Set());
   const [showExportModal, setShowExportModal] = useState(false);
+  const [isDownloadingImages, setIsDownloadingImages] = useState(false);
 
   // Permission check: Can the current user edit/delete this sheet?
   const canModifySheet = (sheet: EntrySheet): boolean => {
@@ -117,6 +119,99 @@ export const EntryList: React.FC<EntryListProps> = ({ sheets, currentUser, onCre
     setShowExportModal(false);
   };
 
+  const sanitizeFileName = (name: string) =>
+    name.replace(/[\\/:*?"<>|]+/g, '_').trim() || 'image';
+
+  const dataUrlToBlob = (dataUrl: string) => {
+    const match = dataUrl.match(/^data:(.+?);base64,(.+)$/);
+    if (!match) {
+      throw new Error('Invalid data URL');
+    }
+    const mimeType = match[1];
+    const base64 = match[2];
+    const binary = atob(base64);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i += 1) bytes[i] = binary.charCodeAt(i);
+    return { blob: new Blob([bytes], { type: mimeType }), mimeType };
+  };
+
+  const getExtensionFromMime = (mimeType: string) => {
+    const map: Record<string, string> = {
+      'image/jpeg': 'jpg',
+      'image/png': 'png',
+      'image/gif': 'gif',
+      'image/webp': 'webp',
+      'image/svg+xml': 'svg',
+      'image/bmp': 'bmp',
+      'image/tiff': 'tiff',
+    };
+    return map[mimeType] || 'img';
+  };
+
+  const fetchImageAsBlob = async (src: string) => {
+    if (src.startsWith('data:')) {
+      return dataUrlToBlob(src);
+    }
+    const res = await fetch(src);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch image: ${res.status}`);
+    }
+    const blob = await res.blob();
+    return { blob, mimeType: blob.type || 'application/octet-stream' };
+  };
+
+  const downloadSelectedProductImages = async () => {
+    if (selectedSheets.size === 0) {
+      alert('画像をダウンロードするには、対象のエントリーシートを選択してください。');
+      return;
+    }
+
+    const targetSheets = sheets.filter(s => selectedSheets.has(s.id));
+    const images: Array<{ fileName: string; src: string }> = [];
+
+    targetSheets.forEach((sheet) => {
+      sheet.products.forEach((prod) => {
+        if (!prod.productImage) return;
+        const baseName = sanitizeFileName(prod.productName || prod.id);
+        const fileName = baseName;
+        images.push({ fileName, src: prod.productImage });
+      });
+    });
+
+    if (images.length === 0) {
+      alert('選択したエントリーシートに商品画像がありません。');
+      return;
+    }
+
+    try {
+      setIsDownloadingImages(true);
+      const zip = new JSZip();
+
+      for (const img of images) {
+        const { blob, mimeType } = await fetchImageAsBlob(img.src);
+        const ext = getExtensionFromMime(mimeType);
+        zip.file(`${img.fileName}.${ext}`, blob);
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `entry_sheet_images_${new Date().toISOString().slice(0, 10)}.zip`;
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('画像の一括ダウンロードに失敗しました。');
+      console.error(err);
+    } finally {
+      setIsDownloadingImages(false);
+    }
+  };
+
   // Helper to determine product card styling based on completion status
   const getProductStatusStyle = (prod: any) => {
     const isBasicFilled = prod.productName && prod.janCode;
@@ -207,6 +302,16 @@ export const EntryList: React.FC<EntryListProps> = ({ sheets, currentUser, onCre
             >
               <Download size={20} />
               CSV出力
+            </button>
+            <button 
+              onClick={downloadSelectedProductImages}
+              disabled={isDownloadingImages}
+              className={`flex-1 sm:flex-none justify-center px-4 py-3 rounded-lg flex items-center gap-2 font-bold shadow-sm transition-all
+                ${isDownloadingImages ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'}
+              `}
+            >
+              <ImageIcon size={20} />
+              {isDownloadingImages ? '画像準備中...' : '商品画像一括DL'}
             </button>
             <button 
               onClick={onCreate}
