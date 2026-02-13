@@ -29,6 +29,8 @@ export interface ProductEntry {
   specificIngredients: string[];
   catchCopy: string;
   productMessage: string;
+  productNotes?: string;
+  productAttachments?: Attachment[];
   width: number;
   height: number;
   depth: number;
@@ -53,6 +55,8 @@ export interface EntrySheet {
   email: string;
   phoneNumber: string;
   title: string;
+  notes?: string;
+  attachments?: Attachment[];
   status: 'draft' | 'completed';
   products: ProductEntry[];
 }
@@ -61,4 +65,11 @@ export interface StoreData {
   users: User[];
   sheets: EntrySheet[];
   master: MasterData;
+}
+
+export interface Attachment {
+  name: string;
+  size: number;
+  type: string;
+  dataUrl: string;
 }

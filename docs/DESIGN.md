@@ -77,6 +77,8 @@ interface EntrySheet {
   email: string;                 // 連絡先メール
   phoneNumber: string;           // 連絡先電話番号
   title: string;                 // シートタイトル
+  notes?: string;                // エントリシート補足情報
+  attachments?: Attachment[];    // シート添付ファイル
   status: 'draft' | 'completed'; // ステータス
   products: ProductEntry[];      // 商品リスト
   createdAt: string;             // 作成日時 (ISO 8601)
@@ -98,13 +100,15 @@ interface ProductEntry {
   id: string;                    // 商品ID (UUID)
   shelfName: string;             // 棚割名（マスターから選択）
   manufacturerName: string;      // メーカー名
-  janCode: string;               // JANコード (8桁または13桁)
+  janCode: string;               // JANコード (8/13/16桁)
   productName: string;           // 商品名
   productImage?: string;         // 商品画像 (Base64 or URL)
   riskClassification: string;    // リスク分類（マスターから選択）
   specificIngredients: string[]; // 特定成分（マスターから複数選択）
   catchCopy: string;             // キャッチコピー
   productMessage: string;        // 商品メッセージ
+  productNotes?: string;         // 商品補足事項
+  productAttachments?: Attachment[]; // 商品添付ファイル
 
   // サイズ情報
   width: number;                 // 幅 (mm)
@@ -122,12 +126,23 @@ interface ProductEntry {
   promoDepth?: number;           // 販促物 奥行 (mm)
   promoImage?: string;           // 販促物画像 (Base64 or URL)
 }
+
+interface Attachment {
+  name: string;                  // ファイル名
+  size: number;                  // ファイルサイズ (bytes)
+  type: string;                  // MIME Type
+  dataUrl: string;               // Base64 Data URL (現状はクライアント保持)
+}
 ```
 
 **バリデーションルール:**
-- 必須項目: `productName`, `janCode`
+- 必須項目（シート）: `creatorName`, `email`, `phoneNumber`, `title`（下書き保存でも必須）
+- 必須項目（商品・完了時）: `productName`, `janCode`, `productImage`
+- `janCode` は `8/13/16` 桁のみ許容
+- 商品画像サイズは `2MB以上50MB以下`（UIには記載せず、エラー時に表示）
+- 添付ファイルは `25MB以下`
 - `hasPromoMaterial === 'yes'` の場合、`promoWidth`, `promoImage` が必須
-- 商品画像がない場合は警告表示（黄色）
+- 棚割り幅合計 `Σ(幅 × フェイシング数)` が `840mm以上` の場合、完了不可（下書き保存は可能）
 
 ### 4. マスターデータ (MasterData)
 
@@ -317,9 +332,9 @@ const [masterData, setMasterData] = useState<MasterData>(...);
 
 | ユーザー名 | パスワード | メーカー | 権限 |
 |----------|----------|---------|------|
-| admin | password | メディコム | ADMIN |
-| satou | password | 大江戸製薬 | STAFF |
-| tanaka | password | 富士ファーマ | STAFF |
+| admin | Password1! | メディコム | ADMIN |
+| satou | Satou1!! | 大江戸製薬 | STAFF |
+| tanaka | Tanaka1! | 富士ファーマ | STAFF |
 
 ### エントリーシート
 

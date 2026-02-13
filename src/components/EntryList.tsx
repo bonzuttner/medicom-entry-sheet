@@ -449,7 +449,7 @@ export const EntryList: React.FC<EntryListProps> = ({ sheets, currentUser, onCre
           </div>
 
           {/* DESKTOP VIEW: Table (Hidden on mobile) */}
-          <div className="hidden md:block bg-white shadow-sm rounded-xl border border-slate-200 overflow-hidden">
+          <div className="hidden md:block bg-white rounded-xl border border-slate-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-200 table-fixed">
                 <thead className="bg-slate-50">

@@ -24,10 +24,24 @@ const hasDuplicateUsernames = (users: User[]): boolean => {
   return false;
 };
 
+const passwordRule = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+
+const validateIncomingPassword = (incomingUser: User, existingUser?: User): string | null => {
+  const incomingPassword = incomingUser.password;
+  if (!incomingPassword) {
+    return existingUser ? null : 'Password is required for new users';
+  }
+  if (isHashedPassword(incomingPassword)) return null;
+  return passwordRule.test(incomingPassword)
+    ? null
+    : 'Password must include uppercase, lowercase, number, symbol, and be at least 8 characters';
+};
+
 const resolvePasswordForSave = (incomingUser: User, existingUser?: User): string => {
   const incomingPassword = incomingUser.password;
   if (!incomingPassword) {
-    return existingUser?.password || hashPassword('password');
+    if (existingUser?.password) return existingUser.password;
+    return hashPassword('Password1!');
   }
   return isHashedPassword(incomingPassword)
     ? incomingPassword
@@ -59,6 +73,15 @@ export default async function handler(req: any, res: any) {
     if (hasDuplicateUsernames(incomingUsers)) {
       sendError(res, 400, 'Duplicate usernames are not allowed');
       return;
+    }
+
+    for (const incomingUser of incomingUsers) {
+      const existingUser = store.users.find((u) => u.id === incomingUser.id);
+      const passwordError = validateIncomingPassword(incomingUser, existingUser);
+      if (passwordError) {
+        sendError(res, 400, passwordError);
+        return;
+      }
     }
 
     if (isAdmin(currentUser)) {

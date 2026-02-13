@@ -5,7 +5,7 @@ const INITIAL_USERS: User[] = [
   {
     id: 'admin1',
     username: 'admin',
-    password: hashPassword('password'),
+    password: hashPassword('Password1!'),
     displayName: 'システム管理者',
     manufacturerName: 'メディコム',
     email: 'admin@medicom.com',
@@ -15,7 +15,7 @@ const INITIAL_USERS: User[] = [
   {
     id: 'user1',
     username: 'satou',
-    password: hashPassword('password'),
+    password: hashPassword('Satou1!!'),
     displayName: '佐藤 健太',
     manufacturerName: '大江戸製薬',
     email: 'k.satou@oedo-pharma.com',
@@ -25,7 +25,7 @@ const INITIAL_USERS: User[] = [
   {
     id: 'user2',
     username: 'tanaka',
-    password: hashPassword('password'),
+    password: hashPassword('Tanaka1!'),
     displayName: '田中 美咲',
     manufacturerName: '富士ファーマ',
     email: 'm.tanaka@fuji-pharma.com',

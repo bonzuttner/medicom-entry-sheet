@@ -33,6 +33,8 @@ export interface ProductEntry {
   specificIngredients: string[]; // Master: Multi-select
   catchCopy: string;
   productMessage: string;
+  productNotes?: string;
+  productAttachments?: Attachment[];
   
   // Dimensions
   width: number;
@@ -64,8 +66,17 @@ export interface EntrySheet {
   email: string; // Auto (Editable)
   phoneNumber: string; // Auto (Editable)
   title: string;
+  notes?: string;
+  attachments?: Attachment[];
   status: 'draft' | 'completed';
   products: ProductEntry[];
+}
+
+export interface Attachment {
+  name: string;
+  size: number;
+  type: string;
+  dataUrl: string;
 }
 
 // UI State Types

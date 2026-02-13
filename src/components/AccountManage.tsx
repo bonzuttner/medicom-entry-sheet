@@ -19,6 +19,7 @@ export const AccountManage: React.FC<AccountManageProps> = ({
 }) => {
   const [editingUser, setEditingUser] = useState<Partial<User> | null>(null);
   const [validationError, setValidationError] = useState<string>('');
+  const passwordRule = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
   const manufacturerOptions = useMemo(
     () =>
       Array.from(
@@ -39,8 +40,13 @@ export const AccountManage: React.FC<AccountManageProps> = ({
   };
 
   const handleSave = () => {
-    if (!editingUser?.username || !editingUser?.displayName || !editingUser?.manufacturerName) {
-      setValidationError('ログインID、表示名、メーカー名は必須です');
+    if (!editingUser?.username || !editingUser?.displayName || !editingUser?.manufacturerName || !editingUser?.password) {
+      setValidationError('ログインID、担当者名、メーカー名、パスワードは必須です');
+      return;
+    }
+
+    if (!passwordRule.test(editingUser.password)) {
+      setValidationError('パスワードは大文字英字・小文字英字・数字・記号を含む8文字以上で入力してください');
       return;
     }
 
@@ -60,7 +66,6 @@ export const AccountManage: React.FC<AccountManageProps> = ({
 
     const existingUser = users.find(u => u.id === editingUser.id);
     const isNewUser = !editingUser.id;
-    const hasPasswordInput = Boolean(editingUser.password && editingUser.password.length > 0);
 
     const newUser: User = {
         id: editingUser.id || Date.now().toString(),
@@ -70,9 +75,7 @@ export const AccountManage: React.FC<AccountManageProps> = ({
         email: editingUser.email || '',
         phoneNumber: editingUser.phoneNumber || '',
         role: editingUser.role || UserRole.STAFF,
-        password: hasPasswordInput
-          ? editingUser.password
-          : (isNewUser ? 'password' : existingUser?.password),
+        password: editingUser.password || (isNewUser ? '' : existingUser?.password),
     };
     onSaveUser(newUser);
     setEditingUser(null);
@@ -120,7 +123,7 @@ export const AccountManage: React.FC<AccountManageProps> = ({
                         <input className="w-full border p-2 rounded" value={editingUser.username || ''} onChange={e => setEditingUser({...editingUser, username: e.target.value})} />
                     </div>
                      <div>
-                        <label className="block text-sm font-medium text-slate-700">表示名 <span className="text-red-500">*</span></label>
+                        <label className="block text-sm font-medium text-slate-700">担当者名 <span className="text-red-500">*</span></label>
                         <input className="w-full border p-2 rounded" value={editingUser.displayName || ''} onChange={e => setEditingUser({...editingUser, displayName: e.target.value})} />
                     </div>
                      <div>
@@ -153,19 +156,17 @@ export const AccountManage: React.FC<AccountManageProps> = ({
                         <input className="w-full border p-2 rounded" value={editingUser.phoneNumber || ''} onChange={e => setEditingUser({...editingUser, phoneNumber: e.target.value})} />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-slate-700">パスワード</label>
+                        <label className="block text-sm font-medium text-slate-700">パスワード <span className="text-red-500">*</span></label>
                         <input
                             type="password"
                             className="w-full border p-2 rounded"
                             value={editingUser.password || ''}
                             onChange={e => setEditingUser({ ...editingUser, password: e.target.value })}
-                            placeholder={editingUser.id ? '変更する場合のみ入力' : '未入力なら password'}
+                            placeholder="大文字・小文字・数字・記号を含む8文字以上"
                             autoComplete="new-password"
                         />
                         <p className="text-xs text-slate-500 mt-1">
-                            {editingUser.id
-                              ? '※ 空欄の場合は現在のパスワードを維持します'
-                              : '※ 空欄の場合は初期パスワード password になります'}
+                            ※ 大文字英字・小文字英字・数字・記号を含む8文字以上
                         </p>
                     </div>
                 </div>
@@ -180,7 +181,7 @@ export const AccountManage: React.FC<AccountManageProps> = ({
             <table className="w-full">
                 <thead className="bg-slate-50 border-b">
                     <tr>
-                        <th className="p-4 text-left">表示名</th>
+                        <th className="p-4 text-left">担当者名</th>
                         <th className="p-4 text-left">ID</th>
                         <th className="p-4 text-left">メーカー名</th>
                         <th className="p-4 text-left">権限</th>

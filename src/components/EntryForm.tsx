@@ -49,6 +49,94 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const readFileAsDataUrl = (file: File): Promise<string> => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('failed to read file'));
+    reader.readAsDataURL(file);
+  });
+
+  const handleAddAttachments = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const MAX_FILE_BYTES = 25 * 1024 * 1024;
+    const next = [...(formData.attachments ?? [])];
+    for (const file of Array.from(files)) {
+      if (file.size > MAX_FILE_BYTES) {
+        alert(`ファイルサイズは25MB以下にしてください: ${file.name}`);
+        continue;
+      }
+      try {
+        const dataUrl = await readFileAsDataUrl(file);
+        next.push({
+          name: file.name,
+          size: file.size,
+          type: file.type || '',
+          dataUrl,
+        });
+      } catch {
+        alert(`ファイルの読み込みに失敗しました: ${file.name}`);
+      }
+    }
+    setFormData(prev => ({ ...prev, attachments: next }));
+  };
+
+  const handleRemoveAttachment = (index: number) => {
+    const next = [...(formData.attachments ?? [])];
+    next.splice(index, 1);
+    setFormData(prev => ({ ...prev, attachments: next }));
+  };
+
+  const handleAddProductAttachments = async (productIndex: number, files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const MAX_FILE_BYTES = 25 * 1024 * 1024;
+    const current = formData.products[productIndex];
+    const next = [...(current.productAttachments ?? [])];
+    for (const file of Array.from(files)) {
+      if (file.size > MAX_FILE_BYTES) {
+        alert(`ファイルサイズは25MB以下にしてください: ${file.name}`);
+        continue;
+      }
+      try {
+        const dataUrl = await readFileAsDataUrl(file);
+        next.push({
+          name: file.name,
+          size: file.size,
+          type: file.type || '',
+          dataUrl,
+        });
+      } catch {
+        alert(`ファイルの読み込みに失敗しました: ${file.name}`);
+      }
+    }
+    handleProductChange(productIndex, 'productAttachments', next);
+  };
+
+  const handleRemoveProductAttachment = (productIndex: number, fileIndex: number) => {
+    const current = formData.products[productIndex];
+    const next = [...(current.productAttachments ?? [])];
+    next.splice(fileIndex, 1);
+    handleProductChange(productIndex, 'productAttachments', next);
+  };
+
+  const formatDate = (value?: string): string => {
+    if (!value) return '';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleString('ja-JP');
+  };
+
+  const formatBytes = (value: number): string => {
+    if (!Number.isFinite(value)) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let size = value;
+    let unit = 0;
+    while (size >= 1024 && unit < units.length - 1) {
+      size /= 1024;
+      unit += 1;
+    }
+    return `${size.toFixed(size >= 10 || unit === 0 ? 0 : 1)} ${units[unit]}`;
+  };
+
   const findReusableProductByName = (
     productName: string,
     currentIndex: number,
@@ -84,6 +172,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     specificIngredients: [...product.specificIngredients].sort(),
     catchCopy: product.catchCopy,
     productMessage: product.productMessage,
+    productNotes: product.productNotes || '',
     width: product.width,
     height: product.height,
     depth: product.depth,
@@ -178,6 +267,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       specificIngredients: [],
       catchCopy: '',
       productMessage: '',
+      productNotes: '',
+      productAttachments: [],
       width: 0,
       height: 0,
       depth: 0,
@@ -205,12 +296,28 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
   const saveSheet = (status: 'draft' | 'completed') => {
     // Basic validation
+    if (!formData.creatorName) {
+        alert("作成者を入力してください");
+        return;
+    }
+    if (!formData.email) {
+        alert("担当者メールを入力してください");
+        return;
+    }
+    if (!formData.phoneNumber) {
+        alert("担当者電話番号を入力してください");
+        return;
+    }
     if (!formData.title) {
         alert("タイトルを入力してください");
         return;
     }
     
     if (status === 'completed') {
+        if (shelfWidthTotal >= 840) {
+            alert("棚割り幅合計が840mm以上のため完了できません。");
+            return;
+        }
         // Strict validation
         for (const p of formData.products) {
             if (!p.productName || !p.janCode || !p.productImage) {
@@ -240,8 +347,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     input.onchange = (e) => {
         const file = (e.target as HTMLInputElement).files?.[0];
         if (file) {
-            if (file.size > 25 * 1024 * 1024) {
-                alert("ファイルサイズは25MB以下にしてください。");
+            if (file.size < 2 * 1024 * 1024 || file.size > 50 * 1024 * 1024) {
+                alert("画像容量は2MB以上50MB以下にしてください。");
                 return;
             }
             // Mock read
@@ -256,6 +363,12 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   };
 
   const activeProduct = formData.products[activeTab];
+  const shelfWidthTotal = formData.products.reduce((sum, product) => {
+    const width = Number(product.width) || 0;
+    const facing = Number(product.facingCount) || 0;
+    return sum + width * facing;
+  }, 0);
+  const isShelfWidthOver = shelfWidthTotal >= 840;
 
   return (
     <div className="pb-24 sm:pb-20">
@@ -288,42 +401,126 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       {/* Sheet Info (Header) */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 mb-4 sm:mb-6">
         <h3 className="text-lg font-bold text-slate-800 border-b pb-4 mb-4">シート基本情報</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            <div className="col-span-1 md:col-span-2">
-                <label className="block text-sm font-bold text-slate-700 mb-2">タイトル <span className="text-danger">*</span></label>
-                <input 
-                    type="text" 
-                    value={formData.title} 
-                    onChange={(e) => handleHeaderChange('title', e.target.value)}
-                    className="w-full border-slate-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary py-3 px-4 text-base sm:text-lg" 
-                    placeholder="例：2024年秋の新商品プロモーション"
-                />
+        <div className="mb-6">
+            <h4 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <span className="w-1 h-5 bg-amber-500 rounded-full"></span>
+                作成情報
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                <div>
+                    <label className="block text-sm font-medium text-slate-500 mb-1">更新日 (自動入力)</label>
+                    <div className="p-3 bg-slate-100 rounded-lg text-slate-700">{formatDate(formData.updatedAt)}</div>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-slate-500 mb-1">作成日 (自動入力)</label>
+                    <div className="p-3 bg-slate-100 rounded-lg text-slate-700">{formatDate(formData.createdAt)}</div>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-slate-500 mb-1">メーカー名 (自動入力)</label>
+                    <div className="p-3 bg-slate-100 rounded-lg text-slate-700">{formData.manufacturerName}</div>
+                </div>
+                 <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">作成者 <span className="text-danger">*</span></label>
+                    <input 
+                        type="text" 
+                        value={formData.creatorName} 
+                        onChange={(e) => handleHeaderChange('creatorName', e.target.value)}
+                        className="w-full border-slate-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary p-3" 
+                    />
+                </div>
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">担当者メール <span className="text-danger">*</span></label>
+                    <input 
+                        type="email" 
+                        value={formData.email} 
+                        onChange={(e) => handleHeaderChange('email', e.target.value)}
+                        className="w-full border-slate-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary p-3" 
+                    />
+                </div>
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">担当者電話番号 <span className="text-danger">*</span></label>
+                    <input 
+                        type="tel" 
+                        value={formData.phoneNumber} 
+                        onChange={(e) => handleHeaderChange('phoneNumber', e.target.value)}
+                        className="w-full border-slate-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary p-3" 
+                    />
+                </div>
             </div>
-            <div>
-                <label className="block text-sm font-medium text-slate-500 mb-1">メーカー名 (自動入力)</label>
-                <div className="p-3 bg-slate-100 rounded-lg text-slate-700">{formData.manufacturerName}</div>
-            </div>
-             <div>
-                <label className="block text-sm font-medium text-slate-500 mb-1">作成者 (自動入力)</label>
-                <div className="p-3 bg-slate-100 rounded-lg text-slate-700">{formData.creatorName}</div>
-            </div>
-            <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">担当者メール <span className="text-danger">*</span></label>
-                <input 
-                    type="email" 
-                    value={formData.email} 
-                    onChange={(e) => handleHeaderChange('email', e.target.value)}
-                    className="w-full border-slate-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary p-3" 
-                />
-            </div>
-            <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">担当者電話番号 <span className="text-danger">*</span></label>
-                <input 
-                    type="tel" 
-                    value={formData.phoneNumber} 
-                    onChange={(e) => handleHeaderChange('phoneNumber', e.target.value)}
-                    className="w-full border-slate-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary p-3" 
-                />
+        </div>
+
+        <div>
+            <h4 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <span className="w-1 h-5 bg-sky-500 rounded-full"></span>
+                詳細情報
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                <div className="col-span-1 md:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">タイトル <span className="text-danger">*</span></label>
+                    <input 
+                        type="text" 
+                        value={formData.title} 
+                        onChange={(e) => handleHeaderChange('title', e.target.value)}
+                        className="w-full border-slate-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary py-3 px-4 text-base sm:text-lg" 
+                        placeholder="例：2024年秋の新商品プロモーション"
+                    />
+                </div>
+                <div className="col-span-1 md:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">エントリシート補足情報</label>
+                    <textarea
+                        rows={3}
+                        value={formData.notes || ''}
+                        onChange={(e) => handleHeaderChange('notes', e.target.value)}
+                        className="w-full border-slate-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary p-3"
+                        placeholder="自由入力"
+                    />
+                </div>
+                <div className="col-span-1 md:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">添付ファイル</label>
+                    <input
+                        type="file"
+                        multiple
+                        className="block w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
+                        onChange={(e) => handleAddAttachments(e.target.files)}
+                    />
+                    <p className="text-xs text-slate-500 mt-1">※ 25MB以下</p>
+                    {(formData.attachments ?? []).length > 0 && (
+                        <ul className="mt-3 space-y-2">
+                            {(formData.attachments ?? []).map((file, index) => (
+                                <li key={`${file.name}-${index}`} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                                    <span className="text-slate-700">
+                                        {file.name} <span className="text-slate-400">({formatBytes(file.size)})</span>
+                                    </span>
+                                    <div className="flex items-center gap-3">
+                                        <a
+                                            href={file.dataUrl}
+                                            download={file.name}
+                                            className="text-primary hover:underline"
+                                        >
+                                            ダウンロード
+                                        </a>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveAttachment(index)}
+                                            className="text-danger hover:underline"
+                                        >
+                                            削除
+                                        </button>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+                <div className="col-span-1 md:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">棚割り幅合計 (mm) ＊自動計算</label>
+                    <div className={`p-3 rounded-lg ${isShelfWidthOver ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-slate-100 text-slate-700'}`}>
+                        {shelfWidthTotal.toLocaleString('ja-JP')} mm
+                    </div>
+                    <p className={`text-xs mt-1 ${isShelfWidthOver ? 'text-red-600' : 'text-slate-500'}`}>
+                    商品情報ごとの「個装サイズ(幅) × フェイシング数」の合計値。840mm以下を推奨。
+                    </p>
+                </div>
             </div>
         </div>
       </div>
@@ -372,6 +569,36 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                 商品情報
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">棚割名 <span className="text-danger">*</span></label>
+                    <select 
+                        className="w-full border-slate-300 rounded-lg py-3 px-3 bg-white"
+                        value={activeProduct.shelfName}
+                        onChange={(e) => handleProductChange(activeTab, 'shelfName', e.target.value)}
+                    >
+                        {masterData.shelfNames.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                </div>
+                <div>
+                     <label className="block text-sm font-bold text-slate-700 mb-2">メーカー名 <span className="text-danger">*</span></label>
+                     <input 
+                        type="text" 
+                        className="w-full border-slate-300 rounded-lg py-3 px-3 focus:ring-primary focus:border-primary"
+                        value={activeProduct.manufacturerName}
+                        onChange={(e) => handleProductChange(activeTab, 'manufacturerName', e.target.value)}
+                     />
+                </div>
+                 <div>
+                     <label className="block text-sm font-bold text-slate-700 mb-2">JANコード <span className="text-danger">*</span> <span className="text-xs font-normal text-slate-500">(8, 13, 16桁)</span></label>
+                     <input 
+                        type="text" 
+                        className="w-full border-slate-300 rounded-lg py-3 px-3 focus:ring-primary focus:border-primary font-mono"
+                        placeholder="1234567890123"
+                        value={activeProduct.janCode}
+                        onChange={(e) => handleProductChange(activeTab, 'janCode', e.target.value.replace(/[^0-9]/g, ''))}
+                        maxLength={16}
+                     />
+                </div>
                  <div className="md:col-span-2">
                      <label className="block text-sm font-bold text-slate-700 mb-2">商品名 <span className="text-danger">*</span></label>
                      <input 
@@ -382,7 +609,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                         onChange={(e) => handleProductNameChange(activeTab, e.target.value)}
                         onBlur={(e) => maybeSuggestReusableProduct(activeTab, e.target.value)}
                      />
-                 </div>
+                </div>
                  {/* Product Image - Prominent */}
                  <div className="md:col-span-2 bg-slate-50 p-4 sm:p-6 rounded-xl border border-slate-200 mb-2">
                     <label className="block text-base font-bold text-slate-700 mb-3">
@@ -406,7 +633,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                             )}
                         </div>
                         <div className="flex-1 text-sm text-slate-600">
-                            <p className="mb-2"><strong>推奨:</strong> 300dpi相当 (2500px以上)。25MB以下。</p>
+                            <p className="mb-2"><strong>推奨:</strong> 300dpi相当 (2500px以上)。</p>
                             <p className="mb-3 text-slate-500">※A4で印刷可能な高解像度画像をアップロードしてください。容量が大きい場合は担当者へメール送付してください。</p>
                             <button 
                                 onClick={() => handleImageUpload(activeTab, 'productImage')}
@@ -416,95 +643,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                             </button>
                         </div>
                     </div>
-                </div>
-
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">棚割名 <span className="text-danger">*</span></label>
-                    <select 
-                        className="w-full border-slate-300 rounded-lg py-3 px-3 bg-white"
-                        value={activeProduct.shelfName}
-                        onChange={(e) => handleProductChange(activeTab, 'shelfName', e.target.value)}
-                    >
-                        {masterData.shelfNames.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
-                </div>
-                <div>
-                     <label className="block text-sm font-bold text-slate-700 mb-2">リスク分類 <span className="text-danger">*</span></label>
-                     <select 
-                        className="w-full border-slate-300 rounded-lg py-3 px-3 bg-white"
-                        value={activeProduct.riskClassification}
-                        onChange={(e) => handleProductChange(activeTab, 'riskClassification', e.target.value)}
-                    >
-                        {masterData.riskClassifications.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
-                </div>
-                 <div>
-                     <label className="block text-sm font-bold text-slate-700 mb-2">JANコード <span className="text-danger">*</span> <span className="text-xs font-normal text-slate-500">(8, 13, 16桁)</span></label>
-                     <input 
-                        type="text" 
-                        className="w-full border-slate-300 rounded-lg py-3 px-3 focus:ring-primary focus:border-primary font-mono"
-                        placeholder="1234567890123"
-                        value={activeProduct.janCode}
-                        onChange={(e) => handleProductChange(activeTab, 'janCode', e.target.value.replace(/[^0-9]/g, ''))}
-                        maxLength={16}
-                     />
-                </div>
-                 <div>
-                     <label className="block text-sm font-bold text-slate-700 mb-2">メーカー名 <span className="text-danger">*</span></label>
-                     <input 
-                        type="text" 
-                        className="w-full border-slate-300 rounded-lg py-3 px-3 focus:ring-primary focus:border-primary"
-                        value={activeProduct.manufacturerName}
-                        onChange={(e) => handleProductChange(activeTab, 'manufacturerName', e.target.value)}
-                     />
-                </div>
-                 <div className="md:col-span-2">
-                     <label className="block text-sm font-bold text-slate-700 mb-2">特定成分</label>
-                     <div className="flex flex-wrap gap-2 sm:gap-3">
-                        {masterData.specificIngredients.map(ing => (
-                            <label key={ing} className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-full px-3 py-2 cursor-pointer hover:bg-slate-100 mb-1">
-                                <input 
-                                    type="checkbox" 
-                                    className="form-checkbox text-primary rounded h-5 w-5 mr-2"
-                                    checked={activeProduct.specificIngredients.includes(ing)}
-                                    onChange={() => handleSpecificIngredientsChange(activeTab, ing)}
-                                />
-                                <span className="text-sm text-slate-700">{ing}</span>
-                            </label>
-                        ))}
-                     </div>
-                </div>
-            </div>
-        </section>
-
-        <hr className="my-8 border-slate-100" />
-
-        {/* Product: Sales Points */}
-        <section className="mb-10">
-            <h4 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                <span className="w-1 h-6 bg-indigo-500 rounded-full"></span>
-                セールスポイント
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                     <label className="block text-sm font-bold text-slate-700 mb-2">キャッチコピー</label>
-                     <textarea 
-                        rows={3}
-                        className="w-full border-slate-300 rounded-lg py-3 px-3 focus:ring-primary focus:border-primary"
-                        placeholder="例：胃のもたれには〇〇胃薬"
-                        value={activeProduct.catchCopy}
-                        onChange={(e) => handleProductChange(activeTab, 'catchCopy', e.target.value)}
-                     />
-                </div>
-                 <div>
-                     <label className="block text-sm font-bold text-slate-700 mb-2">商品メッセージ (制作反映希望)</label>
-                     <textarea 
-                        rows={3}
-                        className="w-full border-slate-300 rounded-lg py-3 px-3 focus:ring-primary focus:border-primary"
-                        placeholder="具体的な強みなど"
-                        value={activeProduct.productMessage}
-                        onChange={(e) => handleProductChange(activeTab, 'productMessage', e.target.value)}
-                     />
                 </div>
             </div>
         </section>
@@ -559,15 +697,52 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
         <hr className="my-8 border-slate-100" />
 
-        {/* Product: Promotion Info */}
-        <section className="mb-6">
+        {/* Product: Risk & Ingredients */}
+        <section className="mb-10">
             <h4 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                <span className="w-1 h-6 bg-orange-500 rounded-full"></span>
-                販促情報
+                <span className="w-1 h-6 bg-emerald-500 rounded-full"></span>
+                リスク・成分
             </h4>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                 <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                     <label className="block text-sm font-bold text-slate-700 mb-2">リスク分類 <span className="text-danger">*</span></label>
+                     <select 
+                        className="w-full border-slate-300 rounded-lg py-3 px-3 bg-white"
+                        value={activeProduct.riskClassification}
+                        onChange={(e) => handleProductChange(activeTab, 'riskClassification', e.target.value)}
+                    >
+                        {masterData.riskClassifications.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                </div>
+                <div className="md:col-span-2">
+                     <label className="block text-sm font-bold text-slate-700 mb-2">特定成分</label>
+                     <div className="flex flex-wrap gap-2 sm:gap-3">
+                        {masterData.specificIngredients.map(ing => (
+                            <label key={ing} className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-full px-3 py-2 cursor-pointer hover:bg-slate-100 mb-1">
+                                <input 
+                                    type="checkbox" 
+                                    className="form-checkbox text-primary rounded h-5 w-5 mr-2"
+                                    checked={activeProduct.specificIngredients.includes(ing)}
+                                    onChange={() => handleSpecificIngredientsChange(activeTab, ing)}
+                                />
+                                <span className="text-sm text-slate-700">{ing}</span>
+                            </label>
+                        ))}
+                     </div>
+                </div>
+            </div>
+        </section>
+
+        <hr className="my-8 border-slate-100" />
+
+        {/* Product: Arrival Date */}
+        <section className="mb-10">
+            <h4 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                <span className="w-1 h-6 bg-cyan-500 rounded-full"></span>
+                送込み店舗着日
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
                      <label className="block text-sm font-bold text-slate-700 mb-2">送込み店舗着日</label>
                      <input 
                         type="date" 
@@ -576,6 +751,51 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                         onChange={(e) => handleProductChange(activeTab, 'arrivalDate', e.target.value)}
                      />
                 </div>
+            </div>
+        </section>
+
+        <hr className="my-8 border-slate-100" />
+
+        {/* Product: Sales Points */}
+        <section className="mb-10">
+            <h4 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                <span className="w-1 h-6 bg-indigo-500 rounded-full"></span>
+                セールスポイント
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                     <label className="block text-sm font-bold text-slate-700 mb-2">キャッチコピー</label>
+                     <textarea 
+                        rows={3}
+                        className="w-full border-slate-300 rounded-lg py-3 px-3 focus:ring-primary focus:border-primary"
+                        placeholder="例：胃のもたれには〇〇胃薬"
+                        value={activeProduct.catchCopy}
+                        onChange={(e) => handleProductChange(activeTab, 'catchCopy', e.target.value)}
+                     />
+                </div>
+                 <div>
+                     <label className="block text-sm font-bold text-slate-700 mb-2">商品メッセージ (制作反映希望)</label>
+                     <textarea 
+                        rows={3}
+                        className="w-full border-slate-300 rounded-lg py-3 px-3 focus:ring-primary focus:border-primary"
+                        placeholder="具体的な強みなど"
+                        value={activeProduct.productMessage}
+                        onChange={(e) => handleProductChange(activeTab, 'productMessage', e.target.value)}
+                     />
+                </div>
+            </div>
+        </section>
+
+        <hr className="my-8 border-slate-100" />
+
+        {/* Product: Promotion Info */}
+        <section className="mb-6">
+            <h4 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                <span className="w-1 h-6 bg-orange-500 rounded-full"></span>
+                販促情報
+            </h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                  <div>
                      <label className="block text-sm font-bold text-slate-700 mb-2">販促物の有無 <span className="text-danger">*</span></label>
                      <select 
@@ -661,6 +881,65 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     </div>
                 </div>
             )}
+        </section>
+
+        <hr className="my-8 border-slate-100" />
+
+        {/* Product: Other Info */}
+        <section className="mb-6">
+            <h4 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                <span className="w-1 h-6 bg-slate-500 rounded-full"></span>
+                その他
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">補足事項</label>
+                    <textarea
+                        rows={3}
+                        className="w-full border-slate-300 rounded-lg py-3 px-3 focus:ring-primary focus:border-primary"
+                        placeholder="自由入力"
+                        value={activeProduct.productNotes || ''}
+                        onChange={(e) => handleProductChange(activeTab, 'productNotes', e.target.value)}
+                    />
+                </div>
+                <div className="md:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">添付ファイル</label>
+                    <input
+                        type="file"
+                        multiple
+                        className="block w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
+                        onChange={(e) => handleAddProductAttachments(activeTab, e.target.files)}
+                    />
+                    <p className="text-xs text-slate-500 mt-1">※ 25MB以下</p>
+                    {(activeProduct.productAttachments ?? []).length > 0 && (
+                        <ul className="mt-3 space-y-2">
+                            {(activeProduct.productAttachments ?? []).map((file, index) => (
+                                <li key={`${file.name}-${index}`} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                                    <span className="text-slate-700">
+                                        {file.name} <span className="text-slate-400">({formatBytes(file.size)})</span>
+                                    </span>
+                                    <div className="flex items-center gap-3">
+                                        <a
+                                            href={file.dataUrl}
+                                            download={file.name}
+                                            className="text-primary hover:underline"
+                                        >
+                                            ダウンロード
+                                        </a>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveProductAttachment(activeTab, index)}
+                                            className="text-danger hover:underline"
+                                        >
+                                            削除
+                                        </button>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            </div>
         </section>
 
       </div>

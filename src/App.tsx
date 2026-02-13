@@ -149,6 +149,8 @@ const App: React.FC = () => {
         email: currentUser.email,
         phoneNumber: currentUser.phoneNumber,
         title: '',
+        notes: '',
+        attachments: [],
         status: 'draft',
         products: [
             {
@@ -161,6 +163,8 @@ const App: React.FC = () => {
                 specificIngredients: [],
                 catchCopy: '',
                 productMessage: '',
+                productNotes: '',
+                productAttachments: [],
                 width: 0,
                 height: 0,
                 depth: 0,

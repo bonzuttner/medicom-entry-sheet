@@ -20,6 +20,36 @@
         }
       }
     </script>
+    <style>
+      body {
+        cursor: default;
+        caret-color: transparent;
+      }
+
+      input,
+      textarea,
+      select,
+      [contenteditable="true"] {
+        cursor: text;
+        caret-color: auto;
+      }
+
+      button,
+      [role="button"],
+      a {
+        cursor: pointer;
+      }
+
+      button:focus,
+      button:focus-visible,
+      a:focus,
+      a:focus-visible,
+      [role="button"]:focus,
+      [role="button"]:focus-visible {
+        outline: none;
+        box-shadow: none;
+      }
+    </style>
   </head>
   <body class="bg-slate-50 text-slate-900 antialiased">
     <div id="root"></div>
