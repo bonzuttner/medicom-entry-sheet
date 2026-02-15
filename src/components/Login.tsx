@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { dataService } from '../services/dataService';
 import { User } from '../types';
-import { LogIn, Lock } from 'lucide-react';
+import { Eye, EyeOff, LogIn } from 'lucide-react';
 
 interface LoginProps {
   onLogin: (user: User) => void | Promise<void>;
@@ -11,6 +11,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,16 +57,21 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             <label className="block text-sm font-medium text-slate-700 mb-2">パスワード</label>
             <div className="relative">
                 <input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     required
                     className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all pr-10"
                     placeholder="パスワードを入力"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                 />
-                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400">
-                    <Lock size={18} />
-                </div>
+                <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                    aria-label={showPassword ? 'パスワードを隠す' : 'パスワードを表示する'}
+                >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
             </div>
           </div>
           
