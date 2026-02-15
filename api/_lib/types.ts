@@ -71,5 +71,6 @@ export interface Attachment {
   name: string;
   size: number;
   type: string;
-  dataUrl: string;
+  url: string;
+  dataUrl?: string;
 }

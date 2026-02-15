@@ -153,6 +153,14 @@ export const EntryList: React.FC<EntryListProps> = ({ sheets, currentUser, onCre
     if (src.startsWith('data:')) {
       return dataUrlToBlob(src);
     }
+    try {
+      const parsed = new URL(src);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        throw new Error('Unsupported image URL protocol');
+      }
+    } catch {
+      throw new Error('Invalid image URL');
+    }
     const res = await fetch(src);
     if (!res.ok) {
       throw new Error(`Failed to fetch image: ${res.status}`);

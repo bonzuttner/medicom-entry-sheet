@@ -13,8 +13,5 @@
       "source": "/api/(.*)",
       "destination": "/api/$1"
     }
-  ],
-  "env": {
-    "VITE_API_BASE": "@VITE_API_BASE"
-  }
+  ]
 }

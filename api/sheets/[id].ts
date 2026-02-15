@@ -1,5 +1,6 @@
 import { canAccessManufacturer, requireUser } from '../_lib/auth';
 import { getMethod, methodNotAllowed, readJsonBody, sendError, sendJson } from '../_lib/http';
+import { normalizeSheetMedia } from '../_lib/media';
 import { pruneSheetsByRetention } from '../_lib/retention';
 import { readStore, writeStore } from '../_lib/store';
 import { EntrySheet } from '../_lib/types';
@@ -49,6 +50,18 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
+    let normalizedSheet: EntrySheet;
+    try {
+      normalizedSheet = await normalizeSheetMedia(
+        sheet,
+        `pharmapop/sheets/${sheet.id}`
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Invalid media payload';
+      sendError(res, 400, message);
+      return;
+    }
+
     const existingIndex = store.sheets.findIndex((s) => s.id === sheetId);
     if (existingIndex >= 0) {
       const existingSheet = store.sheets[existingIndex];
@@ -56,9 +69,9 @@ export default async function handler(req: any, res: any) {
         sendError(res, 403, 'You cannot modify this sheet');
         return;
       }
-      store.sheets[existingIndex] = { ...sheet, id: sheetId };
+      store.sheets[existingIndex] = { ...normalizedSheet, id: sheetId };
     } else {
-      store.sheets.push({ ...sheet, id: sheetId });
+      store.sheets.push({ ...normalizedSheet, id: sheetId });
     }
 
     store.sheets = pruneSheetsByRetention(store.sheets);

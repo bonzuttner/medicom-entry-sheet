@@ -16,7 +16,8 @@
 - **ビルドツール**: Vite 6.2.0
 - **スタイリング**: Tailwind CSS
 - **アイコン**: Lucide React
-- **データ永続化**: LocalStorage（プロトタイプ）
+- **データ永続化**: Vercel KV（本番）/ LocalStorage（ローカル）
+- **画像・添付ファイル**: Vercel Blob（URL保存）
 
 ## セットアップ
 
@@ -40,7 +41,7 @@ npm run dev:all
 
 アプリケーションは http://localhost:3000 で起動します。
 
-### データソース切り替え（AWS移行準備）
+### データソース切り替え（Vercel運用）
 
 `.env.local` でデータ取得先を切り替えできます。
 
@@ -48,12 +49,22 @@ npm run dev:all
 # 既定値: local
 VITE_DATA_SOURCE=local
 
-# API接続に切り替える場合
+# API接続に切り替える場合（ローカル検証時）
 VITE_DATA_SOURCE=api
 VITE_API_BASE=http://localhost:3000
 ```
 
 APIモードでCookieセッションを使う場合は、サーバー側で `SESSION_SECRET` を設定してください。
+Vercel本番では `VITE_API_BASE` は未設定（同一オリジン `/api`）を推奨します。
+また、APIデータを永続化するために Vercel KV を接続し、`KV_REST_API_URL` と `KV_REST_API_TOKEN` を設定してください。
+画像・添付ファイルはVercel Blobへアップロードされるため、`BLOB_READ_WRITE_TOKEN` を設定してください。
+
+`APP_RUNTIME_ENV` によりセキュリティガードを切り替えます。
+- `APP_RUNTIME_ENV=test`（既定）: テスト向け挙動
+- `APP_RUNTIME_ENV=production`: 本番向け厳格モード
+  - `SESSION_SECRET` 必須
+  - Vercel KV 必須
+  - 空ストア時の初期テストデータ自動投入を禁止
 
 APIモードでローカル確認する場合（`api/` のモックAPI利用）は、Vercel CLIで起動します。
 
@@ -63,6 +74,41 @@ npm run dev:api
 
 # API + 型チェック監視
 npm run dev:api:all
+```
+
+### 既存データの移行
+
+Vercelへの移行時は、管理者ログイン後に移行APIでデータを投入できます。
+
+1. 旧環境からデータを取得（管理者）
+```bash
+curl -b cookie.txt https://<old-domain>/api/admin/migrate > store-backup.json
+```
+2. 新環境へデータ投入（管理者）
+```bash
+printf '{"data":' > migrate-payload.json
+cat store-backup.json >> migrate-payload.json
+printf '}' >> migrate-payload.json
+
+curl -X POST -H "Content-Type: application/json" -b cookie.txt \
+  --data-binary @migrate-payload.json \
+  https://<new-domain>/api/admin/migrate
+```
+
+`/api/admin/migrate` は管理者のみ実行可能です。
+
+既存データに `data:` 形式の画像/添付が含まれる場合、読み込み時に自動でBlobへ移行されます（Blob設定時）。
+
+ローカルStorageデータから移行する場合は、旧アプリ画面でブラウザコンソールを開いて以下を実行し、
+出力JSONを `store-backup.json` として保存してください。
+
+```js
+const data = {
+  users: JSON.parse(localStorage.getItem('pharmapop_users') || '[]'),
+  sheets: JSON.parse(localStorage.getItem('pharmapop_sheets') || '[]'),
+  master: JSON.parse(localStorage.getItem('pharmapop_master') || '{}'),
+};
+console.log(JSON.stringify(data));
 ```
 
 ### ビルド

@@ -1,10 +1,14 @@
+import { createInitialStoreData } from './initialData';
+import { hasKvConfig, runKvCommand } from './kv';
+import { hasLegacyEmbeddedMedia, migrateStoreMedia } from './media';
+import { hashPassword, isHashedPassword } from './password';
+import { isProductionRuntime } from './runtime';
+import { MasterData, StoreData } from './types';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { createInitialStoreData } from './initialData';
-import { hashPassword, isHashedPassword } from './password';
-import { MasterData, StoreData } from './types';
 
 const STORE_PATH = path.join('/tmp', 'pharmapop-api-store.json');
+const STORE_KEY = 'pharmapop:store:data';
 
 const normalizeMasterData = (data: Partial<MasterData>, fallback: MasterData): MasterData => ({
   manufacturerNames: data.manufacturerNames ?? fallback.manufacturerNames,
@@ -13,18 +17,52 @@ const normalizeMasterData = (data: Partial<MasterData>, fallback: MasterData): M
   specificIngredients: data.specificIngredients ?? fallback.specificIngredients,
 });
 
-const ensureStoreFile = async (): Promise<void> => {
+const readStoreFromFile = async (): Promise<StoreData> => {
   try {
-    await fs.access(STORE_PATH);
+    const raw = await fs.readFile(STORE_PATH, 'utf8');
+    return JSON.parse(raw) as StoreData;
   } catch {
-    await writeStore(createInitialStoreData());
+    if (isProductionRuntime()) {
+      throw new Error(
+        'Persistent store is not initialized. For production, migrate data first and use Vercel KV.'
+      );
+    }
+    const initial = createInitialStoreData();
+    await fs.writeFile(STORE_PATH, JSON.stringify(initial), 'utf8');
+    return initial;
   }
 };
 
+const writeStoreToFile = async (data: StoreData): Promise<void> => {
+  await fs.writeFile(STORE_PATH, JSON.stringify(data), 'utf8');
+};
+
+const readStoreFromKv = async (): Promise<StoreData> => {
+  const raw = await runKvCommand<string | null>('GET', STORE_KEY);
+  if (!raw) {
+    if (isProductionRuntime()) {
+      throw new Error(
+        'KV store is empty. For production, migrate data before enabling traffic.'
+      );
+    }
+    const initial = createInitialStoreData();
+    await runKvCommand('SET', STORE_KEY, JSON.stringify(initial));
+    return initial;
+  }
+  return JSON.parse(raw) as StoreData;
+};
+
+const writeStoreToKv = async (data: StoreData): Promise<void> => {
+  await runKvCommand('SET', STORE_KEY, JSON.stringify(data));
+};
+
 export const readStore = async (): Promise<StoreData> => {
-  await ensureStoreFile();
-  const raw = await fs.readFile(STORE_PATH, 'utf8');
-  const parsed = JSON.parse(raw) as StoreData;
+  if (isProductionRuntime() && !hasKvConfig()) {
+    throw new Error(
+      'Vercel KV is required when APP_RUNTIME_ENV=production.'
+    );
+  }
+  const parsed = hasKvConfig() ? await readStoreFromKv() : await readStoreFromFile();
   const defaults = createInitialStoreData();
 
   let changed = false;
@@ -49,6 +87,18 @@ export const readStore = async (): Promise<StoreData> => {
     changed = true;
   }
 
+  if (hasLegacyEmbeddedMedia(parsed.sheets)) {
+    try {
+      parsed.sheets = await migrateStoreMedia(parsed.sheets);
+      changed = true;
+    } catch (error) {
+      if (isProductionRuntime()) {
+        throw error;
+      }
+      console.warn('Skipping media migration in non-production runtime:', error);
+    }
+  }
+
   if (changed) {
     await writeStore(parsed);
   }
@@ -57,5 +107,9 @@ export const readStore = async (): Promise<StoreData> => {
 };
 
 export const writeStore = async (data: StoreData): Promise<void> => {
-  await fs.writeFile(STORE_PATH, JSON.stringify(data), 'utf8');
+  if (hasKvConfig()) {
+    await writeStoreToKv(data);
+    return;
+  }
+  await writeStoreToFile(data);
 };

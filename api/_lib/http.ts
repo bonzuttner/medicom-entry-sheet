@@ -1,10 +1,18 @@
 import { createHmac, timingSafeEqual } from 'crypto';
+import { isProductionRuntime } from './runtime';
 import { User } from './types';
 
 const SESSION_COOKIE_NAME = 'pharmapop_session_user';
-const SESSION_SECRET = process.env.SESSION_SECRET || 'dev-only-change-me';
+const DEFAULT_SESSION_SECRET = 'dev-only-change-me';
+const SESSION_SECRET = process.env.SESSION_SECRET || DEFAULT_SESSION_SECRET;
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+if (isProductionRuntime() && SESSION_SECRET === DEFAULT_SESSION_SECRET) {
+  throw new Error(
+    'SESSION_SECRET is required when APP_RUNTIME_ENV=production.'
+  );
+}
 
 export const getMethod = (req: any): string => String(req.method || 'GET').toUpperCase();
 

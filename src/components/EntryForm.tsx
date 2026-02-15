@@ -56,6 +56,36 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     reader.readAsDataURL(file);
   });
 
+  const uploadFile = async (
+    file: File,
+    kind: 'image' | 'attachment'
+  ): Promise<string> => {
+    const dataUrl = await readFileAsDataUrl(file);
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        dataUrl,
+        fileName: file.name,
+        kind,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      throw new Error(errorText || `Upload failed (${response.status})`);
+    }
+
+    const payload = (await response.json()) as { url?: string };
+    if (!payload.url) {
+      throw new Error('Upload response does not include URL');
+    }
+    return payload.url;
+  };
+
   const handleAddAttachments = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const MAX_FILE_BYTES = 25 * 1024 * 1024;
@@ -66,12 +96,12 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         continue;
       }
       try {
-        const dataUrl = await readFileAsDataUrl(file);
+        const url = await uploadFile(file, 'attachment');
         next.push({
           name: file.name,
           size: file.size,
           type: file.type || '',
-          dataUrl,
+          url,
         });
       } catch {
         alert(`ファイルの読み込みに失敗しました: ${file.name}`);
@@ -97,12 +127,12 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         continue;
       }
       try {
-        const dataUrl = await readFileAsDataUrl(file);
+        const url = await uploadFile(file, 'attachment');
         next.push({
           name: file.name,
           size: file.size,
           type: file.type || '',
-          dataUrl,
+          url,
         });
       } catch {
         alert(`ファイルの読み込みに失敗しました: ${file.name}`);
@@ -135,6 +165,20 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       unit += 1;
     }
     return `${size.toFixed(size >= 10 || unit === 0 ? 0 : 1)} ${units[unit]}`;
+  };
+
+  const getSafeDownloadUrl = (value?: string): string => {
+    if (!value) return '#';
+    if (value.startsWith('data:')) return value;
+    try {
+      const parsed = new URL(value);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        return value;
+      }
+    } catch {
+      // noop
+    }
+    return '#';
   };
 
   const findReusableProductByName = (
@@ -347,16 +391,17 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     input.onchange = (e) => {
         const file = (e.target as HTMLInputElement).files?.[0];
         if (file) {
-            if (file.size < 2 * 1024 * 1024 || file.size > 50 * 1024 * 1024) {
-                alert("画像容量は2MB以上50MB以下にしてください。");
+            if (file.size <= 0 || file.size > 10 * 1024 * 1024) {
+                alert("画像容量は10MB以下にしてください。");
                 return;
             }
-            // Mock read
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                handleProductChange(index, field, ev.target?.result as string);
-            };
-            reader.readAsDataURL(file);
+            uploadFile(file, 'image')
+              .then((url) => {
+                handleProductChange(index, field, url);
+              })
+              .catch(() => {
+                alert(`画像のアップロードに失敗しました: ${file.name}`);
+              });
         }
     };
     input.click();
@@ -493,7 +538,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                                     </span>
                                     <div className="flex items-center gap-3">
                                         <a
-                                            href={file.dataUrl}
+                                            href={getSafeDownloadUrl(file.url || file.dataUrl)}
                                             download={file.name}
                                             className="text-primary hover:underline"
                                         >
@@ -920,7 +965,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                                     </span>
                                     <div className="flex items-center gap-3">
                                         <a
-                                            href={file.dataUrl}
+                                            href={getSafeDownloadUrl(file.url || file.dataUrl)}
                                             download={file.name}
                                             className="text-primary hover:underline"
                                         >
