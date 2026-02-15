@@ -1,5 +1,5 @@
-import { getSessionUserId, sendError } from './http';
-import { StoreData, User } from './types';
+import { getSessionUserId, sendError } from './http.js';
+import { StoreData, User } from './types.js';
 
 export const getCurrentUser = (req: any, store: StoreData): User | null => {
   const sessionUserId = getSessionUserId(req);

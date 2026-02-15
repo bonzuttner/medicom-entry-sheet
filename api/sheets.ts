@@ -1,7 +1,7 @@
-import { isAdmin, requireUser } from './_lib/auth';
-import { getMethod, methodNotAllowed, sendJson } from './_lib/http';
-import { pruneSheetsByRetention } from './_lib/retention';
-import { readStore, writeStore } from './_lib/store';
+import { isAdmin, requireUser } from './_lib/auth.js';
+import { getMethod, methodNotAllowed, sendJson } from './_lib/http.js';
+import { pruneSheetsByRetention } from './_lib/retention.js';
+import { readStore, writeStore } from './_lib/store.js';
 
 export default async function handler(req: any, res: any) {
   if (getMethod(req) !== 'GET') {

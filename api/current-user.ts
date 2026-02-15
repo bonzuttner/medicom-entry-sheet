@@ -1,12 +1,12 @@
-import { getCurrentUser } from './_lib/auth';
+import { getCurrentUser } from './_lib/auth.js';
 import {
   clearSessionCookie,
   getMethod,
   methodNotAllowed,
   sanitizeUser,
   sendJson,
-} from './_lib/http';
-import { readStore } from './_lib/store';
+} from './_lib/http.js';
+import { readStore } from './_lib/store.js';
 
 export default async function handler(req: any, res: any) {
   const method = getMethod(req);

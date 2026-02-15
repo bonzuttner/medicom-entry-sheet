@@ -1,7 +1,7 @@
-import { isAdmin, requireUser } from './_lib/auth';
-import { getMethod, methodNotAllowed, readJsonBody, sendError, sendJson } from './_lib/http';
-import { readStore, writeStore } from './_lib/store';
-import { MasterData } from './_lib/types';
+import { isAdmin, requireUser } from './_lib/auth.js';
+import { getMethod, methodNotAllowed, readJsonBody, sendError, sendJson } from './_lib/http.js';
+import { readStore, writeStore } from './_lib/store.js';
+import { MasterData } from './_lib/types.js';
 
 interface PutMasterBody {
   data?: MasterData;

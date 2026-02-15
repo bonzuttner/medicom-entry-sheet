@@ -1,10 +1,10 @@
-import { readStore } from '../_lib/store';
+import { readStore } from '../_lib/store.js';
 import {
   clearLoginFailures,
   getLoginRateLimitStatus,
   recordLoginFailure,
-} from '../_lib/loginRateLimit';
-import { verifyPassword } from '../_lib/password';
+} from '../_lib/loginRateLimit.js';
+import { verifyPassword } from '../_lib/password.js';
 import {
   clearSessionCookie,
   getMethod,
@@ -13,7 +13,7 @@ import {
   sanitizeUser,
   sendJson,
   setSessionCookie,
-} from '../_lib/http';
+} from '../_lib/http.js';
 
 interface LoginBody {
   username?: string;

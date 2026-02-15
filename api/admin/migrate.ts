@@ -1,15 +1,15 @@
-import { isAdmin, requireUser } from '../_lib/auth';
+import { isAdmin, requireUser } from '../_lib/auth.js';
 import {
   getMethod,
   methodNotAllowed,
   readJsonBody,
   sendError,
   sendJson,
-} from '../_lib/http';
-import { normalizeSheetMedia } from '../_lib/media';
-import { hashPassword, isHashedPassword } from '../_lib/password';
-import { readStore, writeStore } from '../_lib/store';
-import { StoreData, User } from '../_lib/types';
+} from '../_lib/http.js';
+import { normalizeSheetMedia } from '../_lib/media.js';
+import { hashPassword, isHashedPassword } from '../_lib/password.js';
+import { readStore, writeStore } from '../_lib/store.js';
+import { StoreData, User } from '../_lib/types.js';
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;

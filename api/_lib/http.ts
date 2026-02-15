@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'crypto';
-import { isProductionRuntime } from './runtime';
-import { User } from './types';
+import { isProductionRuntime } from './runtime.js';
+import { User } from './types.js';
 
 const SESSION_COOKIE_NAME = 'pharmapop_session_user';
 const DEFAULT_SESSION_SECRET = 'dev-only-change-me';

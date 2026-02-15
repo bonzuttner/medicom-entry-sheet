@@ -1,9 +1,9 @@
-import { canAccessManufacturer, requireUser } from '../_lib/auth';
-import { getMethod, methodNotAllowed, readJsonBody, sendError, sendJson } from '../_lib/http';
-import { normalizeSheetMedia } from '../_lib/media';
-import { pruneSheetsByRetention } from '../_lib/retention';
-import { readStore, writeStore } from '../_lib/store';
-import { EntrySheet } from '../_lib/types';
+import { canAccessManufacturer, requireUser } from '../_lib/auth.js';
+import { getMethod, methodNotAllowed, readJsonBody, sendError, sendJson } from '../_lib/http.js';
+import { normalizeSheetMedia } from '../_lib/media.js';
+import { pruneSheetsByRetention } from '../_lib/retention.js';
+import { readStore, writeStore } from '../_lib/store.js';
+import { EntrySheet } from '../_lib/types.js';
 
 interface PutSheetBody {
   sheet?: EntrySheet;

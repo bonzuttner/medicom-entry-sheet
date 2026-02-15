@@ -1,5 +1,5 @@
-import { EntrySheet, MasterData, StoreData, User } from './types';
-import { hashPassword } from './password';
+import { EntrySheet, MasterData, StoreData, User } from './types.js';
+import { hashPassword } from './password.js';
 
 const INITIAL_USERS: User[] = [
   {

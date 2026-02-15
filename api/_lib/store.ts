@@ -1,9 +1,9 @@
-import { createInitialStoreData } from './initialData';
-import { hasKvConfig, runKvCommand } from './kv';
-import { hasLegacyEmbeddedMedia, migrateStoreMedia } from './media';
-import { hashPassword, isHashedPassword } from './password';
-import { isProductionRuntime } from './runtime';
-import { MasterData, StoreData } from './types';
+import { createInitialStoreData } from './initialData.js';
+import { hasKvConfig, runKvCommand } from './kv.js';
+import { hasLegacyEmbeddedMedia, migrateStoreMedia } from './media.js';
+import { hashPassword, isHashedPassword } from './password.js';
+import { isProductionRuntime } from './runtime.js';
+import { MasterData, StoreData } from './types.js';
 import { promises as fs } from 'fs';
 import path from 'path';
 

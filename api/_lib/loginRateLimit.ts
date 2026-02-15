@@ -1,7 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { hasKvConfig, runKvCommand } from './kv';
-import { isProductionRuntime } from './runtime';
+import { hasKvConfig, runKvCommand } from './kv.js';
+import { isProductionRuntime } from './runtime.js';
 
 interface AttemptState {
   firstFailedAt: number;

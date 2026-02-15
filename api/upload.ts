@@ -1,7 +1,7 @@
-import { requireUser } from './_lib/auth';
-import { getMethod, readJsonBody, sendError, sendJson } from './_lib/http';
-import { uploadMediaDataUrl } from './_lib/media';
-import { readStore } from './_lib/store';
+import { requireUser } from './_lib/auth.js';
+import { getMethod, readJsonBody, sendError, sendJson } from './_lib/http.js';
+import { uploadMediaDataUrl } from './_lib/media.js';
+import { readStore } from './_lib/store.js';
 
 interface UploadBody {
   dataUrl?: string;

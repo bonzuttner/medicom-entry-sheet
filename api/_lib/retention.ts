@@ -1,4 +1,4 @@
-import { EntrySheet } from './types';
+import { EntrySheet } from './types.js';
 
 const HISTORY_RETENTION_YEARS = 3;
 

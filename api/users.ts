@@ -1,4 +1,4 @@
-import { isAdmin, requireUser } from './_lib/auth';
+import { isAdmin, requireUser } from './_lib/auth.js';
 import {
   getMethod,
   methodNotAllowed,
@@ -6,10 +6,10 @@ import {
   sanitizeUser,
   sendError,
   sendJson,
-} from './_lib/http';
-import { hashPassword, isHashedPassword } from './_lib/password';
-import { readStore, writeStore } from './_lib/store';
-import { User } from './_lib/types';
+} from './_lib/http.js';
+import { hashPassword, isHashedPassword } from './_lib/password.js';
+import { readStore, writeStore } from './_lib/store.js';
+import { User } from './_lib/types.js';
 
 interface PutUsersBody {
   users?: User[];

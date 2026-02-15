@@ -1,5 +1,5 @@
 import { put } from '@vercel/blob';
-import { Attachment, EntrySheet, ProductEntry } from './types';
+import { Attachment, EntrySheet, ProductEntry } from './types.js';
 
 const IMAGE_MIME_TYPES = new Set([
   'image/jpeg',
