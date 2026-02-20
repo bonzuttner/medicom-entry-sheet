@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import JSZip from 'jszip';
 import { EntrySheet, User, UserRole } from '../types';
-import { Plus, Copy, Edit3, Trash2, Search, FileWarning, ChevronDown, ChevronUp, Download, CheckSquare, Square, Image as ImageIcon, X, AlertCircle, AlertTriangle, MoreHorizontal } from 'lucide-react';
+import { Plus, Copy, Edit3, Trash2, Search, FileWarning, ChevronDown, ChevronUp, Download, CheckSquare, Square, Image as ImageIcon, X, AlertCircle, AlertTriangle } from 'lucide-react';
 
 interface EntryListProps {
   sheets: EntrySheet[];
@@ -21,6 +21,7 @@ export const EntryList: React.FC<EntryListProps> = ({ sheets, currentUser, onCre
 
   const normalizeSheetStatus = (status: EntrySheet['status'] | string): 'completed' | 'draft' =>
     status === 'completed' ? 'completed' : 'draft';
+  const normalizeManufacturerKey = (value: string): string => value.trim();
 
   const hasText = (value: unknown): boolean =>
     typeof value === 'string' ? value.trim().length > 0 : Boolean(value);
@@ -28,7 +29,10 @@ export const EntryList: React.FC<EntryListProps> = ({ sheets, currentUser, onCre
   // Permission check: Can the current user edit/delete this sheet?
   const canModifySheet = (sheet: EntrySheet): boolean => {
     if (currentUser.role === UserRole.ADMIN) return true;
-    return sheet.manufacturerName === currentUser.manufacturerName;
+    return (
+      normalizeManufacturerKey(sheet.manufacturerName) ===
+      normalizeManufacturerKey(currentUser.manufacturerName)
+    );
   };
 
   // Search Filter
@@ -195,7 +199,7 @@ export const EntryList: React.FC<EntryListProps> = ({ sheets, currentUser, onCre
       sheet.products.forEach((prod) => {
         if (!prod.productImage) return;
         const baseName = sanitizeFileName(prod.productName || prod.id);
-        const fileName = baseName;
+        const fileName = `${sheet.id}-${prod.id}-${baseName}`;
         images.push({ fileName, src: prod.productImage });
       });
     });

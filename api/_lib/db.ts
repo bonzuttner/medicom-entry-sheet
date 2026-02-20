@@ -46,7 +46,13 @@ export const query = async <T = any>(
   } catch (error) {
     console.error('Database query error:', error);
     console.error('Query:', queryString);
-    console.error('Params:', params);
+    // Do not log raw parameter values to avoid leaking sensitive data.
+    console.error('Params metadata:', {
+      count: params.length,
+      types: params.map((value) =>
+        value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value
+      ),
+    });
     throw error;
   }
 };

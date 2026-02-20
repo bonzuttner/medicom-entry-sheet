@@ -14,11 +14,13 @@ export default async function handler(req: any, res: any) {
   if (!currentUser) return;
 
   if (method === 'GET') {
-    const users = isAdmin(currentUser)
-      ? await UserRepository.findAll()
-      : await UserRepository.findByManufacturerId(
-          await UserRepository.getOrCreateManufacturerId(currentUser.manufacturerName)
-        );
+    let users;
+    if (isAdmin(currentUser)) {
+      users = await UserRepository.findAll();
+    } else {
+      const manufacturerId = await UserRepository.getManufacturerId(currentUser.manufacturerName);
+      users = manufacturerId ? await UserRepository.findByManufacturerId(manufacturerId) : [];
+    }
     sendJson(res, 200, users.map((u) => sanitizeUser(u)));
     return;
   }

@@ -12,17 +12,14 @@ export default async function handler(req: any, res: any) {
   const currentUser = await requireUser(req, res);
   if (!currentUser) return;
 
-  // Prune old sheets (retention policy)
-  const cutoffDate = new Date();
-  cutoffDate.setFullYear(cutoffDate.getFullYear() - 3);
-  await SheetRepository.pruneByRetention(cutoffDate);
-
   // Get sheets based on user role
-  const sheets = isAdmin(currentUser)
-    ? await SheetRepository.findAll()
-    : await SheetRepository.findByManufacturerId(
-        await UserRepository.getOrCreateManufacturerId(currentUser.manufacturerName)
-      );
+  let sheets;
+  if (isAdmin(currentUser)) {
+    sheets = await SheetRepository.findAll();
+  } else {
+    const manufacturerId = await UserRepository.getManufacturerId(currentUser.manufacturerName);
+    sheets = manufacturerId ? await SheetRepository.findByManufacturerId(manufacturerId) : [];
+  }
 
   sendJson(res, 200, sheets);
 }

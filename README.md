@@ -18,7 +18,7 @@
 - **アイコン**: Lucide React
 - **データベース**: Vercel Postgres (Neon)
 - **画像・添付ファイル**: Vercel Blob
-- **データソース**: LocalStorage（開発）/ API（本番）
+- **データソース**: API（Vercel Functions）
 
 ## セットアップ
 
@@ -42,15 +42,11 @@ npm run dev:all
 
 ### 開発環境設定
 
-`.env.local` でデータ取得先を切り替えできます。
+現行実装は API 固定です。ローカル確認は `vercel dev`（`npm run dev:api`）を使用してください。
 
 ```bash
-# 開発モード: LocalStorage使用
-VITE_DATA_SOURCE=local
-
-# APIモード（ローカル検証時）
-VITE_DATA_SOURCE=api
-VITE_API_BASE=http://localhost:3000
+# Vercel dev の起動URLを使う場合のみ設定（通常は不要）
+VITE_API_BASE=<vercel-dev-url>
 ```
 
 ### 本番環境設定
@@ -79,12 +75,6 @@ npm run dev:api
 npm run dev:api:all
 ```
 
-### データベース移行
-
-Vercel KVから PostgreSQL（Neon）への移行手順は、[docs/MIGRATION.md](docs/MIGRATION.md) を参照してください。
-
-**重要**: Vercel KVは2024年末に廃止されました。本番環境ではVercel Postgres (Neon) の使用が必須です。
-
 ### ビルド
 
 ```bash
@@ -99,7 +89,7 @@ npm run preview
 
 ### ログイン
 
-初期ユーザー（開発環境のみ）:
+初期ユーザー（初期データ投入済み環境のみ）:
 
 | ユーザー名 | パスワード | メーカー | 権限 |
 |----------|----------|---------|------|
@@ -126,7 +116,7 @@ npm run preview
 - リスク分類の管理
 - 特定成分の管理
 
-## ディレクトリ構成
+## ディレクトリ構成（概要）
 
 ```
 /medicom-entry-sheet/
@@ -135,7 +125,9 @@ npm run preview
 │   ├── DESIGN.md            # システム設計書
 │   ├── PERMISSIONS.md       # 権限設計書
 │   ├── SECURITY.md          # セキュリティ設計書
-│   └── MIGRATION.md         # DB移行手順書
+│   ├── PROJECT_STRUCTURE.md # 構成の見方
+│   ├── DATABASE_SCHEMA.md   # DB項目説明
+│   └── SYSTEM_OVERVIEW.md   # システム構成概要
 ├── api/                      # APIエンドポイント（Vercel Functions）
 │   ├── _lib/                # 共通ライブラリ
 │   ├── auth/                # 認証API
@@ -150,8 +142,7 @@ npm run preview
 │   │   ├── AccountManage.tsx # アカウント管理
 │   │   └── MasterManage.tsx # マスターデータ管理
 │   ├── services/            # ビジネスロジック
-│   │   ├── storage.ts       # ローカル永続化層
-│   │   ├── dataService.ts   # local/api 切り替え層
+│   │   ├── dataService.ts   # APIアクセス層
 │   │   └── apiClient.ts     # HTTP クライアント
 │   ├── types.ts             # TypeScript型定義
 │   ├── App.tsx              # メインアプリケーション
@@ -165,7 +156,11 @@ npm run preview
 - [システム設計書](docs/DESIGN.md) - データモデル、アーキテクチャ、技術仕様
 - [権限設計書](docs/PERMISSIONS.md) - ロール定義、アクセス権限、セキュリティ
 - [セキュリティ設計書](docs/SECURITY.md) - 脅威モデル、認証/認可、運用チェック
-- [DB移行手順書](docs/MIGRATION.md) - Vercel KV → PostgreSQL 移行ガイド
+- [開発セットアップ最短手順](docs/SETUP_QUICKSTART.md) - 起動方法、環境変数サンプル、DB初期化
+- [プロジェクト構成の見方](docs/PROJECT_STRUCTURE.md) - バックエンド/DB設計ファイルの場所
+- [DB項目説明](docs/DATABASE_SCHEMA.md) - 主要テーブルとカラムの意味
+- [システム構成概要](docs/SYSTEM_OVERVIEW.md) - フロント/バック/API/DBの関係
+- [S3移行計画](docs/AWS_S3_MIGRATION_PLAN.md) - 将来AWSへ分離する場合の手順
 
 ## 権限設計
 
@@ -202,7 +197,7 @@ npm run preview
 1. Vercel CLIをインストール: `npm install -g vercel`
 2. プロジェクトをリンク: `vercel link`
 3. Vercel Postgres統合を追加: `vercel integration add neon`
-4. データベースマイグレーション実行（[docs/MIGRATION.md](docs/MIGRATION.md) 参照）
+4. DBスキーマを適用（`api/admin/schema.sql`）
 5. 本番デプロイ: `vercel --prod`
 
 ## ライセンス

@@ -2,165 +2,144 @@
 
 ## 1. 目的
 
-本書は、PharmaPOP Entry System のデータ保護と不正利用防止のための設計方針を定義する。
-実装変更時は本書を更新し、設計と実装の乖離を防ぐ。
+本書は、PharmaPOP Entry System のセキュリティ実装方針を定義する。
+実装変更時は本書も更新し、設計と実装の不一致を防ぐ。
 
 ## 2. 対象範囲
 
 - フロントエンド: `src/`
-- APIモック/将来の本番APIの雛形: `api/`
+- API: `api/`
 - データ保存:
-  - 開発モード: LocalStorage
-  - APIモード: `/tmp` 永続化ファイル（モック）
-- 認証/認可、セッション管理、入力検証、監視運用
+  - 本番運用: PostgreSQL（Vercel Postgres / Neon）
+  - 開発用: API（`vercel dev`）
 
-## 3. 守る対象（保護資産）
+## 3. 保護対象
 
-- ユーザー情報（ID、所属メーカー、権限）
+- ユーザー情報（ID、所属メーカー、ロール）
 - 認証情報（パスワード、セッション）
-- エントリーシート・商品情報・画像データ
+- エントリーシート・商品・添付ファイル
 - マスターデータ
 
 ## 4. 脅威モデル
 
-- なりすましログイン（認証回避、セッション改ざん）
-- ブルートフォースログイン
-- 他社データの閲覧・更新（権限境界突破）
+- 認証回避（なりすまし）
+- ブルートフォース攻撃
+- 他社データへの不正アクセス（テナント境界突破）
 - パスワード漏えい
-- 画像/履歴データの過剰保持による漏えい範囲拡大
+- 不正ファイルアップロード
 
 ## 5. セキュリティ方針
 
-- 認証はAPI側で実施し、UI制御のみで完結させない
-- 認可はAPI側で毎回実施する
-- パスワードは平文保存しない（`scrypt` ハッシュ）
-- セッションは署名付きCookieで改ざん検知する
-- ログイン試行回数を制限する
-- データ保持期間を定め、古い履歴は削除する
-- 本番ビルドは `api` データソースを強制する
+- 認証・認可は API 側で必ず実施する
+- UI の表示制御は補助とし、データ保護の本体にしない
+- パスワードは平文保存しない（`scrypt`）
+- セッションは署名付き Cookie で管理する
+- ログイン試行を制限する
+- 画像/添付は MIME・サイズ・解像度を検証する
 
-## 6. 現在の実装
+## 6. 実装状況
 
 ### 6.1 認証
 
-- ログイン: `POST /api/auth/login`
-- パスワード照合: `verifyPassword`（`scrypt`）
-- 成功時: セッションCookie発行
-- 失敗時: セッションCookie破棄
+- `POST /api/auth/login` で認証
+- 成功時にセッション Cookie を発行
+- 未認証アクセスは `401`
 
-実装参照:
+実装:
 - `api/auth/login.ts`
-- `api/_lib/password.ts`
+- `api/_lib/auth.ts`
+- `api/_lib/http.ts`
 
 ### 6.2 パスワード保護
 
-- 保存時は `scrypt$salt$hash` 形式で保存
-- 初期データもハッシュ済みで作成
-- 既存平文データは読み込み時に自動移行
+- 形式: `scrypt$salt$hash`
+- `PASSWORD_PEPPER` を連結してハッシュ
+- 平文データ互換の照合ロジックあり（移行互換）
 
-実装参照:
+実装:
 - `api/_lib/password.ts`
-- `api/_lib/initialData.ts`
-- `api/_lib/store.ts`
 
 ### 6.3 セッション管理
 
 - Cookie名: `pharmapop_session_user`
 - 値: `userId.signature`（HMAC-SHA256）
 - 属性: `HttpOnly`, `SameSite=Lax`, `Max-Age=12h`
-- 本番時は `Secure` を自動付与
+- `NODE_ENV=production` では `Secure` を付与
 
-実装参照:
+実装:
 - `api/_lib/http.ts`
-- `api/_lib/auth.ts`
 
-### 6.4 ブルートフォース対策
-
-- 単位: `IP + username`
-- 制限: 15分間に5回失敗で15分ロック
-- ロック時: `429` + `Retry-After`
-- 成功時: 失敗カウンタ削除
-
-実装参照:
-- `api/_lib/loginRateLimit.ts`
-- `api/auth/login.ts`
-
-### 6.5 認可（マルチテナント境界）
+### 6.4 認可（ロール・メーカー境界）
 
 - `ADMIN`: 全メーカー操作可
 - `STAFF`: 自社メーカーのみ操作可
-- API側で `requireUser` とメーカー境界チェックを適用
-- マスターデータは API でも ADMIN のみ閲覧・更新可（`GET /api/master`, `PUT /api/master`）
+- APIで毎回 `requireUser` + 境界チェック
+- マスターデータ API は `ADMIN` のみ
 
-実装参照:
+実装:
 - `api/_lib/auth.ts`
-- `api/users.ts`
 - `api/sheets.ts`
 - `api/sheets/[id].ts`
+- `api/users.ts`
+- `api/users/[id].ts`
 - `api/master.ts`
 
-### 6.6 データ保持
+### 6.5 ログイン試行制限
 
-- エントリーシート履歴は3年保持
-- 保持期間超過分は自動削除
-- 画像はシート内に保持され、参照中のものは残る
+- 単位: `IP + username`
+- 15分で5回失敗すると15分ロック
+- ロック中は `429` + `Retry-After`
 
-実装参照:
-- `src/services/storage.ts`
-- `api/_lib/retention.ts`
-- `api/sheets.ts`
-- `api/sheets/[id].ts`
+実装:
+- `api/_lib/loginRateLimit.ts`
+- `api/auth/login.ts`
 
-### 6.7 画像アップロード要件（品質・容量）
+補足:
+- 現状の試行回数ストアは `/tmp/pharmapop-login-attempts.json` を使用（サーバーレス環境では永続保証なし）
 
-- 画像容量: `50MB以下`（下限なし）
-- 解像度推奨: `2500px × 3508px程度`
-- 強制基準: `短辺1500px未満` は解像度不足で拒否
-- 上記はクライアントとAPIの両方で検証
+### 6.6 画像・添付ファイル検証
 
-実装参照:
+- 商品画像:
+  - 50MB以下
+  - 短辺1500px未満は拒否
+  - MIME制限あり
+- 添付ファイル:
+  - 25MB以下
+  - MIME制限あり
+- クライアントと API の両方で検証
+
+実装:
 - `src/components/EntryForm.tsx`
 - `api/_lib/media.ts`
 
-### 6.8 本番時データソース制御
+### 6.7 データアクセス
 
-- 開発時: `VITE_DATA_SOURCE` で `local/api` 切替
-- 本番ビルド: `api` を強制
+- 現行実装は API 固定
+- 開発時も `vercel dev` 経由で API を利用
 
-実装参照:
+実装:
 - `src/services/dataService.ts`
 
-## 7. 秘密情報管理
+## 7. 環境変数（セキュリティ関連）
 
-- 必須:
-  - `SESSION_SECRET`
-- 推奨:
-  - `PASSWORD_PEPPER`
-- 本番では環境変数を安全なストアで管理する
-  - AWS: `Secrets Manager` または `SSM Parameter Store`
+必須:
+- `SESSION_SECRET`（本番ランタイムでは必須）
 
-## 8. 運用チェックリスト（月次）
+推奨:
+- `PASSWORD_PEPPER`
 
-1. ログイン失敗増加（429/401）を監視確認
-2. 権限エラー（403）急増の確認
-3. 依存パッケージの脆弱性確認
-4. 秘密情報ローテーション状況確認
-5. 3年保持ルールが期待通り動作しているか確認
+## 8. 運用チェック
+
+1. `401/403/429` の増加を監視
+2. 依存パッケージの脆弱性を定期確認
+3. `SESSION_SECRET` / `PASSWORD_PEPPER` の管理・ローテーションを確認
+4. 画像アップロード失敗率（サイズ・解像度）を確認
 
 ## 9. 既知の制約
 
-- LocalStorageモードは開発用であり、本番利用しない
-- APIモックの `/tmp` 保存は本番用途ではない
-- CAPTCHA/MFA は未実装（将来 Cognito 側で対応）
+- レート制限カウンタの `/tmp` 保存は耐障害性が弱い（将来は Redis 等へ移行推奨）
+- MFA/CAPTCHA は未実装
 
-## 10. 更新ルール
+## 10. 更新履歴
 
-- セキュリティ関連の実装を変更したPRでは本書更新を必須化する
-- 更新時は以下を最低記載する
-  - 変更目的
-  - 影響範囲
-  - ロールバック方法
-
-## 11. 更新履歴
-
-- 2026-02-08: 初版作成（認証・認可・ハッシュ化・レート制限・保持期間を反映）
+- 2026-02-20: 実装現状（API認証・認可、画像検証、レート制限）に合わせて全面更新

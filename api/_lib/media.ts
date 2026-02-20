@@ -6,9 +6,7 @@ const IMAGE_MIME_TYPES = new Set([
   'image/png',
   'image/webp',
   'image/gif',
-  'image/svg+xml',
   'image/bmp',
-  'image/tiff',
 ]);
 
 const ATTACHMENT_MIME_TYPES = new Set([

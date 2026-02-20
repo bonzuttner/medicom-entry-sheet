@@ -34,8 +34,6 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const store = await readStore();
-  const beforeSheets = [...store.sheets];
   const currentUser = await requireUser(req, res);
   if (!currentUser) return;
   if (!isAdmin(currentUser)) {
@@ -44,6 +42,7 @@ export default async function handler(req: any, res: any) {
   }
 
   if (method === 'GET') {
+    const store = await readStore();
     sendJson(res, 200, store);
     return;
   }
@@ -53,6 +52,7 @@ export default async function handler(req: any, res: any) {
     sendError(res, 400, 'data with users/sheets/master is required');
     return;
   }
+  const beforeSheets = (await readStore()).sheets;
 
   const nextStore: StoreData = {
     users: normalizeUsers(body.data.users),
@@ -73,6 +73,10 @@ export default async function handler(req: any, res: any) {
   }
 
   await writeStore(nextStore);
-  await deleteUnusedManagedBlobUrls(beforeSheets, nextStore.sheets);
+  try {
+    await deleteUnusedManagedBlobUrls(beforeSheets, nextStore.sheets);
+  } catch (error) {
+    console.warn('Failed to cleanup unused managed blobs after migration', error);
+  }
   sendJson(res, 200, { ok: true, users: nextStore.users.length, sheets: nextStore.sheets.length });
 }

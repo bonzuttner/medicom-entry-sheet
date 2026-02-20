@@ -140,6 +140,14 @@ export default async function handler(req: any, res: any) {
     sendError(res, 403, 'Only admins can manage admin users');
     return;
   }
+  if (targetUser.role === 'ADMIN') {
+    const allUsers = await UserRepository.findAll();
+    const adminCount = allUsers.filter((user) => user.role === 'ADMIN').length;
+    if (adminCount <= 1) {
+      sendError(res, 400, '最後の管理者アカウントは削除できません');
+      return;
+    }
+  }
 
   const deleted = await UserRepository.deleteById(targetUserId);
   if (!deleted) {

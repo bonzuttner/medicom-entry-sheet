@@ -15,7 +15,7 @@ export default async function handler(req: any, res: any) {
   }
 
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    sendError(res, 500, 'Blob storage is not configured');
+    sendError(res, 503, 'Blob storage is not configured');
     return;
   }
 

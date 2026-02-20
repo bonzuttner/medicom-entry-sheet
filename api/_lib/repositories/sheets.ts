@@ -584,26 +584,57 @@ export const upsert = async (sheet: EntrySheet): Promise<void> => {
       );
 
       await db.query(`DELETE FROM product_ingredients WHERE product_id = $1`, [productId]);
-      // Insert ingredients
+      // Insert ingredients in bulk
       if (product.specificIngredients && product.specificIngredients.length > 0) {
-        for (const ingredient of product.specificIngredients) {
+        const ingredients = [...new Set(product.specificIngredients.map((value) => value.trim()).filter(Boolean))];
+        if (ingredients.length > 0) {
           await db.query(
-            `INSERT INTO product_ingredients (product_id, ingredient_name) VALUES ($1, $2)`,
-            [productId, ingredient]
+            `
+            INSERT INTO product_ingredients (product_id, ingredient_name)
+            SELECT $1, items.ingredient_name
+            FROM unnest($2::text[]) AS items(ingredient_name)
+            `,
+            [productId, ingredients]
           );
         }
       }
 
       await db.query(`DELETE FROM attachments WHERE product_id = $1`, [productId]);
-      // Insert product attachments
+      // Insert product attachments in bulk
       if (product.productAttachments && product.productAttachments.length > 0) {
-        for (const attachment of product.productAttachments) {
+        const normalizedAttachments = product.productAttachments
+          .map((attachment) => ({
+            name: String(attachment.name || '').trim(),
+            size: Number(attachment.size) || 0,
+            type: String(attachment.type || '').trim(),
+            url: String(attachment.url || '').trim(),
+          }))
+          .filter((attachment) => attachment.name && attachment.url);
+
+        if (normalizedAttachments.length > 0) {
           await db.query(
             `
             INSERT INTO attachments (product_id, name, size, type, url)
-            VALUES ($1, $2, $3, $4, $5)
+            SELECT
+              $1,
+              items.name,
+              items.size,
+              items.type,
+              items.url
+            FROM unnest(
+              $2::text[],
+              $3::bigint[],
+              $4::text[],
+              $5::text[]
+            ) AS items(name, size, type, url)
             `,
-            [productId, attachment.name, attachment.size, attachment.type, attachment.url]
+            [
+              productId,
+              normalizedAttachments.map((attachment) => attachment.name),
+              normalizedAttachments.map((attachment) => attachment.size),
+              normalizedAttachments.map((attachment) => attachment.type),
+              normalizedAttachments.map((attachment) => attachment.url),
+            ]
           );
         }
       }
@@ -617,17 +648,40 @@ export const upsert = async (sheet: EntrySheet): Promise<void> => {
     // Delete existing attachments
     await db.query(`DELETE FROM attachments WHERE sheet_id = $1`, [normalizedSheet.id]);
 
-    // Insert attachments
+    // Insert sheet attachments in bulk
     if (normalizedSheet.attachments && normalizedSheet.attachments.length > 0) {
-      for (const attachment of normalizedSheet.attachments) {
+      const normalizedAttachments = normalizedSheet.attachments
+        .map((attachment) => ({
+          name: String(attachment.name || '').trim(),
+          size: Number(attachment.size) || 0,
+          type: String(attachment.type || '').trim(),
+          url: String(attachment.url || '').trim(),
+        }))
+        .filter((attachment) => attachment.name && attachment.url);
+
+      if (normalizedAttachments.length > 0) {
         await db.query(
-          `INSERT INTO attachments (sheet_id, name, size, type, url) VALUES ($1, $2, $3, $4, $5)`,
+          `
+          INSERT INTO attachments (sheet_id, name, size, type, url)
+          SELECT
+            $1,
+            items.name,
+            items.size,
+            items.type,
+            items.url
+          FROM unnest(
+            $2::text[],
+            $3::bigint[],
+            $4::text[],
+            $5::text[]
+          ) AS items(name, size, type, url)
+          `,
           [
             normalizedSheet.id,
-            String(attachment.name || '').trim(),
-            attachment.size,
-            String(attachment.type || '').trim(),
-            String(attachment.url || '').trim(),
+            normalizedAttachments.map((attachment) => attachment.name),
+            normalizedAttachments.map((attachment) => attachment.size),
+            normalizedAttachments.map((attachment) => attachment.type),
+            normalizedAttachments.map((attachment) => attachment.url),
           ]
         );
       }

@@ -25,8 +25,8 @@ export interface MasterData {
 export interface ProductEntry {
   id: string;
   shelfName: string; // Master: Pull-down
-  manufacturerName: string; // Auto-filled but editable per product if needed
-  janCode: string; // 8 or 16 digits
+  manufacturerName: string; // Server-side normalized to sheet manufacturer
+  janCode: string; // 8, 13, or 16 digits
   productName: string;
   productImage?: string; // Mock URL or Base64
   riskClassification: string; // Master: Pull-down

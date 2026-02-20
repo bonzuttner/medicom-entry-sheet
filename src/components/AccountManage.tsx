@@ -52,12 +52,19 @@ export const AccountManage: React.FC<AccountManageProps> = ({
   };
 
   const handleSave = async () => {
-    if (!editingUser?.username || !editingUser?.displayName || !editingUser?.manufacturerName || !editingUser?.password) {
-      setValidationError('ログインID、担当者名、メーカー名、パスワードは必須です');
+    const isNewUser = !editingUser?.id;
+
+    if (!editingUser?.username || !editingUser?.displayName || !editingUser?.manufacturerName) {
+      setValidationError('ログインID、担当者名、メーカー名は必須です');
       return;
     }
 
-    if (!passwordRule.test(editingUser.password)) {
+    if (isNewUser && !editingUser.password) {
+      setValidationError('新規アカウント作成時はパスワードが必須です');
+      return;
+    }
+
+    if (editingUser.password && !passwordRule.test(editingUser.password)) {
       setValidationError('パスワードは大文字英字・小文字英字・数字・記号を含む8文字以上で入力してください');
       return;
     }
@@ -94,7 +101,6 @@ export const AccountManage: React.FC<AccountManageProps> = ({
     }
 
     const existingUser = users.find(u => u.id === editingUser.id);
-    const isNewUser = !editingUser.id;
 
     const newUser: User = {
         id: editingUser.id || uuidv4(),
@@ -104,7 +110,7 @@ export const AccountManage: React.FC<AccountManageProps> = ({
         email: normalizedEmail,
         phoneNumber: normalizedPhone,
         role: editingUser.role || UserRole.STAFF,
-        password: editingUser.password || (isNewUser ? '' : existingUser?.password),
+        password: editingUser.password?.trim() || (isNewUser ? '' : existingUser?.password),
     };
     try {
       await onSaveUser(newUser);
@@ -210,11 +216,13 @@ export const AccountManage: React.FC<AccountManageProps> = ({
                             className="w-full border p-2 rounded"
                             value={editingUser.password || ''}
                             onChange={e => setEditingUser({ ...editingUser, password: e.target.value })}
-                            placeholder="大文字・小文字・数字・記号を含む8文字以上"
+                            placeholder={editingUser.id ? '変更する場合のみ入力（8文字以上）' : '大文字・小文字・数字・記号を含む8文字以上'}
                             autoComplete="new-password"
                         />
                         <p className="text-xs text-slate-500 mt-1">
-                            ※ 大文字英字・小文字英字・数字・記号を含む8文字以上
+                            {editingUser.id
+                              ? '※ 未入力なら現在のパスワードを維持します'
+                              : '※ 大文字英字・小文字英字・数字・記号を含む8文字以上'}
                         </p>
                     </div>
                 </div>

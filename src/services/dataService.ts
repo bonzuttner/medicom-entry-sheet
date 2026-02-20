@@ -1,6 +1,5 @@
 import { EntrySheet, MasterData, User } from '../types';
 import { apiClient } from './apiClient';
-import { storage as localStorageService } from './storage';
 
 export interface DataService {
   getUsers: () => Promise<User[]>;
@@ -15,38 +14,6 @@ export interface DataService {
   getMasterData: () => Promise<MasterData>;
   saveMasterData: (data: MasterData) => Promise<void>;
 }
-
-const requestedDataSource = (import.meta.env.VITE_DATA_SOURCE ?? 'local').toLowerCase();
-const dataSource = import.meta.env.PROD ? 'api' : requestedDataSource;
-
-const localDataService: DataService = {
-  getUsers: async () => localStorageService.getUsers(),
-  saveUser: async (user) => {
-    const users = localStorageService.getUsers();
-    const next = [...users.filter((u) => u.id !== user.id), user];
-    localStorageService.saveUsers(next);
-  },
-  deleteUser: async (id) => {
-    const users = localStorageService.getUsers().filter((u) => u.id !== id);
-    localStorageService.saveUsers(users);
-  },
-  login: async (username, password) => localStorageService.login(username, password),
-  getCurrentUser: async () => localStorageService.getCurrentUser(),
-  setCurrentUser: async (user) => {
-    localStorageService.setCurrentUser(user);
-  },
-  getSheets: async () => localStorageService.getSheets(),
-  saveSheet: async (sheet) => {
-    localStorageService.saveSheet(sheet);
-  },
-  deleteSheet: async (id) => {
-    localStorageService.deleteSheet(id);
-  },
-  getMasterData: async () => localStorageService.getMasterData(),
-  saveMasterData: async (data) => {
-    localStorageService.saveMasterData(data);
-  },
-};
 
 const apiDataService: DataService = {
   getUsers: async () => apiClient.get<User[]>('/api/users'),
@@ -79,7 +46,5 @@ const apiDataService: DataService = {
   },
 };
 
-export const isApiDataSource = dataSource === 'api';
-export const dataService: DataService = isApiDataSource
-  ? apiDataService
-  : localDataService;
+export const isApiDataSource = true;
+export const dataService: DataService = apiDataService;

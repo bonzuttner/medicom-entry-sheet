@@ -25,6 +25,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   const [formData, setFormData] = useState<EntrySheet>(initialData);
   const [activeTab, setActiveTab] = useState<number>(initialActiveTab); // Index of the product being edited
   const [isSaving, setIsSaving] = useState(false);
+  const [pendingUploads, setPendingUploads] = useState(0);
   const askedPrefillByProductRef = useRef<Map<number, string>>(new Map());
 
   const parseRequiredNumber = (value: string): number => {
@@ -92,6 +93,15 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     return payload.url;
   };
 
+  const runTrackedUpload = async <T,>(task: () => Promise<T>): Promise<T> => {
+    setPendingUploads((current) => current + 1);
+    try {
+      return await task();
+    } finally {
+      setPendingUploads((current) => Math.max(0, current - 1));
+    }
+  };
+
   const handleAddAttachments = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const MAX_FILE_BYTES = 25 * 1024 * 1024;
@@ -106,8 +116,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       validFiles.push(file);
     }
 
-    const uploadResults = await Promise.allSettled(
-      validFiles.map((file) => uploadFile(file, 'attachment'))
+    const uploadResults = await runTrackedUpload(() =>
+      Promise.allSettled(validFiles.map((file) => uploadFile(file, 'attachment')))
     );
 
     uploadResults.forEach((result, index) => {
@@ -147,8 +157,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       validFiles.push(file);
     }
 
-    const uploadResults = await Promise.allSettled(
-      validFiles.map((file) => uploadFile(file, 'attachment'))
+    const uploadResults = await runTrackedUpload(() =>
+      Promise.allSettled(validFiles.map((file) => uploadFile(file, 'attachment')))
     );
 
     uploadResults.forEach((result, index) => {
@@ -345,7 +355,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   const addProduct = () => {
     const newProduct: ProductEntry = {
       id: uuidv4(),
-      shelfName: masterData.shelfNames[0],
+      shelfName: masterData.shelfNames[0] || '',
       manufacturerName: formData.manufacturerName,
       janCode: '',
       productName: '',
@@ -382,6 +392,10 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
   const saveSheet = async (status: 'draft' | 'completed') => {
     if (isSaving) return;
+    if (pendingUploads > 0) {
+        alert("ファイルアップロード中です。完了後に保存してください。");
+        return;
+    }
     // Basic validation
     if (!formData.creatorName) {
         alert("作成者を入力してください");
@@ -467,7 +481,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                 alert(`解像度不足です（短辺${MIN_SHORT_SIDE_PX}px未満）。`);
                 return;
               }
-              const url = await uploadFile(file, 'image');
+              const url = await runTrackedUpload(() => uploadFile(file, 'image'));
               handleProductChange(index, field, url);
             } catch {
               alert(`画像のアップロードに失敗しました: ${file.name}`);
@@ -503,18 +517,18 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             <div className="w-full sm:w-auto flex gap-3 order-1 sm:order-2">
                 <button 
                     onClick={() => { void saveSheet('draft'); }}
-                    disabled={isSaving}
+                    disabled={isSaving || pendingUploads > 0}
                     className="flex-1 sm:flex-none px-4 py-3 bg-slate-200 text-slate-700 font-bold rounded-lg hover:bg-slate-300 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    {isSaving ? '保存中...' : '一時保存'}
+                    {pendingUploads > 0 ? 'アップロード中...' : isSaving ? '保存中...' : '一時保存'}
                 </button>
                 <button 
                     onClick={() => { void saveSheet('completed'); }}
-                    disabled={isSaving}
+                    disabled={isSaving || pendingUploads > 0}
                     className="flex-[2] sm:flex-none px-6 py-3 bg-primary text-white font-bold rounded-lg hover:bg-sky-600 shadow-lg shadow-sky-200 flex items-center justify-center gap-2 transition-colors whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                     <Save size={20} />
-                    {isSaving ? '保存中...' : '完了'}
+                    {pendingUploads > 0 ? 'アップロード中...' : isSaving ? '保存中...' : '完了'}
                 </button>
             </div>
          </div>

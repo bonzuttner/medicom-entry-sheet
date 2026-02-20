@@ -7,6 +7,27 @@ interface PutMasterBody {
   data?: MasterData;
 }
 
+const MAX_MASTER_VALUE_LENGTH = 20;
+
+const findTooLongMasterValue = (data: MasterData): string | null => {
+  const categories: Array<{ label: string; values: string[] }> = [
+    { label: 'メーカー名', values: data.manufacturerNames || [] },
+    { label: '棚割名', values: data.shelfNames || [] },
+    { label: 'リスク分類', values: data.riskClassifications || [] },
+    { label: '特定成分', values: data.specificIngredients || [] },
+  ];
+
+  for (const category of categories) {
+    for (const value of category.values) {
+      if (typeof value === 'string' && value.length > MAX_MASTER_VALUE_LENGTH) {
+        return category.label;
+      }
+    }
+  }
+
+  return null;
+};
+
 export default async function handler(req: any, res: any) {
   const method = getMethod(req);
 
@@ -33,6 +54,11 @@ export default async function handler(req: any, res: any) {
     const body = await readJsonBody<PutMasterBody>(req);
     if (!body.data) {
       sendError(res, 400, 'data is required');
+      return;
+    }
+    const tooLongCategory = findTooLongMasterValue(body.data);
+    if (tooLongCategory) {
+      sendError(res, 400, `${tooLongCategory}は${MAX_MASTER_VALUE_LENGTH}文字以内で入力してください`);
       return;
     }
 

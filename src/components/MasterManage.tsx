@@ -107,8 +107,12 @@ const MasterSection = ({ title, items, onAdd, onRemove, isSaving }: { title: str
                 />
                 <button 
                     onClick={async () => {
-                      await onAdd(input);
-                      setInput('');
+                      try {
+                        await onAdd(input);
+                        setInput('');
+                      } catch (error) {
+                        console.error('Failed to add master item:', error);
+                      }
                     }}
                     disabled={isSaving}
                     className="bg-secondary text-white px-4 py-2 rounded-lg hover:bg-slate-600 flex items-center gap-1"

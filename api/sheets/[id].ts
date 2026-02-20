@@ -8,6 +8,8 @@ interface PutSheetBody {
   sheet?: EntrySheet;
 }
 
+const MAX_GENERAL_TEXT_LENGTH = 4000;
+
 const getSheetId = (req: any): string | null => {
   const raw = req.query?.id;
   if (Array.isArray(raw)) return raw[0] || null;
@@ -24,11 +26,37 @@ const normalizeProducts = (
   if (!Array.isArray(incoming)) return [];
   return incoming.map((product) => ({
     ...product,
-    manufacturerName: product.manufacturerName || fallbackManufacturerName,
+    // Product manufacturer must always match sheet owner manufacturer.
+    manufacturerName: fallbackManufacturerName,
     janCode: String(product.janCode || '').trim(),
     productName: String(product.productName || '').trim(),
     shelfName: String(product.shelfName || '').trim(),
   }));
+};
+
+const isTooLong = (value: string | undefined): boolean =>
+  typeof value === 'string' && value.length > MAX_GENERAL_TEXT_LENGTH;
+
+const findTooLongField = (sheet: EntrySheet): string | null => {
+  if (isTooLong(sheet.title)) return 'タイトル';
+  if (isTooLong(sheet.notes)) return 'エントリシート補足情報';
+  if (isTooLong(sheet.email)) return '担当者メール';
+  if (isTooLong(sheet.phoneNumber)) return '担当者電話番号';
+
+  for (let i = 0; i < sheet.products.length; i += 1) {
+    const product = sheet.products[i];
+    const prefix = `商品${i + 1}`;
+    if (isTooLong(product.shelfName)) return `${prefix} 棚割名`;
+    if (isTooLong(product.productName)) return `${prefix} 商品名`;
+    if (isTooLong(product.janCode)) return `${prefix} JANコード`;
+    if (isTooLong(product.catchCopy)) return `${prefix} キャッチコピー`;
+    if (isTooLong(product.productMessage)) return `${prefix} 商品メッセージ`;
+    if (isTooLong(product.productNotes)) return `${prefix} 補足事項`;
+    if (isTooLong(product.promoSample)) return `${prefix} 香り・色見本`;
+    if (isTooLong(product.specialFixture)) return `${prefix} 特殊な陳列什器`;
+  }
+
+  return null;
 };
 
 export default async function handler(req: any, res: any) {
@@ -83,6 +111,11 @@ export default async function handler(req: any, res: any) {
 
     if (safeSheet.products.length === 0) {
       sendError(res, 400, 'At least one product is required');
+      return;
+    }
+    const tooLongField = findTooLongField(safeSheet);
+    if (tooLongField) {
+      sendError(res, 400, `${tooLongField}は${MAX_GENERAL_TEXT_LENGTH}文字以内で入力してください`);
       return;
     }
 

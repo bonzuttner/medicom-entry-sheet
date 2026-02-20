@@ -19,7 +19,7 @@ import {
   sendError,
   sendJson,
 } from '../_lib/http.js';
-import { readStore } from '../_lib/store.js';
+import { hashPassword, isHashedPassword } from '../_lib/password.js';
 import { StoreData, EntrySheet, ProductEntry, Attachment } from '../_lib/types.js';
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
@@ -56,18 +56,13 @@ const normalizeStoreDataForPostgres = (data: StoreData): StoreData => {
     return { ...user, id: nextId };
   });
 
-  const sheetIdMap = new Map<string, string>();
-  const productIdMap = new Map<string, string>();
-
   const sheets = data.sheets.map((sheet) => {
     const nextSheetId = ensureUuid(sheet.id, 'sheet');
-    sheetIdMap.set(sheet.id, nextSheetId);
 
     const nextCreatorId = userIdMap.get(sheet.creatorId) || ensureUuid(sheet.creatorId, 'user');
 
     const products = sheet.products.map((product) => {
       const nextProductId = ensureUuid(product.id, 'product');
-      productIdMap.set(product.id, nextProductId);
       return { ...product, id: nextProductId };
     });
 
@@ -126,6 +121,10 @@ const migrateUsers = async (
     if (!manufacturerId) {
       throw new Error(`Manufacturer not found: ${user.manufacturerName}`);
     }
+    if (!user.password) {
+      throw new Error(`Password is required for user: ${user.username}`);
+    }
+    const passwordHash = isHashedPassword(user.password) ? user.password : hashPassword(user.password);
 
     // 既存ユーザーがあれば削除（旧ID形式からの移行を考慮してusername基準）
     await dbClient.query('DELETE FROM users WHERE username = $1', [user.username]);
@@ -152,7 +151,7 @@ const migrateUsers = async (
       [
         user.id,
         user.username,
-        user.password || '',
+        passwordHash,
         user.displayName,
         manufacturerId,
         user.email,
@@ -342,7 +341,6 @@ export default async function handler(req: any, res: any) {
   }
 
   // 認証・認可チェック
-  await readStore();
   const currentUser = await requireUser(req, res);
   if (!currentUser) return;
   if (!isAdmin(currentUser)) {
