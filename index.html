@@ -23,7 +23,10 @@
     <style>
       body {
         cursor: default;
-        caret-color: transparent;
+      }
+
+      *:not(input):not(textarea):not(select):not([contenteditable="true"]) {
+        caret-color: transparent !important;
       }
 
       input,

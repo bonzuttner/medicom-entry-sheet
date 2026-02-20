@@ -9,7 +9,7 @@
  * Body: { data: StoreData }
  */
 
-import { sql } from '@vercel/postgres';
+import { sql, type VercelPoolClient } from '@vercel/postgres';
 import { createHash } from 'crypto';
 import { isAdmin, requireUser } from '../_lib/auth.js';
 import {
@@ -45,6 +45,8 @@ const deterministicUuid = (value: string): string => {
 
 const ensureUuid = (value: string, scope: string): string =>
   isUuid(value) ? value : deterministicUuid(`${scope}:${value}`);
+
+type DbClient = Pick<VercelPoolClient, 'query'>;
 
 const normalizeStoreDataForPostgres = (data: StoreData): StoreData => {
   const userIdMap = new Map<string, string>();
@@ -89,17 +91,19 @@ const normalizeStoreDataForPostgres = (data: StoreData): StoreData => {
  * @returns メーカー名 → UUID のマッピング
  */
 const migrateManufacturers = async (
+  dbClient: DbClient,
   manufacturerNames: string[]
 ): Promise<Map<string, string>> => {
   const mapping = new Map<string, string>();
 
   for (const name of manufacturerNames) {
-    const result = await sql`
-      INSERT INTO manufacturers (name)
-      VALUES (${name})
-      ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-      RETURNING id
-    `;
+    const result = await dbClient.query(
+      `INSERT INTO manufacturers (name)
+       VALUES ($1)
+       ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+       RETURNING id`,
+      [name]
+    );
     mapping.set(name, result.rows[0].id);
   }
 
@@ -111,6 +115,7 @@ const migrateManufacturers = async (
  * @returns ユーザーID（UUID文字列） → PostgreSQL UUID のマッピング
  */
 const migrateUsers = async (
+  dbClient: DbClient,
   users: StoreData['users'],
   manufacturerMapping: Map<string, string>
 ): Promise<Map<string, string>> => {
@@ -123,36 +128,38 @@ const migrateUsers = async (
     }
 
     // 既存ユーザーがあれば削除（旧ID形式からの移行を考慮してusername基準）
-    await sql`DELETE FROM users WHERE username = ${user.username}`;
+    await dbClient.query('DELETE FROM users WHERE username = $1', [user.username]);
 
-    const result = await sql`
-      INSERT INTO users (
-        id, username, password_hash, display_name, manufacturer_id,
-        email, phone_number, role, created_at, updated_at
-      ) VALUES (
-        ${user.id},
-        ${user.username},
-        ${user.password || ''},
-        ${user.displayName},
-        ${manufacturerId},
-        ${user.email},
-        ${user.phoneNumber || ''},
-        ${user.role},
-        NOW(),
-        NOW()
-      )
-      ON CONFLICT (username) DO UPDATE SET
-        id = EXCLUDED.id,
-        username = EXCLUDED.username,
-        password_hash = EXCLUDED.password_hash,
-        display_name = EXCLUDED.display_name,
-        manufacturer_id = EXCLUDED.manufacturer_id,
-        email = EXCLUDED.email,
-        phone_number = EXCLUDED.phone_number,
-        role = EXCLUDED.role,
-        updated_at = NOW()
-      RETURNING id
-    `;
+    const result = await dbClient.query(
+      `INSERT INTO users (
+         id, username, password_hash, display_name, manufacturer_id,
+         email, phone_number, role, created_at, updated_at
+       ) VALUES (
+         $1, $2, $3, $4, $5,
+         $6, $7, $8, NOW(), NOW()
+       )
+       ON CONFLICT (username) DO UPDATE SET
+         id = EXCLUDED.id,
+         username = EXCLUDED.username,
+         password_hash = EXCLUDED.password_hash,
+         display_name = EXCLUDED.display_name,
+         manufacturer_id = EXCLUDED.manufacturer_id,
+         email = EXCLUDED.email,
+         phone_number = EXCLUDED.phone_number,
+         role = EXCLUDED.role,
+         updated_at = NOW()
+       RETURNING id`,
+      [
+        user.id,
+        user.username,
+        user.password || '',
+        user.displayName,
+        manufacturerId,
+        user.email,
+        user.phoneNumber || '',
+        user.role,
+      ]
+    );
     mapping.set(user.id, result.rows[0].id);
   }
 
@@ -163,6 +170,7 @@ const migrateUsers = async (
  * エントリーシートをPostgreSQLに投入
  */
 const migrateSheets = async (
+  dbClient: DbClient,
   sheets: EntrySheet[],
   manufacturerMapping: Map<string, string>
 ): Promise<void> => {
@@ -173,32 +181,35 @@ const migrateSheets = async (
     }
 
     // 既存シートがあれば削除（CASCADE で商品・添付ファイルも削除）
-    await sql`DELETE FROM entry_sheets WHERE id = ${sheet.id}`;
+    await dbClient.query('DELETE FROM entry_sheets WHERE id = $1', [sheet.id]);
 
     // シート本体を投入
-    await sql`
-      INSERT INTO entry_sheets (
-        id, creator_id, manufacturer_id, title, notes, status,
-        created_at, updated_at
-      ) VALUES (
-        ${sheet.id},
-        ${sheet.creatorId},
-        ${manufacturerId},
-        ${sheet.title},
-        ${sheet.notes || null},
-        ${sheet.status},
-        ${sheet.createdAt || new Date().toISOString()},
-        ${sheet.updatedAt || new Date().toISOString()}
-      )
-    `;
+    await dbClient.query(
+      `INSERT INTO entry_sheets (
+         id, creator_id, manufacturer_id, title, notes, status,
+         created_at, updated_at
+       ) VALUES (
+         $1, $2, $3, $4, $5, $6, $7, $8
+       )`,
+      [
+        sheet.id,
+        sheet.creatorId,
+        manufacturerId,
+        sheet.title,
+        sheet.notes || null,
+        sheet.status,
+        sheet.createdAt || new Date().toISOString(),
+        sheet.updatedAt || new Date().toISOString(),
+      ]
+    );
 
     // シートの添付ファイルを投入
     if (sheet.attachments && sheet.attachments.length > 0) {
-      await migrateAttachments(sheet.attachments, sheet.id, null);
+      await migrateAttachments(dbClient, sheet.attachments, sheet.id, null);
     }
 
     // 商品エントリーを投入
-    await migrateProducts(sheet.products, sheet.id, manufacturerMapping);
+    await migrateProducts(dbClient, sheet.products, sheet.id, manufacturerMapping);
   }
 };
 
@@ -206,6 +217,7 @@ const migrateSheets = async (
  * 商品エントリーをPostgreSQLに投入
  */
 const migrateProducts = async (
+  dbClient: DbClient,
   products: ProductEntry[],
   sheetId: string,
   manufacturerMapping: Map<string, string>
@@ -216,57 +228,64 @@ const migrateProducts = async (
       throw new Error(`Manufacturer not found for product: ${product.manufacturerName}`);
     }
 
-    await sql`
-      INSERT INTO product_entries (
-        id, sheet_id, shelf_name, manufacturer_id, jan_code, product_name,
-        product_image_url, risk_classification, catch_copy, product_message,
-        product_notes, width, height, depth, facing_count, arrival_date,
-        has_promo_material, promo_sample, special_fixture,
-        promo_width, promo_height, promo_depth, promo_image_url,
-        created_at, updated_at
-      ) VALUES (
-        ${product.id},
-        ${sheetId},
-        ${product.shelfName},
-        ${manufacturerId},
-        ${product.janCode},
-        ${product.productName},
-        ${product.productImage || null},
-        ${product.riskClassification || null},
-        ${product.catchCopy || null},
-        ${product.productMessage || null},
-        ${product.productNotes || null},
-        ${product.width || null},
-        ${product.height || null},
-        ${product.depth || null},
-        ${product.facingCount || null},
-        ${product.arrivalDate || null},
-        ${product.hasPromoMaterial === 'yes'},
-        ${product.promoSample || null},
-        ${product.specialFixture || null},
-        ${product.promoWidth || null},
-        ${product.promoHeight || null},
-        ${product.promoDepth || null},
-        ${product.promoImage || null},
-        NOW(),
-        NOW()
-      )
-    `;
+    await dbClient.query(
+      `INSERT INTO product_entries (
+         id, sheet_id, shelf_name, manufacturer_id, jan_code, product_name,
+         product_image_url, risk_classification, catch_copy, product_message,
+         product_notes, width, height, depth, facing_count, arrival_date,
+         has_promo_material, promo_sample, special_fixture,
+         promo_width, promo_height, promo_depth, promo_image_url,
+         created_at, updated_at
+       ) VALUES (
+         $1, $2, $3, $4, $5, $6,
+         $7, $8, $9, $10,
+         $11, $12, $13, $14, $15, $16,
+         $17, $18, $19,
+         $20, $21, $22, $23,
+         NOW(), NOW()
+       )`,
+      [
+        product.id,
+        sheetId,
+        product.shelfName,
+        manufacturerId,
+        product.janCode,
+        product.productName,
+        product.productImage || null,
+        product.riskClassification || null,
+        product.catchCopy || null,
+        product.productMessage || null,
+        product.productNotes || null,
+        product.width || null,
+        product.height || null,
+        product.depth || null,
+        product.facingCount || null,
+        product.arrivalDate || null,
+        product.hasPromoMaterial === 'yes',
+        product.promoSample || null,
+        product.specialFixture || null,
+        product.promoWidth || null,
+        product.promoHeight || null,
+        product.promoDepth || null,
+        product.promoImage || null,
+      ]
+    );
 
     // 特定成分を投入
     if (product.specificIngredients && product.specificIngredients.length > 0) {
       for (const ingredient of product.specificIngredients) {
-        await sql`
-          INSERT INTO product_ingredients (product_id, ingredient_name)
-          VALUES (${product.id}, ${ingredient})
-          ON CONFLICT (product_id, ingredient_name) DO NOTHING
-        `;
+        await dbClient.query(
+          `INSERT INTO product_ingredients (product_id, ingredient_name)
+           VALUES ($1, $2)
+           ON CONFLICT (product_id, ingredient_name) DO NOTHING`,
+          [product.id, ingredient]
+        );
       }
     }
 
     // 商品の添付ファイルを投入
     if (product.productAttachments && product.productAttachments.length > 0) {
-      await migrateAttachments(product.productAttachments, null, product.id);
+      await migrateAttachments(dbClient, product.productAttachments, null, product.id);
     }
   }
 };
@@ -275,32 +294,29 @@ const migrateProducts = async (
  * 添付ファイルをPostgreSQLに投入
  */
 const migrateAttachments = async (
+  dbClient: DbClient,
   attachments: Attachment[],
   sheetId: string | null,
   productId: string | null
 ): Promise<void> => {
   for (const attachment of attachments) {
-    await sql`
-      INSERT INTO attachments (
-        sheet_id, product_id, name, size, type, url, created_at
-      ) VALUES (
-        ${sheetId},
-        ${productId},
-        ${attachment.name},
-        ${attachment.size},
-        ${attachment.type},
-        ${attachment.url},
-        NOW()
-      )
-    `;
+    await dbClient.query(
+      `INSERT INTO attachments (
+         sheet_id, product_id, name, size, type, url, created_at
+       ) VALUES (
+         $1, $2, $3, $4, $5, $6, NOW()
+       )`,
+      [sheetId, productId, attachment.name, attachment.size, attachment.type, attachment.url]
+    );
   }
 };
 
 /**
  * マスターデータをPostgreSQLに投入
  */
-const migrateMasterData = async (master: StoreData['master']): Promise<void> => {
+const migrateMasterData = async (dbClient: DbClient, master: StoreData['master']): Promise<void> => {
   const categories = [
+    { key: 'manufacturer_name', values: master.manufacturerNames },
     { key: 'shelf_name', values: master.shelfNames },
     { key: 'risk_classification', values: master.riskClassifications },
     { key: 'specific_ingredient', values: master.specificIngredients },
@@ -308,11 +324,12 @@ const migrateMasterData = async (master: StoreData['master']): Promise<void> => 
 
   for (const category of categories) {
     for (let i = 0; i < category.values.length; i++) {
-      await sql`
-        INSERT INTO master_data (category, value, display_order)
-        VALUES (${category.key}, ${category.values[i]}, ${i})
-        ON CONFLICT (category, value) DO UPDATE SET display_order = EXCLUDED.display_order
-      `;
+      await dbClient.query(
+        `INSERT INTO master_data (category, value, display_order)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (category, value) DO UPDATE SET display_order = EXCLUDED.display_order`,
+        [category.key, category.values[i], i]
+      );
     }
   }
 };
@@ -342,43 +359,48 @@ export default async function handler(req: any, res: any) {
   const normalizedData = normalizeStoreDataForPostgres(body.data);
 
   try {
-    // トランザクション開始
-    await sql`BEGIN`;
-
-    // 1. メーカーマスターを投入
-    const manufacturerMapping = await migrateManufacturers(
-      normalizedData.master.manufacturerNames
-    );
-
-    // 2. ユーザーを投入
-    await migrateUsers(normalizedData.users, manufacturerMapping);
-
-    // 3. エントリーシートを投入（商品・添付ファイルも含む）
-    await migrateSheets(normalizedData.sheets, manufacturerMapping);
-
-    // 4. マスターデータを投入
-    await migrateMasterData(normalizedData.master);
-
-    // トランザクションコミット
-    await sql`COMMIT`;
-
-    sendJson(res, 200, {
-      ok: true,
-      migrated: {
-        manufacturers: manufacturerMapping.size,
-        users: normalizedData.users.length,
-        sheets: normalizedData.sheets.length,
-        products: normalizedData.sheets.reduce((sum, s) => sum + s.products.length, 0),
-      },
-    });
-  } catch (error) {
-    // エラー発生時はロールバック
+    const client = await sql.connect();
     try {
-      await sql`ROLLBACK`;
-    } catch (rollbackError) {
-      console.error('Rollback failed:', rollbackError);
-    }
+      await client.query('BEGIN');
 
+      // 1. メーカーマスターを投入
+      const manufacturerMapping = await migrateManufacturers(
+        client,
+        normalizedData.master.manufacturerNames
+      );
+
+      // 2. ユーザーを投入
+      await migrateUsers(client, normalizedData.users, manufacturerMapping);
+
+      // 3. エントリーシートを投入（商品・添付ファイルも含む）
+      await migrateSheets(client, normalizedData.sheets, manufacturerMapping);
+
+      // 4. マスターデータを投入
+      await migrateMasterData(client, normalizedData.master);
+
+      // トランザクションコミット
+      await client.query('COMMIT');
+
+      sendJson(res, 200, {
+        ok: true,
+        migrated: {
+          manufacturers: manufacturerMapping.size,
+          users: normalizedData.users.length,
+          sheets: normalizedData.sheets.length,
+          products: normalizedData.sheets.reduce((sum, s) => sum + s.products.length, 0),
+        },
+      });
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackError) {
+        console.error('Rollback failed:', rollbackError);
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
     const message = error instanceof Error ? error.message : 'Migration failed';
     console.error('Migration error:', error);
     sendError(res, 500, `Migration failed: ${message}`);

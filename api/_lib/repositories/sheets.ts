@@ -98,6 +98,14 @@ const rowsToSheet = async (
     const ingredients = ingredientRows
       .filter((i) => i.product_id === p.id)
       .map((i) => i.ingredient_name);
+    const productAttachments: Attachment[] = attachmentRows
+      .filter((a) => a.product_id === p.id)
+      .map((a) => ({
+        name: a.name,
+        size: a.size,
+        type: a.type,
+        url: a.url,
+      }));
 
     return {
       id: p.id,
@@ -123,6 +131,7 @@ const rowsToSheet = async (
       promoDepth: p.promo_depth || undefined,
       promoImage: p.promo_image_url || undefined,
       specificIngredients: ingredients,
+      productAttachments: productAttachments.length > 0 ? productAttachments : undefined,
     };
   });
 
@@ -197,7 +206,14 @@ export const findAll = async (): Promise<EntrySheet[]> => {
       [sheetIds]
     ),
     db.query<AttachmentRow>(
-      `SELECT * FROM attachments WHERE sheet_id = ANY($1)`,
+      `
+      SELECT *
+      FROM attachments
+      WHERE sheet_id = ANY($1)
+         OR product_id IN (
+           SELECT id FROM product_entries WHERE sheet_id = ANY($1)
+         )
+      `,
       [sheetIds]
     ),
   ]);
@@ -259,7 +275,14 @@ export const findByManufacturerId = async (manufacturerId: string): Promise<Entr
       [sheetIds]
     ),
     db.query<AttachmentRow>(
-      `SELECT * FROM attachments WHERE sheet_id = ANY($1)`,
+      `
+      SELECT *
+      FROM attachments
+      WHERE sheet_id = ANY($1)
+         OR product_id IN (
+           SELECT id FROM product_entries WHERE sheet_id = ANY($1)
+         )
+      `,
       [sheetIds]
     ),
   ]);
@@ -317,7 +340,17 @@ export const findById = async (sheetId: string): Promise<EntrySheet | null> => {
       `,
       [sheetId]
     ),
-    db.query<AttachmentRow>(`SELECT * FROM attachments WHERE sheet_id = $1`, [sheetId]),
+    db.query<AttachmentRow>(
+      `
+      SELECT *
+      FROM attachments
+      WHERE sheet_id = $1
+         OR product_id IN (
+           SELECT id FROM product_entries WHERE sheet_id = $1
+         )
+      `,
+      [sheetId]
+    ),
   ]);
 
   return rowsToSheet(
@@ -448,6 +481,19 @@ export const upsert = async (sheet: EntrySheet): Promise<EntrySheet> => {
           await db.query(
             `INSERT INTO product_ingredients (product_id, ingredient_name) VALUES ($1, $2)`,
             [productId, ingredient]
+          );
+        }
+      }
+
+      // Insert product attachments
+      if (product.productAttachments && product.productAttachments.length > 0) {
+        for (const attachment of product.productAttachments) {
+          await db.query(
+            `
+            INSERT INTO attachments (product_id, name, size, type, url)
+            VALUES ($1, $2, $3, $4, $5)
+            `,
+            [productId, attachment.name, attachment.size, attachment.type, attachment.url]
           );
         }
       }

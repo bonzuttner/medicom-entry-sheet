@@ -232,9 +232,8 @@ const App: React.FC = () => {
 
   // User Management
   const handleSaveUser = async (user: User) => {
-    const newUsers = [...users.filter(u => u.id !== user.id), user];
     try {
-      await dataService.saveUsers(newUsers);
+      await dataService.saveUser(user);
       const refreshedUsers = await dataService.getUsers();
       setUsers(refreshedUsers);
     } catch (error) {
@@ -245,9 +244,9 @@ const App: React.FC = () => {
 
   const handleDeleteUser = async (id: string) => {
     try {
-      const newUsers = users.filter(u => u.id !== id);
-      await dataService.saveUsers(newUsers);
-      setUsers(newUsers);
+      await dataService.deleteUser(id);
+      const refreshedUsers = await dataService.getUsers();
+      setUsers(refreshedUsers);
     } catch (error) {
       console.error('Failed to delete user:', error);
     }

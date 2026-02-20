@@ -4,7 +4,8 @@ import { storage as localStorageService } from './storage';
 
 export interface DataService {
   getUsers: () => Promise<User[]>;
-  saveUsers: (users: User[]) => Promise<void>;
+  saveUser: (user: User) => Promise<void>;
+  deleteUser: (id: string) => Promise<void>;
   login: (username: string, password?: string) => Promise<User | null>;
   getCurrentUser: () => Promise<User | null>;
   setCurrentUser: (user: User | null) => Promise<void>;
@@ -20,7 +21,13 @@ const dataSource = import.meta.env.PROD ? 'api' : requestedDataSource;
 
 const localDataService: DataService = {
   getUsers: async () => localStorageService.getUsers(),
-  saveUsers: async (users) => {
+  saveUser: async (user) => {
+    const users = localStorageService.getUsers();
+    const next = [...users.filter((u) => u.id !== user.id), user];
+    localStorageService.saveUsers(next);
+  },
+  deleteUser: async (id) => {
+    const users = localStorageService.getUsers().filter((u) => u.id !== id);
     localStorageService.saveUsers(users);
   },
   login: async (username, password) => localStorageService.login(username, password),
@@ -43,8 +50,11 @@ const localDataService: DataService = {
 
 const apiDataService: DataService = {
   getUsers: async () => apiClient.get<User[]>('/api/users'),
-  saveUsers: async (users) => {
-    await apiClient.put<void>('/api/users', { users });
+  saveUser: async (user) => {
+    await apiClient.put<void>(`/api/users/${user.id}`, { user });
+  },
+  deleteUser: async (id) => {
+    await apiClient.delete<void>(`/api/users/${id}`);
   },
   login: async (username, password) =>
     apiClient.post<User | null>('/api/auth/login', { username, password }),

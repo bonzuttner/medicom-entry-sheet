@@ -124,6 +124,9 @@ export default async function handler(req: any, res: any) {
     try {
       savedSheet = await SheetRepository.upsert({ ...normalizedSheet, id: sheetId });
     } catch (error) {
+      // DB save failed after media normalization/upload.
+      // Delete newly uploaded blobs that are not part of the previous persisted sheet.
+      await deleteUnusedManagedBlobUrls([normalizedSheet], beforeSheets);
       const message = error instanceof Error ? error.message : 'Failed to save sheet';
       sendError(res, 500, message);
       return;

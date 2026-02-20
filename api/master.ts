@@ -11,6 +11,12 @@ export default async function handler(req: any, res: any) {
   const method = getMethod(req);
 
   if (method === 'GET') {
+    const currentUser = await requireUser(req, res);
+    if (!currentUser) return;
+    if (!isAdmin(currentUser)) {
+      sendError(res, 403, 'Only admin can view master data');
+      return;
+    }
     const masterData = await MasterRepository.getAll();
     sendJson(res, 200, masterData);
     return;

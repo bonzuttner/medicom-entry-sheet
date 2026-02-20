@@ -405,6 +405,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
   // Helper for mock image upload
   const handleImageUpload = (index: number, field: 'productImage' | 'promoImage') => {
+    const MIN_IMAGE_BYTES = 2 * 1024 * 1024;
+    const MAX_IMAGE_BYTES = 50 * 1024 * 1024;
     // Simulate file input click
     const input = document.createElement('input');
     input.type = 'file';
@@ -412,8 +414,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     input.onchange = (e) => {
         const file = (e.target as HTMLInputElement).files?.[0];
         if (file) {
-            if (file.size <= 0 || file.size > 10 * 1024 * 1024) {
-                alert("画像容量は10MB以下にしてください。");
+            if (file.size < MIN_IMAGE_BYTES || file.size > MAX_IMAGE_BYTES) {
+                alert("画像容量は2MB以上50MB以下にしてください。");
                 return;
             }
             uploadFile(file, 'image')

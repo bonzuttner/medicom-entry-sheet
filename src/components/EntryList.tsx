@@ -69,8 +69,15 @@ export const EntryList: React.FC<EntryListProps> = ({ sheets, currentUser, onCre
   };
 
   const executeExport = (targetSheets: EntrySheet[]) => {
+    const toSafeCsvCell = (value: unknown): string => {
+      const raw = value == null ? '' : String(value);
+      const normalized = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      const formulaGuarded = /^[=+\-@]/.test(normalized) ? `'${normalized}` : normalized;
+      return `"${formulaGuarded.replace(/"/g, '""')}"`;
+    };
+
     // Flatten data: 1 Row per Product
-    const csvRows = [
+    const csvRows: string[][] = [
       // Header
       [
         "シートID", "状態", "タイトル", "メーカー名", "作成者", "更新日", "担当者メール", "担当者電話",
@@ -82,28 +89,28 @@ export const EntryList: React.FC<EntryListProps> = ({ sheets, currentUser, onCre
     targetSheets.forEach(sheet => {
       sheet.products.forEach(prod => {
         csvRows.push([
-          sheet.id,
-          normalizeSheetStatus(sheet.status) === 'completed' ? '完了' : '下書き',
-          `"${sheet.title.replace(/"/g, '""')}"`, // Escape quotes
-          sheet.manufacturerName,
-          sheet.creatorName,
-          new Date(sheet.updatedAt).toLocaleDateString(),
-          sheet.email,
-          sheet.phoneNumber,
-          prod.id,
-          prod.shelfName,
-          `'${prod.janCode}`, // Excel string force
-          `"${prod.productName.replace(/"/g, '""')}"`,
-          prod.riskClassification,
-          prod.width.toString(),
-          prod.height.toString(),
-          prod.depth.toString(),
-          prod.facingCount.toString(),
-          prod.hasPromoMaterial === 'yes' ? '有り' : '無し',
-          prod.promoWidth ? prod.promoWidth.toString() : '',
-          prod.promoHeight ? prod.promoHeight.toString() : '',
-          prod.promoDepth ? prod.promoDepth.toString() : '',
-          `"${(prod.productMessage || '').replace(/"/g, '""')}"`
+          toSafeCsvCell(sheet.id),
+          toSafeCsvCell(normalizeSheetStatus(sheet.status) === 'completed' ? '完了' : '下書き'),
+          toSafeCsvCell(sheet.title),
+          toSafeCsvCell(sheet.manufacturerName),
+          toSafeCsvCell(sheet.creatorName),
+          toSafeCsvCell(new Date(sheet.updatedAt).toLocaleDateString()),
+          toSafeCsvCell(sheet.email),
+          toSafeCsvCell(sheet.phoneNumber),
+          toSafeCsvCell(prod.id),
+          toSafeCsvCell(prod.shelfName),
+          toSafeCsvCell(prod.janCode),
+          toSafeCsvCell(prod.productName),
+          toSafeCsvCell(prod.riskClassification),
+          toSafeCsvCell(prod.width),
+          toSafeCsvCell(prod.height),
+          toSafeCsvCell(prod.depth),
+          toSafeCsvCell(prod.facingCount),
+          toSafeCsvCell(prod.hasPromoMaterial === 'yes' ? '有り' : '無し'),
+          toSafeCsvCell(prod.promoWidth ?? ''),
+          toSafeCsvCell(prod.promoHeight ?? ''),
+          toSafeCsvCell(prod.promoDepth ?? ''),
+          toSafeCsvCell(prod.productMessage || ''),
         ]);
       });
     });

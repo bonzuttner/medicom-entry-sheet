@@ -1,4 +1,5 @@
-import { sql } from '@vercel/postgres';
+import { sql, type VercelPoolClient } from '@vercel/postgres';
+import { AsyncLocalStorage } from 'async_hooks';
 
 /**
  * PostgreSQL Database Connection Pool
@@ -11,6 +12,12 @@ import { sql } from '@vercel/postgres';
  * Note: @vercel/postgres is deprecated. Future versions should migrate to Neon SDK.
  * See: https://vercel.com/docs/storage/vercel-postgres/using-an-orm
  */
+
+const transactionClientStorage = new AsyncLocalStorage<VercelPoolClient>();
+
+const getActiveClient = (): VercelPoolClient | null => {
+  return transactionClientStorage.getStore() || null;
+};
 
 /**
  * Execute a SQL query with parameters
@@ -28,7 +35,10 @@ export const query = async <T = any>(
   params: any[] = []
 ): Promise<{ rows: T[]; rowCount: number }> => {
   try {
-    const result = await sql.query(queryString, params);
+    const client = getActiveClient();
+    const result = client
+      ? await client.query(queryString, params)
+      : await sql.query(queryString, params);
     return {
       rows: result.rows as T[],
       rowCount: result.rowCount || 0,
@@ -72,17 +82,29 @@ export const queryOne = async <T = any>(
  * });
  */
 export const transaction = async <T>(
-  callback: (client: typeof sql) => Promise<T>
+  callback: (client: VercelPoolClient) => Promise<T>
 ): Promise<T> => {
+  const existingClient = getActiveClient();
+  if (existingClient) {
+    return callback(existingClient);
+  }
+
+  const client = await sql.connect();
   try {
-    await sql.query('BEGIN');
-    const result = await callback(sql);
-    await sql.query('COMMIT');
+    await client.query('BEGIN');
+    const result = await transactionClientStorage.run(client, async () => callback(client));
+    await client.query('COMMIT');
     return result;
   } catch (error) {
-    await sql.query('ROLLBACK');
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      console.error('Transaction rollback error:', rollbackError);
+    }
     console.error('Transaction rolled back due to error:', error);
     throw error;
+  } finally {
+    client.release();
   }
 };
 

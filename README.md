@@ -40,8 +40,6 @@ npm run dev
 npm run dev:all
 ```
 
-アプリケーションは http://localhost:3000 で起動します。
-
 ### 開発環境設定
 
 `.env.local` でデータ取得先を切り替えできます。
