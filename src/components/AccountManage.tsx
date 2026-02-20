@@ -21,6 +21,13 @@ export const AccountManage: React.FC<AccountManageProps> = ({
   const [editingUser, setEditingUser] = useState<Partial<User> | null>(null);
   const [validationError, setValidationError] = useState<string>('');
   const passwordRule = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+  const emailRule = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+  const phoneRule = /^[0-9]{10,11}$/;
+
+  const normalizePhoneNumber = (value: string): string =>
+    value
+      .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
+      .replace(/[^0-9]/g, '');
   const manufacturerOptions = useMemo(
     () =>
       Array.from(
@@ -65,6 +72,19 @@ export const AccountManage: React.FC<AccountManageProps> = ({
       return;
     }
 
+    const normalizedEmail = (editingUser.email || '').trim();
+    const normalizedPhone = normalizePhoneNumber(editingUser.phoneNumber || '');
+
+    if (normalizedEmail && !emailRule.test(normalizedEmail)) {
+      setValidationError('メールアドレスの形式が正しくありません');
+      return;
+    }
+
+    if (normalizedPhone && !phoneRule.test(normalizedPhone)) {
+      setValidationError('電話番号はハイフンなしの10〜11桁の半角数字で入力してください');
+      return;
+    }
+
     const existingUser = users.find(u => u.id === editingUser.id);
     const isNewUser = !editingUser.id;
 
@@ -73,8 +93,8 @@ export const AccountManage: React.FC<AccountManageProps> = ({
         username: editingUser.username.trim(),
         displayName: editingUser.displayName.trim(),
         manufacturerName: editingUser.manufacturerName.trim(),
-        email: editingUser.email || '',
-        phoneNumber: editingUser.phoneNumber || '',
+        email: normalizedEmail,
+        phoneNumber: normalizedPhone,
         role: editingUser.role || UserRole.STAFF,
         password: editingUser.password || (isNewUser ? '' : existingUser?.password),
     };
@@ -155,11 +175,25 @@ export const AccountManage: React.FC<AccountManageProps> = ({
                     </div>
                      <div>
                         <label className="block text-sm font-medium text-slate-700">メールアドレス</label>
-                        <input className="w-full border p-2 rounded" value={editingUser.email || ''} onChange={e => setEditingUser({...editingUser, email: e.target.value})} />
+                        <input
+                            type="email"
+                            className="w-full border p-2 rounded"
+                            value={editingUser.email || ''}
+                            onChange={e => setEditingUser({...editingUser, email: e.target.value})}
+                            placeholder="example@company.co.jp"
+                        />
                     </div>
                      <div>
                         <label className="block text-sm font-medium text-slate-700">電話番号</label>
-                        <input className="w-full border p-2 rounded" value={editingUser.phoneNumber || ''} onChange={e => setEditingUser({...editingUser, phoneNumber: e.target.value})} />
+                        <input
+                            inputMode="numeric"
+                            className="w-full border p-2 rounded"
+                            value={editingUser.phoneNumber || ''}
+                            onChange={e => setEditingUser({...editingUser, phoneNumber: normalizePhoneNumber(e.target.value)})}
+                            placeholder="09012345678"
+                            maxLength={11}
+                        />
+                        <p className="text-xs text-slate-500 mt-1">※ ハイフンなしで入力（10〜11桁）</p>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700">パスワード <span className="text-red-500">*</span></label>

@@ -216,7 +216,8 @@ const App: React.FC = () => {
       setCurrentPage(Page.LIST);
     } catch (error) {
       console.error('Failed to save sheet:', error);
-      alert('保存に失敗しました。入力内容を確認して再試行してください。');
+      const message = error instanceof Error ? error.message : '保存に失敗しました';
+      alert(`保存に失敗しました: ${message}`);
     }
   };
 

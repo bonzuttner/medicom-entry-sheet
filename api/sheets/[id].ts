@@ -1,4 +1,4 @@
-import { canAccessManufacturer, requireUser } from '../_lib/auth.js';
+import { canAccessManufacturer, isAdmin, requireUser } from '../_lib/auth.js';
 import { getMethod, methodNotAllowed, readJsonBody, sendError, sendJson } from '../_lib/http.js';
 import { deleteUnusedManagedBlobUrls, normalizeSheetMedia } from '../_lib/media.js';
 import { EntrySheet } from '../_lib/types.js';
@@ -38,21 +38,35 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    if (!canAccessManufacturer(currentUser, sheet.manufacturerName)) {
+    const existingSheet = await SheetRepository.findById(sheetId);
+
+    // For STAFF users, enforce manufacturer/creator to avoid client-side mismatch causing save failures.
+    const safeSheet: EntrySheet = isAdmin(currentUser)
+      ? { ...sheet, id: sheetId }
+      : {
+          ...sheet,
+          id: sheetId,
+          manufacturerName: currentUser.manufacturerName,
+          creatorId: existingSheet?.creatorId || currentUser.id,
+          creatorName: existingSheet?.creatorName || currentUser.displayName,
+          email: sheet.email || currentUser.email,
+          phoneNumber: sheet.phoneNumber || currentUser.phoneNumber,
+        };
+
+    if (!canAccessManufacturer(currentUser, safeSheet.manufacturerName)) {
       sendError(res, 403, 'You can only save sheets in your manufacturer');
       return;
     }
 
     // Get existing sheet for blob cleanup
-    const existingSheet = await SheetRepository.findById(sheetId);
     const beforeSheets = existingSheet ? [existingSheet] : [];
 
     // Normalize media URLs (convert data URLs to Vercel Blob)
     let normalizedSheet: EntrySheet;
     try {
       normalizedSheet = await normalizeSheetMedia(
-        sheet,
-        `pharmapop/sheets/${sheet.id}`
+        safeSheet,
+        `pharmapop/sheets/${safeSheet.id}`
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Invalid media payload';
@@ -67,7 +81,14 @@ export default async function handler(req: any, res: any) {
     }
 
     // Save to database
-    const savedSheet = await SheetRepository.upsert({ ...normalizedSheet, id: sheetId });
+    let savedSheet: EntrySheet;
+    try {
+      savedSheet = await SheetRepository.upsert({ ...normalizedSheet, id: sheetId });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to save sheet';
+      sendError(res, 500, message);
+      return;
+    }
 
     // Clean up unused blob URLs
     await deleteUnusedManagedBlobUrls(beforeSheets, [savedSheet]);

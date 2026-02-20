@@ -1,6 +1,7 @@
 import * as db from '../db.js';
 import { EntrySheet, ProductEntry, Attachment } from '../types.js';
 import { ensureManufacturer } from './users.js';
+import { randomUUID } from 'crypto';
 
 /**
  * Sheet Repository
@@ -356,8 +357,26 @@ export const upsert = async (sheet: EntrySheet): Promise<EntrySheet> => {
     await db.query(`DELETE FROM product_entries WHERE sheet_id = $1`, [sheet.id]);
 
     // Insert products
+    const usedProductIds = new Set<string>();
     for (const product of sheet.products) {
       const productManufacturerId = await ensureManufacturer(product.manufacturerName);
+      let productId = product.id || randomUUID();
+
+      // Ensure product ID uniqueness within this save request and across sheets.
+      while (usedProductIds.has(productId)) {
+        productId = randomUUID();
+      }
+      while (true) {
+        const existing = await db.query<{ sheet_id: string }>(
+          `SELECT sheet_id FROM product_entries WHERE id = $1 LIMIT 1`,
+          [productId]
+        );
+        if (existing.rows.length === 0 || existing.rows[0].sheet_id === sheet.id) {
+          break;
+        }
+        productId = randomUUID();
+      }
+      usedProductIds.add(productId);
 
       await db.query(
         `
@@ -373,7 +392,7 @@ export const upsert = async (sheet: EntrySheet): Promise<EntrySheet> => {
         )
         `,
         [
-          product.id,
+          productId,
           sheet.id,
           product.shelfName,
           productManufacturerId,
@@ -404,7 +423,7 @@ export const upsert = async (sheet: EntrySheet): Promise<EntrySheet> => {
         for (const ingredient of product.specificIngredients) {
           await db.query(
             `INSERT INTO product_ingredients (product_id, ingredient_name) VALUES ($1, $2)`,
-            [product.id, ingredient]
+            [productId, ingredient]
           );
         }
       }
