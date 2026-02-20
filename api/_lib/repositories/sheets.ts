@@ -19,8 +19,8 @@ interface SheetRow {
   title: string;
   notes: string | null;
   status: string;
-  created_at: Date;
-  updated_at: Date;
+  created_at: Date | string;
+  updated_at: Date | string;
 }
 
 interface ProductRow {
@@ -39,7 +39,7 @@ interface ProductRow {
   height: number | null;
   depth: number | null;
   facing_count: number | null;
-  arrival_date: Date | null;
+  arrival_date: Date | string | null;
   has_promo_material: boolean;
   promo_sample: string | null;
   special_fixture: string | null;
@@ -48,6 +48,20 @@ interface ProductRow {
   promo_depth: number | null;
   promo_image_url: string | null;
 }
+
+const toIsoString = (value: Date | string | null | undefined): string => {
+  if (!value) return new Date().toISOString();
+  if (value instanceof Date) return value.toISOString();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+};
+
+const toDateOnlyString = (value: Date | string | null | undefined): string => {
+  if (!value) return '';
+  if (value instanceof Date) return value.toISOString().split('T')[0];
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString().split('T')[0];
+};
 
 interface IngredientRow {
   product_id: string;
@@ -93,7 +107,7 @@ const rowsToSheet = async (
       height: p.height || 0,
       depth: p.depth || 0,
       facingCount: p.facing_count || 1,
-      arrivalDate: p.arrival_date ? p.arrival_date.toISOString().split('T')[0] : '',
+      arrivalDate: toDateOnlyString(p.arrival_date),
       hasPromoMaterial: p.has_promo_material ? 'yes' : 'no',
       promoSample: p.promo_sample || undefined,
       specialFixture: p.special_fixture || undefined,
@@ -124,8 +138,8 @@ const rowsToSheet = async (
     title: sheetRow.title,
     notes: sheetRow.notes || undefined,
     status: sheetRow.status as 'draft' | 'completed',
-    createdAt: sheetRow.created_at.toISOString(),
-    updatedAt: sheetRow.updated_at.toISOString(),
+    createdAt: toIsoString(sheetRow.created_at),
+    updatedAt: toIsoString(sheetRow.updated_at),
     products,
     attachments: attachments.length > 0 ? attachments : undefined,
   };
