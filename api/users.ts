@@ -17,7 +17,7 @@ export default async function handler(req: any, res: any) {
     const users = isAdmin(currentUser)
       ? await UserRepository.findAll()
       : await UserRepository.findByManufacturerId(
-          (await UserRepository.getManufacturerId(currentUser.manufacturerName)) || ''
+          await UserRepository.getOrCreateManufacturerId(currentUser.manufacturerName)
         );
     sendJson(res, 200, users.map((u) => sanitizeUser(u)));
     return;

@@ -116,6 +116,15 @@ export const getManufacturerId = async (manufacturerName: string): Promise<strin
 };
 
 /**
+ * Get manufacturer ID by name, creating it when missing.
+ */
+export const getOrCreateManufacturerId = async (manufacturerName: string): Promise<string> => {
+  const existingId = await getManufacturerId(manufacturerName);
+  if (existingId) return existingId;
+  return ensureManufacturer(manufacturerName);
+};
+
+/**
  * Ensure manufacturer exists, create if not
  * Thread-safe: uses ON CONFLICT to handle concurrent inserts
  */
@@ -219,6 +228,7 @@ export default {
   findAll,
   findByManufacturerId,
   getManufacturerId,
+  getOrCreateManufacturerId,
   ensureManufacturer,
   upsert,
   upsertMany,

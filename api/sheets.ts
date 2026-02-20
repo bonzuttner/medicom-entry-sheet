@@ -21,7 +21,7 @@ export default async function handler(req: any, res: any) {
   const sheets = isAdmin(currentUser)
     ? await SheetRepository.findAll()
     : await SheetRepository.findByManufacturerId(
-        (await UserRepository.getManufacturerId(currentUser.manufacturerName)) || ''
+        await UserRepository.getOrCreateManufacturerId(currentUser.manufacturerName)
       );
 
   sendJson(res, 200, sheets);

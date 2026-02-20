@@ -18,6 +18,7 @@ export const AccountManage: React.FC<AccountManageProps> = ({
   onSaveUser,
   onDeleteUser,
 }) => {
+  const normalizeManufacturerKey = (value: string): string => value.trim();
   const [editingUser, setEditingUser] = useState<Partial<User> | null>(null);
   const [validationError, setValidationError] = useState<string>('');
   const passwordRule = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
@@ -44,7 +45,10 @@ export const AccountManage: React.FC<AccountManageProps> = ({
   // Permission check: Can the current user edit/delete this user?
   const canModifyUser = (targetUser: User): boolean => {
     if (currentUser.role === UserRole.ADMIN) return true;
-    return targetUser.manufacturerName === currentUser.manufacturerName;
+    return (
+      normalizeManufacturerKey(targetUser.manufacturerName) ===
+      normalizeManufacturerKey(currentUser.manufacturerName)
+    );
   };
 
   const handleSave = async () => {
@@ -67,7 +71,11 @@ export const AccountManage: React.FC<AccountManageProps> = ({
     }
 
     // Permission validation: STAFF can only create/edit users in their own manufacturer
-    if (currentUser.role === UserRole.STAFF && editingUser.manufacturerName !== currentUser.manufacturerName) {
+    if (
+      currentUser.role === UserRole.STAFF &&
+      normalizeManufacturerKey(editingUser.manufacturerName) !==
+        normalizeManufacturerKey(currentUser.manufacturerName)
+    ) {
       setValidationError(`他社（${editingUser.manufacturerName}）のアカウントは作成・編集できません`);
       return;
     }

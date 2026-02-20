@@ -18,6 +18,7 @@ const EMPTY_MASTER_DATA: MasterData = {
 };
 
 const normalizeProductName = (value: string): string => value.trim().toLowerCase();
+const normalizeManufacturerKey = (value: string): string => value.trim();
 
 const cloneProductTemplate = (product: ProductEntry): ProductEntry => ({
   ...product,
@@ -282,12 +283,20 @@ const App: React.FC = () => {
   // Filter sheets based on user role and manufacturer
   const visibleSheets = currentUser.role === UserRole.ADMIN
     ? sheets
-    : sheets.filter(sheet => sheet.manufacturerName === currentUser.manufacturerName);
+    : sheets.filter(
+        (sheet) =>
+          normalizeManufacturerKey(sheet.manufacturerName) ===
+          normalizeManufacturerKey(currentUser.manufacturerName)
+      );
 
   // Filter users based on user role and manufacturer
   const visibleUsers = currentUser.role === UserRole.ADMIN
     ? users
-    : users.filter(user => user.manufacturerName === currentUser.manufacturerName);
+    : users.filter(
+        (user) =>
+          normalizeManufacturerKey(user.manufacturerName) ===
+          normalizeManufacturerKey(currentUser.manufacturerName)
+      );
   const targetManufacturerName = editingSheet?.manufacturerName ?? currentUser.manufacturerName;
   const reusableProductTemplates = buildReusableProductTemplates(
     sheets,
