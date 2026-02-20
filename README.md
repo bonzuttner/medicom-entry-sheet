@@ -12,7 +12,7 @@
 
 ## 技術スタック
 
-- **フロントエンド**: React 19.2.4 + TypeScript 5.8.2
+- **フロントエンド**: React 19.2.4 + TypeScript 5.8.2　
 - **ビルドツール**: Vite 6.2.0
 - **スタイリング**: Tailwind CSS
 - **アイコン**: Lucide React
