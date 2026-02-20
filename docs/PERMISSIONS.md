@@ -143,6 +143,7 @@ const handleSave = () => {
 **UI制御**:
 - STAFF には「マスタ管理」メニューが表示されない
 - URL直接アクセスでも、レンダリング時に権限チェック
+- APIでも `GET /api/master` はADMINのみ許可（STAFF/未認証は 403/401）
 
 #### 編集権限
 

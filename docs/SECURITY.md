@@ -90,6 +90,7 @@
 - `ADMIN`: 全メーカー操作可
 - `STAFF`: 自社メーカーのみ操作可
 - API側で `requireUser` とメーカー境界チェックを適用
+- マスターデータは API でも ADMIN のみ閲覧・更新可（`GET /api/master`, `PUT /api/master`）
 
 実装参照:
 - `api/_lib/auth.ts`
@@ -110,7 +111,18 @@
 - `api/sheets.ts`
 - `api/sheets/[id].ts`
 
-### 6.7 本番時データソース制御
+### 6.7 画像アップロード要件（品質・容量）
+
+- 画像容量: `50MB以下`（下限なし）
+- 解像度推奨: `2500px × 3508px程度`
+- 強制基準: `短辺1500px未満` は解像度不足で拒否
+- 上記はクライアントとAPIの両方で検証
+
+実装参照:
+- `src/components/EntryForm.tsx`
+- `api/_lib/media.ts`
+
+### 6.8 本番時データソース制御
 
 - 開発時: `VITE_DATA_SOURCE` で `local/api` 切替
 - 本番ビルド: `api` を強制

@@ -162,7 +162,10 @@ interface Attachment {
 - 必須項目（シート）: `creatorName`, `email`, `phoneNumber`, `title`（下書き保存でも必須）
 - 必須項目（商品・完了時）: `productName`, `janCode`, `productImage`
 - `janCode` は `8/13/16` 桁のみ許容
-- 商品画像サイズは `2MB以上50MB以下`（UIには記載せず、エラー時に表示）
+- 商品画像サイズは `50MB以下`（下限なし）
+- 商品画像は `2500px × 3508px程度` を推奨
+- 商品画像は `短辺1500px未満` の場合、解像度不足として保存不可
+- 画像解像度チェックはクライアント・APIの両方で実施
 - 添付ファイルは `25MB以下`
 - `hasPromoMaterial === 'yes'` の場合、`promoWidth`, `promoImage` が必須
 - 棚割り幅合計 `Σ(幅 × フェイシング数)` が `840mm以上` の場合、完了不可（下書き保存は可能）

@@ -26,8 +26,9 @@ const ATTACHMENT_MIME_TYPES = new Set([
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 ]);
 
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 50 * 1024 * 1024;
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
+const MIN_IMAGE_SHORT_SIDE_PX = 1500;
 
 const safeFileName = (name: string): string =>
   name.replace(/[^\w.\-]/g, '_').slice(0, 120) || 'file';
@@ -81,6 +82,128 @@ const ensureAllowedSize = (size: number, isAttachment: boolean): void => {
   }
 };
 
+const readUInt32BE = (bytes: Uint8Array, offset: number): number =>
+  ((bytes[offset] << 24) |
+    (bytes[offset + 1] << 16) |
+    (bytes[offset + 2] << 8) |
+    bytes[offset + 3]) >>> 0;
+
+const readUInt32LE = (bytes: Uint8Array, offset: number): number =>
+  (bytes[offset] |
+    (bytes[offset + 1] << 8) |
+    (bytes[offset + 2] << 16) |
+    (bytes[offset + 3] << 24)) >>> 0;
+
+const readUInt16BE = (bytes: Uint8Array, offset: number): number =>
+  (bytes[offset] << 8) | bytes[offset + 1];
+
+const readUInt16LE = (bytes: Uint8Array, offset: number): number =>
+  bytes[offset] | (bytes[offset + 1] << 8);
+
+const parsePngDimensions = (bytes: Uint8Array): { width: number; height: number } | null => {
+  if (bytes.length < 24) return null;
+  const pngSig = [137, 80, 78, 71, 13, 10, 26, 10];
+  for (let i = 0; i < pngSig.length; i += 1) {
+    if (bytes[i] !== pngSig[i]) return null;
+  }
+  return {
+    width: readUInt32BE(bytes, 16),
+    height: readUInt32BE(bytes, 20),
+  };
+};
+
+const parseJpegDimensions = (bytes: Uint8Array): { width: number; height: number } | null => {
+  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return null;
+  let offset = 2;
+  while (offset + 9 < bytes.length) {
+    if (bytes[offset] !== 0xff) {
+      offset += 1;
+      continue;
+    }
+    const marker = bytes[offset + 1];
+    const length = readUInt16BE(bytes, offset + 2);
+    const isSof =
+      (marker >= 0xc0 && marker <= 0xc3) ||
+      (marker >= 0xc5 && marker <= 0xc7) ||
+      (marker >= 0xc9 && marker <= 0xcb) ||
+      (marker >= 0xcd && marker <= 0xcf);
+    if (isSof) {
+      return {
+        height: readUInt16BE(bytes, offset + 5),
+        width: readUInt16BE(bytes, offset + 7),
+      };
+    }
+    if (length < 2) return null;
+    offset += 2 + length;
+  }
+  return null;
+};
+
+const parseGifDimensions = (bytes: Uint8Array): { width: number; height: number } | null => {
+  if (bytes.length < 10) return null;
+  const header = String.fromCharCode(...bytes.slice(0, 6));
+  if (header !== 'GIF87a' && header !== 'GIF89a') return null;
+  return {
+    width: readUInt16LE(bytes, 6),
+    height: readUInt16LE(bytes, 8),
+  };
+};
+
+const parseBmpDimensions = (bytes: Uint8Array): { width: number; height: number } | null => {
+  if (bytes.length < 26 || bytes[0] !== 0x42 || bytes[1] !== 0x4d) return null;
+  const dibSize = readUInt32LE(bytes, 14);
+  if (dibSize < 12 || bytes.length < 26) return null;
+  return {
+    width: readUInt32LE(bytes, 18),
+    height: Math.abs(readUInt32LE(bytes, 22)),
+  };
+};
+
+const parseWebpDimensions = (bytes: Uint8Array): { width: number; height: number } | null => {
+  if (bytes.length < 30) return null;
+  const riff = String.fromCharCode(...bytes.slice(0, 4));
+  const webp = String.fromCharCode(...bytes.slice(8, 12));
+  if (riff !== 'RIFF' || webp !== 'WEBP') return null;
+  const chunkType = String.fromCharCode(...bytes.slice(12, 16));
+  if (chunkType === 'VP8X' && bytes.length >= 30) {
+    const widthMinusOne = bytes[24] | (bytes[25] << 8) | (bytes[26] << 16);
+    const heightMinusOne = bytes[27] | (bytes[28] << 8) | (bytes[29] << 16);
+    return { width: widthMinusOne + 1, height: heightMinusOne + 1 };
+  }
+  return null;
+};
+
+const parseImageDimensions = (
+  mimeType: string,
+  bytes: Uint8Array
+): { width: number; height: number } | null => {
+  switch (mimeType) {
+    case 'image/png':
+      return parsePngDimensions(bytes);
+    case 'image/jpeg':
+      return parseJpegDimensions(bytes);
+    case 'image/webp':
+      return parseWebpDimensions(bytes);
+    case 'image/gif':
+      return parseGifDimensions(bytes);
+    case 'image/bmp':
+      return parseBmpDimensions(bytes);
+    default:
+      return null;
+  }
+};
+
+const ensureImageResolution = (mimeType: string, bytes: Uint8Array): void => {
+  const dimensions = parseImageDimensions(mimeType, bytes);
+  if (!dimensions) {
+    throw new Error('画像の解像度を判定できない形式です（JPEG/PNG/WebP/GIF/BMPを使用してください）');
+  }
+  const shortSide = Math.min(dimensions.width, dimensions.height);
+  if (shortSide < MIN_IMAGE_SHORT_SIDE_PX) {
+    throw new Error(`解像度不足です（短辺${MIN_IMAGE_SHORT_SIDE_PX}px未満）`);
+  }
+};
+
 const uploadBinary = async (
   bytes: Uint8Array,
   mimeType: string,
@@ -121,6 +244,9 @@ const normalizeMediaUrl = async (
     const { mimeType, bytes } = parseDataUrl(value);
     ensureAllowedMime(mimeType, isAttachment);
     ensureAllowedSize(bytes.byteLength, isAttachment);
+    if (!isAttachment) {
+      ensureImageResolution(mimeType, bytes);
+    }
     return uploadBinary(bytes, mimeType, pathPrefix, fileName);
   }
 
@@ -215,6 +341,9 @@ export const uploadMediaDataUrl = async (
   const { mimeType, bytes } = parseDataUrl(dataUrl);
   ensureAllowedMime(mimeType, isAttachment);
   ensureAllowedSize(bytes.byteLength, isAttachment);
+  if (!isAttachment) {
+    ensureImageResolution(mimeType, bytes);
+  }
   return uploadBinary(bytes, mimeType, pathPrefix, fileName);
 };
 

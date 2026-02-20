@@ -405,26 +405,46 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
   // Helper for mock image upload
   const handleImageUpload = (index: number, field: 'productImage' | 'promoImage') => {
-    const MIN_IMAGE_BYTES = 2 * 1024 * 1024;
     const MAX_IMAGE_BYTES = 50 * 1024 * 1024;
+    const MIN_SHORT_SIDE_PX = 1500;
+    const getImageDimensions = (file: File): Promise<{ width: number; height: number }> =>
+      new Promise((resolve, reject) => {
+        const objectUrl = URL.createObjectURL(file);
+        const image = new Image();
+        image.onload = () => {
+          resolve({ width: image.naturalWidth, height: image.naturalHeight });
+          URL.revokeObjectURL(objectUrl);
+        };
+        image.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          reject(new Error('画像の解像度を判定できませんでした'));
+        };
+        image.src = objectUrl;
+      });
+
     // Simulate file input click
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
         const file = (e.target as HTMLInputElement).files?.[0];
         if (file) {
-            if (file.size < MIN_IMAGE_BYTES || file.size > MAX_IMAGE_BYTES) {
-                alert("画像容量は2MB以上50MB以下にしてください。");
+            if (file.size <= 0 || file.size > MAX_IMAGE_BYTES) {
+                alert("画像容量は50MB以下にしてください。");
                 return;
             }
-            uploadFile(file, 'image')
-              .then((url) => {
-                handleProductChange(index, field, url);
-              })
-              .catch(() => {
-                alert(`画像のアップロードに失敗しました: ${file.name}`);
-              });
+            try {
+              const { width, height } = await getImageDimensions(file);
+              const shortSide = Math.min(width, height);
+              if (shortSide < MIN_SHORT_SIDE_PX) {
+                alert(`解像度不足です（短辺${MIN_SHORT_SIDE_PX}px未満）。`);
+                return;
+              }
+              const url = await uploadFile(file, 'image');
+              handleProductChange(index, field, url);
+            } catch {
+              alert(`画像のアップロードに失敗しました: ${file.name}`);
+            }
         }
     };
     input.click();
@@ -702,7 +722,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                             )}
                         </div>
                         <div className="flex-1 text-sm text-slate-600">
-                            <p className="mb-2"><strong>推奨:</strong> 300dpi相当 (2500px以上)。</p>
+                            <p className="mb-2"><strong>推奨:</strong> 2500px × 3508px程度。</p>
+                            <p className="mb-2 text-slate-500">※ 短辺1500px未満は解像度不足で登録できません。</p>
                             <p className="mb-3 text-slate-500">※A4で印刷可能な高解像度画像をアップロードしてください。容量が大きい場合は担当者へメール送付してください。</p>
                             <button 
                                 onClick={() => handleImageUpload(activeTab, 'productImage')}
