@@ -9,6 +9,7 @@ import { dataService } from './services/dataService';
 import { User, Page, EntrySheet, MasterData, ProductEntry, UserRole } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
+
 const EMPTY_MASTER_DATA: MasterData = {
   manufacturerNames: [],
   shelfNames: [],
