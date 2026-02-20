@@ -1,27 +1,48 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { MasterData } from '../types';
 import { Plus, X } from 'lucide-react';
 
 interface MasterManageProps {
   data: MasterData;
-  onSave: (data: MasterData) => void;
+  onSave: (data: MasterData) => Promise<void> | void;
 }
 
 export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
   const [localData, setLocalData] = useState<MasterData>(data);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const addItem = (category: keyof MasterData, value: string) => {
-    if(!value) return;
-    const newData = { ...localData, [category]: [...localData[category], value] };
+  useEffect(() => {
+    setLocalData(data);
+  }, [data]);
+
+  const normalizeItem = (value: string): string => value.trim();
+
+  const persist = async (newData: MasterData) => {
     setLocalData(newData);
-    onSave(newData); // Auto save for UX
+    setIsSaving(true);
+    try {
+      await onSave(newData);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const removeItem = (category: keyof MasterData, value: string) => {
+  const addItem = async (category: keyof MasterData, rawValue: string) => {
+    const value = normalizeItem(rawValue);
+    if (!value) return;
+
+    if (localData[category].some((existing) => existing.trim() === value)) {
+      return;
+    }
+
+    const newData = { ...localData, [category]: [...localData[category], value] };
+    await persist(newData);
+  };
+
+  const removeItem = async (category: keyof MasterData, value: string) => {
     if(!window.confirm(`「${value}」を削除しますか？`)) return;
     const newData = { ...localData, [category]: localData[category].filter(v => v !== value) };
-    setLocalData(newData);
-    onSave(newData);
+    await persist(newData);
   };
 
   return (
@@ -34,6 +55,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
             items={localData.manufacturerNames} 
             onAdd={(v) => addItem('manufacturerNames', v)} 
             onRemove={(v) => removeItem('manufacturerNames', v)} 
+            isSaving={isSaving}
         />
 
         <MasterSection 
@@ -41,6 +63,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
             items={localData.shelfNames} 
             onAdd={(v) => addItem('shelfNames', v)} 
             onRemove={(v) => removeItem('shelfNames', v)} 
+            isSaving={isSaving}
         />
         
         <MasterSection 
@@ -48,6 +71,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
             items={localData.riskClassifications} 
             onAdd={(v) => addItem('riskClassifications', v)} 
             onRemove={(v) => removeItem('riskClassifications', v)} 
+            isSaving={isSaving}
         />
 
         <MasterSection 
@@ -55,12 +79,13 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
             items={localData.specificIngredients} 
             onAdd={(v) => addItem('specificIngredients', v)} 
             onRemove={(v) => removeItem('specificIngredients', v)} 
+            isSaving={isSaving}
         />
     </div>
   );
 };
 
-const MasterSection = ({ title, items, onAdd, onRemove }: { title: string, items: string[], onAdd: (v: string) => void, onRemove: (v: string) => void }) => {
+const MasterSection = ({ title, items, onAdd, onRemove, isSaving }: { title: string, items: string[], onAdd: (v: string) => Promise<void>, onRemove: (v: string) => Promise<void>, isSaving: boolean }) => {
     const [input, setInput] = useState('');
     return (
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
@@ -81,10 +106,14 @@ const MasterSection = ({ title, items, onAdd, onRemove }: { title: string, items
                     onChange={(e) => setInput(e.target.value)}
                 />
                 <button 
-                    onClick={() => { onAdd(input); setInput(''); }}
+                    onClick={async () => {
+                      await onAdd(input);
+                      setInput('');
+                    }}
+                    disabled={isSaving}
                     className="bg-secondary text-white px-4 py-2 rounded-lg hover:bg-slate-600 flex items-center gap-1"
                 >
-                    <Plus size={16} /> 追加
+                    <Plus size={16} /> {isSaving ? '保存中...' : '追加'}
                 </button>
             </div>
         </div>

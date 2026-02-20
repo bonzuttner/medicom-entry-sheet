@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Layout } from './components/Layout';
 import { Login } from './components/Login';
 import { EntryList } from './components/EntryList';
@@ -58,6 +58,7 @@ const App: React.FC = () => {
   const [editingSheet, setEditingSheet] = useState<EntrySheet | null>(null);
   const [initialProductIndex, setInitialProductIndex] = useState<number>(0);
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
+  const masterSaveSeqRef = useRef(0);
 
   // Initialize
   useEffect(() => {
@@ -185,6 +186,11 @@ const App: React.FC = () => {
 
   const handleDuplicateSheet = async (sheet: EntrySheet) => {
     try {
+      const duplicatedProducts = sheet.products.map((product) => ({
+        ...product,
+        id: uuidv4(),
+      }));
+
       const duplicated: EntrySheet = {
           ...sheet,
           id: uuidv4(),
@@ -192,11 +198,13 @@ const App: React.FC = () => {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           status: 'draft', // Reset status on copy
+          products: duplicatedProducts,
       };
       await dataService.saveSheet(duplicated);
       setSheets(await dataService.getSheets());
     } catch (error) {
       console.error('Failed to duplicate sheet:', error);
+      alert('複製の保存に失敗しました。時間をおいて再試行してください。');
     }
   };
 
@@ -208,6 +216,7 @@ const App: React.FC = () => {
       setCurrentPage(Page.LIST);
     } catch (error) {
       console.error('Failed to save sheet:', error);
+      alert('保存に失敗しました。入力内容を確認して再試行してください。');
     }
   };
 
@@ -222,12 +231,14 @@ const App: React.FC = () => {
 
   // User Management
   const handleSaveUser = async (user: User) => {
+    const newUsers = [...users.filter(u => u.id !== user.id), user];
     try {
-      const newUsers = [...users.filter(u => u.id !== user.id), user];
       await dataService.saveUsers(newUsers);
-      setUsers(newUsers);
+      const refreshedUsers = await dataService.getUsers();
+      setUsers(refreshedUsers);
     } catch (error) {
       console.error('Failed to save user:', error);
+      throw error;
     }
   };
 
@@ -243,9 +254,12 @@ const App: React.FC = () => {
 
   // Master Management
   const handleSaveMaster = async (data: MasterData) => {
+    const seq = ++masterSaveSeqRef.current;
     try {
       await dataService.saveMasterData(data);
-      setMasterData(data);
+      if (seq === masterSaveSeqRef.current) {
+        setMasterData(data);
+      }
     } catch (error) {
       console.error('Failed to save master data:', error);
     }

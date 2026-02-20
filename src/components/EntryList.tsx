@@ -19,6 +19,12 @@ export const EntryList: React.FC<EntryListProps> = ({ sheets, currentUser, onCre
   const [showExportModal, setShowExportModal] = useState(false);
   const [isDownloadingImages, setIsDownloadingImages] = useState(false);
 
+  const normalizeSheetStatus = (status: EntrySheet['status'] | string): 'completed' | 'draft' =>
+    status === 'completed' ? 'completed' : 'draft';
+
+  const hasText = (value: unknown): boolean =>
+    typeof value === 'string' ? value.trim().length > 0 : Boolean(value);
+
   // Permission check: Can the current user edit/delete this sheet?
   const canModifySheet = (sheet: EntrySheet): boolean => {
     if (currentUser.role === UserRole.ADMIN) return true;
@@ -77,7 +83,7 @@ export const EntryList: React.FC<EntryListProps> = ({ sheets, currentUser, onCre
       sheet.products.forEach(prod => {
         csvRows.push([
           sheet.id,
-          sheet.status === 'completed' ? '完了' : '下書き',
+          normalizeSheetStatus(sheet.status) === 'completed' ? '完了' : '下書き',
           `"${sheet.title.replace(/"/g, '""')}"`, // Escape quotes
           sheet.manufacturerName,
           sheet.creatorName,
@@ -222,7 +228,7 @@ export const EntryList: React.FC<EntryListProps> = ({ sheets, currentUser, onCre
 
   // Helper to determine product card styling based on completion status
   const getProductStatusStyle = (prod: any) => {
-    const isBasicFilled = prod.productName && prod.janCode;
+    const isBasicFilled = hasText(prod.productName) && hasText(prod.janCode);
     const isPromoFilled = prod.hasPromoMaterial === 'yes' 
         ? (prod.promoWidth && prod.promoImage) 
         : true;
@@ -385,8 +391,8 @@ export const EntryList: React.FC<EntryListProps> = ({ sheets, currentUser, onCre
                             </div>
                             <div className="flex-1 min-w-0" onClick={() => toggleExpand(sheet.id)}>
                                 <div className="flex justify-between items-start mb-1">
-                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${sheet.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-700'}`}>
-                                        {sheet.status === 'completed' ? '完了' : '下書き'}
+                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${normalizeSheetStatus(sheet.status) === 'completed' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-700'}`}>
+                                        {normalizeSheetStatus(sheet.status) === 'completed' ? '完了' : '下書き'}
                                     </span>
                                     <span className="text-xs text-slate-400">{new Date(sheet.updatedAt).toLocaleDateString()}</span>
                                 </div>
@@ -492,7 +498,7 @@ export const EntryList: React.FC<EntryListProps> = ({ sheets, currentUser, onCre
                              </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            {sheet.status === 'completed' ? (
+                            {normalizeSheetStatus(sheet.status) === 'completed' ? (
                               <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                                 完了
                               </span>

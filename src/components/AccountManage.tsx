@@ -1,12 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { MasterData, User, UserRole } from '../types';
 import { Plus, Edit, Trash2, AlertCircle } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 
 interface AccountManageProps {
   users: User[];
   masterData: MasterData;
   currentUser: User;
-  onSaveUser: (user: User) => void;
+  onSaveUser: (user: User) => Promise<void> | void;
   onDeleteUser: (id: string) => void;
 }
 
@@ -39,7 +40,7 @@ export const AccountManage: React.FC<AccountManageProps> = ({
     return targetUser.manufacturerName === currentUser.manufacturerName;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!editingUser?.username || !editingUser?.displayName || !editingUser?.manufacturerName || !editingUser?.password) {
       setValidationError('ログインID、担当者名、メーカー名、パスワードは必須です');
       return;
@@ -68,18 +69,23 @@ export const AccountManage: React.FC<AccountManageProps> = ({
     const isNewUser = !editingUser.id;
 
     const newUser: User = {
-        id: editingUser.id || Date.now().toString(),
-        username: editingUser.username,
-        displayName: editingUser.displayName,
-        manufacturerName: editingUser.manufacturerName,
+        id: editingUser.id || uuidv4(),
+        username: editingUser.username.trim(),
+        displayName: editingUser.displayName.trim(),
+        manufacturerName: editingUser.manufacturerName.trim(),
         email: editingUser.email || '',
         phoneNumber: editingUser.phoneNumber || '',
         role: editingUser.role || UserRole.STAFF,
         password: editingUser.password || (isNewUser ? '' : existingUser?.password),
     };
-    onSaveUser(newUser);
-    setEditingUser(null);
-    setValidationError('');
+    try {
+      await onSaveUser(newUser);
+      setEditingUser(null);
+      setValidationError('');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '保存に失敗しました';
+      setValidationError(message);
+    }
   };
 
   const handleAddNew = () => {

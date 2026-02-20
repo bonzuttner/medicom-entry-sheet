@@ -37,6 +37,11 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     return Number.isFinite(parsed) ? parsed : undefined;
   };
 
+  const normalizeJanCodeInput = (value: string): string =>
+    value
+      .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
+      .replace(/[^0-9]/g, '');
+
   // Sync update time
   useEffect(() => {
     setFormData(prev => ({
@@ -179,6 +184,22 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       // noop
     }
     return '#';
+  };
+
+  const getDisplayFileNameFromUrl = (value?: string): string => {
+    if (!value) return '';
+    try {
+      const parsed = new URL(value);
+      const raw = decodeURIComponent(parsed.pathname.split('/').pop() || '');
+      if (!raw) return '';
+      const withoutTimestamp = raw.replace(/^\d+-/, '');
+      const withoutRandomSuffix =
+        withoutTimestamp.match(/^(.+\.[A-Za-z0-9]+)-[A-Za-z0-9]{6,}$/)?.[1] ||
+        withoutTimestamp.replace(/-[A-Za-z0-9]{6,}$/, '');
+      return withoutRandomSuffix;
+    } catch {
+      return '';
+    }
   };
 
   const findReusableProductByName = (
@@ -408,6 +429,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   };
 
   const activeProduct = formData.products[activeTab];
+  const promoImageFileName = getDisplayFileNameFromUrl(activeProduct.promoImage);
   const shelfWidthTotal = formData.products.reduce((sum, product) => {
     const width = Number(product.width) || 0;
     const facing = Number(product.facingCount) || 0;
@@ -640,7 +662,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                         className="w-full border-slate-300 rounded-lg py-3 px-3 focus:ring-primary focus:border-primary font-mono"
                         placeholder="1234567890123"
                         value={activeProduct.janCode}
-                        onChange={(e) => handleProductChange(activeTab, 'janCode', e.target.value.replace(/[^0-9]/g, ''))}
+                        onChange={(e) => handleProductChange(activeTab, 'janCode', normalizeJanCodeInput(e.target.value))}
                         maxLength={16}
                      />
                 </div>
@@ -915,9 +937,14 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                                     画像を選択...
                                 </button>
                                 {activeProduct.promoImage ? (
-                                    <span className="text-success font-medium flex items-center gap-1">
-                                        <ImageIcon size={16} /> 登録済み
-                                    </span>
+                                    <div className="text-success font-medium flex flex-col gap-1">
+                                        <span className="flex items-center gap-1">
+                                            <ImageIcon size={16} /> 登録済み
+                                        </span>
+                                        {promoImageFileName ? (
+                                            <span className="text-xs text-slate-600 break-all">{promoImageFileName}</span>
+                                        ) : null}
+                                    </div>
                                 ) : (
                                     <span className="text-danger font-medium text-sm">※登録必須</span>
                                 )}
