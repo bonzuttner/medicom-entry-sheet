@@ -1,7 +1,5 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { hasKvConfig, runKvCommand } from './kv.js';
-import { isProductionRuntime } from './runtime.js';
 
 interface AttemptState {
   firstFailedAt: number;
@@ -14,7 +12,6 @@ interface RateLimitStore {
 }
 
 const STORE_PATH = path.join('/tmp', 'pharmapop-login-attempts.json');
-const KEY_PREFIX = 'pharmapop:login-attempt:';
 const WINDOW_MS = 15 * 60 * 1000;
 const LOCK_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
@@ -45,19 +42,6 @@ const writeStoreToFile = async (data: RateLimitStore): Promise<void> => {
   await fs.writeFile(STORE_PATH, JSON.stringify(data), 'utf8');
 };
 
-const readAttemptFromKv = async (key: string): Promise<AttemptState | null> => {
-  const raw = await runKvCommand<string | null>('GET', `${KEY_PREFIX}${key}`);
-  return raw ? (JSON.parse(raw) as AttemptState) : null;
-};
-
-const writeAttemptToKv = async (key: string, state: AttemptState): Promise<void> => {
-  await runKvCommand('SET', `${KEY_PREFIX}${key}`, JSON.stringify(state), 'PX', LOCK_MS + WINDOW_MS);
-};
-
-const deleteAttemptFromKv = async (key: string): Promise<void> => {
-  await runKvCommand('DEL', `${KEY_PREFIX}${key}`);
-};
-
 const cleanupExpired = (store: RateLimitStore, now: number): void => {
   for (const [key, state] of Object.entries(store.attempts)) {
     const lockExpired = !state.lockedUntil || state.lockedUntil <= now;
@@ -74,18 +58,6 @@ export const getLoginRateLimitStatus = async (
 ): Promise<{ limited: boolean; retryAfterSeconds: number }> => {
   const now = Date.now();
   const key = buildKey(req, username);
-  if (isProductionRuntime() && !hasKvConfig()) {
-    throw new Error('Vercel KV is required for login rate limiting in production.');
-  }
-  if (hasKvConfig()) {
-    const state = await readAttemptFromKv(key);
-    if (!state?.lockedUntil || state.lockedUntil <= now) {
-      return { limited: false, retryAfterSeconds: 0 };
-    }
-
-    const retryAfterSeconds = Math.max(1, Math.ceil((state.lockedUntil - now) / 1000));
-    return { limited: true, retryAfterSeconds };
-  }
 
   const store = await readStoreFromFile();
   cleanupExpired(store, now);
@@ -103,24 +75,6 @@ export const getLoginRateLimitStatus = async (
 export const recordLoginFailure = async (req: any, username: string): Promise<void> => {
   const now = Date.now();
   const key = buildKey(req, username);
-  if (hasKvConfig()) {
-    const current = await readAttemptFromKv(key);
-    if (!current || current.firstFailedAt + WINDOW_MS <= now) {
-      await writeAttemptToKv(key, {
-        firstFailedAt: now,
-        failedCount: 1,
-      });
-      return;
-    }
-
-    const nextFailedCount = current.failedCount + 1;
-    await writeAttemptToKv(key, {
-      ...current,
-      failedCount: nextFailedCount,
-      lockedUntil: nextFailedCount >= MAX_ATTEMPTS ? now + LOCK_MS : current.lockedUntil,
-    });
-    return;
-  }
 
   const store = await readStoreFromFile();
   cleanupExpired(store, now);
@@ -145,10 +99,6 @@ export const recordLoginFailure = async (req: any, username: string): Promise<vo
 
 export const clearLoginFailures = async (req: any, username: string): Promise<void> => {
   const key = buildKey(req, username);
-  if (hasKvConfig()) {
-    await deleteAttemptFromKv(key);
-    return;
-  }
 
   const store = await readStoreFromFile();
   if (store.attempts[key]) {

@@ -16,8 +16,9 @@
 - **ビルドツール**: Vite 6.2.0
 - **スタイリング**: Tailwind CSS
 - **アイコン**: Lucide React
-- **データ永続化**: Vercel KV（本番）/ LocalStorage（ローカル）
-- **画像・添付ファイル**: Vercel Blob（URL保存）
+- **データベース**: Vercel Postgres (Neon)
+- **画像・添付ファイル**: Vercel Blob
+- **データソース**: LocalStorage（開発）/ API（本番）
 
 ## セットアップ
 
@@ -41,30 +42,34 @@ npm run dev:all
 
 アプリケーションは http://localhost:3000 で起動します。
 
-### データソース切り替え（Vercel運用）
+### 開発環境設定
 
 `.env.local` でデータ取得先を切り替えできます。
 
 ```bash
-# 既定値: local
+# 開発モード: LocalStorage使用
 VITE_DATA_SOURCE=local
 
-# API接続に切り替える場合（ローカル検証時）
+# APIモード（ローカル検証時）
 VITE_DATA_SOURCE=api
 VITE_API_BASE=http://localhost:3000
 ```
 
-APIモードでCookieセッションを使う場合は、サーバー側で `SESSION_SECRET` を設定してください。
-Vercel本番では `VITE_API_BASE` は未設定（同一オリジン `/api`）を推奨します。
-また、APIデータを永続化するために Vercel KV を接続し、`KV_REST_API_URL` と `KV_REST_API_TOKEN` を設定してください。
-画像・添付ファイルはVercel Blobへアップロードされるため、`BLOB_READ_WRITE_TOKEN` を設定してください。
+### 本番環境設定
 
-`APP_RUNTIME_ENV` によりセキュリティガードを切り替えます。
-- `APP_RUNTIME_ENV=test`（既定）: テスト向け挙動
-- `APP_RUNTIME_ENV=production`: 本番向け厳格モード
-  - `SESSION_SECRET` 必須
-  - Vercel KV 必須
-  - 空ストア時の初期テストデータ自動投入を禁止
+本番環境では以下の環境変数が必要です：
+
+#### 必須
+
+- `POSTGRES_URL`: PostgreSQL接続URL（Vercel Postgres統合で自動設定）
+- `SESSION_SECRET`: セッションCookieの署名キー（64文字以上推奨）
+- `BLOB_READ_WRITE_TOKEN`: Vercel Blob用トークン
+
+#### オプション
+
+- `PASSWORD_PEPPER`: パスワードハッシュの追加ソルト
+- `APP_RUNTIME_ENV`: セキュリティモード（`test` または `production`）
+- `MEDIA_ALLOWED_HOSTS`: 外部画像URLのホワイトリスト
 
 APIモードでローカル確認する場合（`api/` のモックAPI利用）は、Vercel CLIで起動します。
 
@@ -76,40 +81,11 @@ npm run dev:api
 npm run dev:api:all
 ```
 
-### 既存データの移行
+### データベース移行
 
-Vercelへの移行時は、管理者ログイン後に移行APIでデータを投入できます。
+Vercel KVから PostgreSQL（Neon）への移行手順は、[docs/MIGRATION.md](docs/MIGRATION.md) を参照してください。
 
-1. 旧環境からデータを取得（管理者）
-```bash
-curl -b cookie.txt https://<old-domain>/api/admin/migrate > store-backup.json
-```
-2. 新環境へデータ投入（管理者）
-```bash
-printf '{"data":' > migrate-payload.json
-cat store-backup.json >> migrate-payload.json
-printf '}' >> migrate-payload.json
-
-curl -X POST -H "Content-Type: application/json" -b cookie.txt \
-  --data-binary @migrate-payload.json \
-  https://<new-domain>/api/admin/migrate
-```
-
-`/api/admin/migrate` は管理者のみ実行可能です。
-
-既存データに `data:` 形式の画像/添付が含まれる場合、読み込み時に自動でBlobへ移行されます（Blob設定時）。
-
-ローカルStorageデータから移行する場合は、旧アプリ画面でブラウザコンソールを開いて以下を実行し、
-出力JSONを `store-backup.json` として保存してください。
-
-```js
-const data = {
-  users: JSON.parse(localStorage.getItem('pharmapop_users') || '[]'),
-  sheets: JSON.parse(localStorage.getItem('pharmapop_sheets') || '[]'),
-  master: JSON.parse(localStorage.getItem('pharmapop_master') || '{}'),
-};
-console.log(JSON.stringify(data));
-```
+**重要**: Vercel KVは2024年末に廃止されました。本番環境ではVercel Postgres (Neon) の使用が必須です。
 
 ### ビルド
 
@@ -125,13 +101,13 @@ npm run preview
 
 ### ログイン
 
-初期ユーザー:
+初期ユーザー（開発環境のみ）:
 
 | ユーザー名 | パスワード | メーカー | 権限 |
 |----------|----------|---------|------|
-| **admin** | password | メディコム | 管理者 |
-| **satou** | password | 大江戸製薬 | 一般 |
-| **tanaka** | password | 富士ファーマ | 一般 |
+| **admin** | Password1! | メディコム | 管理者 |
+| **satou** | Satou1!! | 大江戸製薬 | 一般 |
+| **tanaka** | Tanaka1! | 富士ファーマ | 一般 |
 
 ### 主要機能
 
@@ -159,7 +135,14 @@ npm run preview
 ├── README.md                 # プロジェクト概要（本ファイル）
 ├── docs/                     # ドキュメント
 │   ├── DESIGN.md            # システム設計書
-│   └── PERMISSIONS.md       # 権限設計書
+│   ├── PERMISSIONS.md       # 権限設計書
+│   ├── SECURITY.md          # セキュリティ設計書
+│   └── MIGRATION.md         # DB移行手順書
+├── api/                      # APIエンドポイント（Vercel Functions）
+│   ├── _lib/                # 共通ライブラリ
+│   ├── auth/                # 認証API
+│   ├── admin/               # 管理者API
+│   └── *.ts                 # エンドポイント
 ├── src/
 │   ├── components/          # Reactコンポーネント
 │   │   ├── Layout.tsx       # 共通レイアウト
@@ -170,7 +153,8 @@ npm run preview
 │   │   └── MasterManage.tsx # マスターデータ管理
 │   ├── services/            # ビジネスロジック
 │   │   ├── storage.ts       # ローカル永続化層
-│   │   └── dataService.ts   # local/api 切り替え層
+│   │   ├── dataService.ts   # local/api 切り替え層
+│   │   └── apiClient.ts     # HTTP クライアント
 │   ├── types.ts             # TypeScript型定義
 │   ├── App.tsx              # メインアプリケーション
 │   └── index.tsx            # エントリーポイント
@@ -182,8 +166,8 @@ npm run preview
 
 - [システム設計書](docs/DESIGN.md) - データモデル、アーキテクチャ、技術仕様
 - [権限設計書](docs/PERMISSIONS.md) - ロール定義、アクセス権限、セキュリティ
-- [最小API設計（AWS向け）](docs/API_MINIMAL_AWS.md) - 低運用コストでのAPI・認証・運用方針
 - [セキュリティ設計書](docs/SECURITY.md) - 脅威モデル、認証/認可、運用チェック
+- [DB移行手順書](docs/MIGRATION.md) - Vercel KV → PostgreSQL 移行ガイド
 
 ## 権限設計
 
@@ -205,12 +189,23 @@ npm run preview
 - **コンポーネント**: `src/components/` - UIコンポーネント
 - **ビジネスロジック**: `src/services/` - データ操作ロジック
 - **型定義**: `src/types.ts` - TypeScript型定義
+- **API**: `api/` - Vercel Functions（Node.js + TypeScript）
 
 ### スタイルガイド
 
 - Tailwind CSS のユーティリティクラスを使用
 - レスポンシブデザインは `sm:`, `md:`, `lg:` プレフィックスで制御
 - カラーパレット: `primary` (sky-500), `danger` (red-500), `warning` (yellow-500)
+
+## デプロイ
+
+### Vercelへのデプロイ
+
+1. Vercel CLIをインストール: `npm install -g vercel`
+2. プロジェクトをリンク: `vercel link`
+3. Vercel Postgres統合を追加: `vercel integration add neon`
+4. データベースマイグレーション実行（[docs/MIGRATION.md](docs/MIGRATION.md) 参照）
+5. 本番デプロイ: `vercel --prod`
 
 ## ライセンス
 

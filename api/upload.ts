@@ -1,7 +1,6 @@
 import { requireUser } from './_lib/auth.js';
 import { getMethod, readJsonBody, sendError, sendJson } from './_lib/http.js';
 import { uploadMediaDataUrl } from './_lib/media.js';
-import { readStore } from './_lib/store.js';
 
 interface UploadBody {
   dataUrl?: string;
@@ -20,8 +19,7 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const store = await readStore();
-  const user = requireUser(req, res, store);
+  const user = await requireUser(req, res);
   if (!user) return;
 
   const body = await readJsonBody<UploadBody>(req);

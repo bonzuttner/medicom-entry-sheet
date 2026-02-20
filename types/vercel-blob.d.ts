@@ -14,4 +14,6 @@ declare module '@vercel/blob' {
     body: Blob | ArrayBuffer | Uint8Array | string,
     options?: PutOptions
   ): Promise<PutBlobResult>;
+
+  export function del(url: string | string[]): Promise<void>;
 }

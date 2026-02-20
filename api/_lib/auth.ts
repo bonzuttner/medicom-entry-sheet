@@ -1,14 +1,15 @@
 import { getSessionUserId, sendError } from './http.js';
-import { StoreData, User } from './types.js';
+import { User } from './types.js';
+import * as UserRepository from './repositories/users.js';
 
-export const getCurrentUser = (req: any, store: StoreData): User | null => {
+export const getCurrentUser = async (req: any): Promise<User | null> => {
   const sessionUserId = getSessionUserId(req);
   if (!sessionUserId) return null;
-  return store.users.find((u) => u.id === sessionUserId) || null;
+  return await UserRepository.findById(sessionUserId);
 };
 
-export const requireUser = (req: any, res: any, store: StoreData): User | null => {
-  const currentUser = getCurrentUser(req, store);
+export const requireUser = async (req: any, res: any): Promise<User | null> => {
+  const currentUser = await getCurrentUser(req);
   if (!currentUser) {
     sendError(res, 401, 'Unauthorized');
     return null;

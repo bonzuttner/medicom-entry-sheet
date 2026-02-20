@@ -1,4 +1,4 @@
-import { put } from '@vercel/blob';
+import { del, put } from '@vercel/blob';
 import { Attachment, EntrySheet, ProductEntry } from './types.js';
 
 const IMAGE_MIME_TYPES = new Set([
@@ -98,6 +98,16 @@ const uploadBinary = async (
 export const mediaLimits = {
   maxImageBytes: MAX_IMAGE_BYTES,
   maxAttachmentBytes: MAX_ATTACHMENT_BYTES,
+};
+
+const isManagedBlobUrl = (value: string): boolean => {
+  try {
+    const parsed = new URL(value);
+    const isHttp = parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    return isHttp && isAllowedHost(parsed.hostname);
+  } catch {
+    return false;
+  }
 };
 
 const normalizeMediaUrl = async (
@@ -219,6 +229,55 @@ export const migrateStoreMedia = async (sheets: EntrySheet[]): Promise<EntryShee
 
 const hasLegacyAttachment = (attachment: Attachment): boolean =>
   Boolean(attachment.dataUrl) || Boolean(attachment.url?.startsWith('data:'));
+
+const collectAttachmentUrls = (attachments?: Attachment[]): string[] =>
+  (attachments || [])
+    .map((attachment) => attachment.url || attachment.dataUrl)
+    .filter((value): value is string => Boolean(value));
+
+const collectSheetMediaUrls = (sheet: EntrySheet): string[] => {
+  const urls: string[] = [];
+  urls.push(...collectAttachmentUrls(sheet.attachments));
+  for (const product of sheet.products) {
+    if (product.productImage) urls.push(product.productImage);
+    if (product.promoImage) urls.push(product.promoImage);
+    urls.push(...collectAttachmentUrls(product.productAttachments));
+  }
+  return urls;
+};
+
+const collectStoreMediaUrlSet = (sheets: EntrySheet[]): Set<string> => {
+  const urls = new Set<string>();
+  for (const sheet of sheets) {
+    for (const url of collectSheetMediaUrls(sheet)) {
+      urls.add(url);
+    }
+  }
+  return urls;
+};
+
+export const deleteUnusedManagedBlobUrls = async (
+  beforeSheets: EntrySheet[],
+  afterSheets: EntrySheet[]
+): Promise<void> => {
+  const beforeSet = collectStoreMediaUrlSet(beforeSheets);
+  const afterSet = collectStoreMediaUrlSet(afterSheets);
+  const toDelete: string[] = [];
+
+  for (const url of beforeSet) {
+    if (!afterSet.has(url) && isManagedBlobUrl(url)) {
+      toDelete.push(url);
+    }
+  }
+
+  for (const url of toDelete) {
+    try {
+      await del(url);
+    } catch (error) {
+      console.warn('Failed to delete blob URL:', url, error);
+    }
+  }
+};
 
 export const hasLegacyEmbeddedMedia = (sheets: EntrySheet[]): boolean =>
   sheets.some((sheet) => {

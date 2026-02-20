@@ -6,7 +6,7 @@ import {
   sendError,
   sendJson,
 } from '../_lib/http.js';
-import { normalizeSheetMedia } from '../_lib/media.js';
+import { deleteUnusedManagedBlobUrls, normalizeSheetMedia } from '../_lib/media.js';
 import { hashPassword, isHashedPassword } from '../_lib/password.js';
 import { readStore, writeStore } from '../_lib/store.js';
 import { StoreData, User } from '../_lib/types.js';
@@ -35,7 +35,8 @@ export default async function handler(req: any, res: any) {
   }
 
   const store = await readStore();
-  const currentUser = requireUser(req, res, store);
+  const beforeSheets = [...store.sheets];
+  const currentUser = await requireUser(req, res);
   if (!currentUser) return;
   if (!isAdmin(currentUser)) {
     sendError(res, 403, 'Only admin can migrate data');
@@ -72,5 +73,6 @@ export default async function handler(req: any, res: any) {
   }
 
   await writeStore(nextStore);
+  await deleteUnusedManagedBlobUrls(beforeSheets, nextStore.sheets);
   sendJson(res, 200, { ok: true, users: nextStore.users.length, sheets: nextStore.sheets.length });
 }

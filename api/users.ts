@@ -8,8 +8,8 @@ import {
   sendJson,
 } from './_lib/http.js';
 import { hashPassword, isHashedPassword } from './_lib/password.js';
-import { readStore, writeStore } from './_lib/store.js';
 import { User } from './_lib/types.js';
+import * as UserRepository from './_lib/repositories/users.js';
 
 interface PutUsersBody {
   users?: User[];
@@ -50,14 +50,15 @@ const resolvePasswordForSave = (incomingUser: User, existingUser?: User): string
 
 export default async function handler(req: any, res: any) {
   const method = getMethod(req);
-  const store = await readStore();
-  const currentUser = requireUser(req, res, store);
+  const currentUser = await requireUser(req, res);
   if (!currentUser) return;
 
   if (method === 'GET') {
     const users = isAdmin(currentUser)
-      ? store.users
-      : store.users.filter((u) => u.manufacturerName === currentUser.manufacturerName);
+      ? await UserRepository.findAll()
+      : await UserRepository.findByManufacturerId(
+          (await UserRepository.getManufacturerId(currentUser.manufacturerName)) || ''
+        );
     sendJson(res, 200, users.map((u) => sanitizeUser(u)));
     return;
   }
@@ -76,8 +77,8 @@ export default async function handler(req: any, res: any) {
     }
 
     for (const incomingUser of incomingUsers) {
-      const existingUser = store.users.find((u) => u.id === incomingUser.id);
-      const passwordError = validateIncomingPassword(incomingUser, existingUser);
+      const existingUser = await UserRepository.findById(incomingUser.id);
+      const passwordError = validateIncomingPassword(incomingUser, existingUser || undefined);
       if (passwordError) {
         sendError(res, 400, passwordError);
         return;
@@ -85,18 +86,23 @@ export default async function handler(req: any, res: any) {
     }
 
     if (isAdmin(currentUser)) {
-      store.users = incomingUsers.map((incomingUser) => {
-        const existingUser = store.users.find((u) => u.id === incomingUser.id);
-        return {
-          ...incomingUser,
-          password: resolvePasswordForSave(incomingUser, existingUser),
-        };
-      });
-      await writeStore(store);
-      sendJson(res, 200, store.users.map((u) => sanitizeUser(u)));
+      // ADMIN: Can save all users
+      const usersToSave = await Promise.all(
+        incomingUsers.map(async (incomingUser) => {
+          const existingUser = await UserRepository.findById(incomingUser.id);
+          return {
+            ...incomingUser,
+            password: resolvePasswordForSave(incomingUser, existingUser || undefined),
+          };
+        })
+      );
+
+      const savedUsers = await UserRepository.upsertMany(usersToSave);
+      sendJson(res, 200, savedUsers.map((u) => sanitizeUser(u)));
       return;
     }
 
+    // STAFF: Can only save users in their manufacturer
     const hasCrossManufacturerData = incomingUsers.some(
       (u) => u.manufacturerName !== currentUser.manufacturerName
     );
@@ -111,27 +117,18 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    const otherManufacturerUsers = store.users.filter(
-      (u) => u.manufacturerName !== currentUser.manufacturerName
+    const usersToSave = await Promise.all(
+      incomingUsers.map(async (incomingUser) => {
+        const existingUser = await UserRepository.findById(incomingUser.id);
+        return {
+          ...incomingUser,
+          password: resolvePasswordForSave(incomingUser, existingUser || undefined),
+        };
+      })
     );
-    const mergedManufacturerUsers = incomingUsers.map((incomingUser) => {
-      const existingUser = store.users.find((u) => u.id === incomingUser.id);
-      return {
-        ...incomingUser,
-        password: resolvePasswordForSave(incomingUser, existingUser),
-      };
-    });
 
-    store.users = [...otherManufacturerUsers, ...mergedManufacturerUsers];
-    await writeStore(store);
-
-    sendJson(
-      res,
-      200,
-      store.users
-        .filter((u) => u.manufacturerName === currentUser.manufacturerName)
-        .map((u) => sanitizeUser(u))
-    );
+    const savedUsers = await UserRepository.upsertMany(usersToSave);
+    sendJson(res, 200, savedUsers.map((u) => sanitizeUser(u)));
     return;
   }
 

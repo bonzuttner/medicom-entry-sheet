@@ -1,4 +1,3 @@
-import { readStore } from '../_lib/store.js';
 import {
   clearLoginFailures,
   getLoginRateLimitStatus,
@@ -14,6 +13,7 @@ import {
   sendJson,
   setSessionCookie,
 } from '../_lib/http.js';
+import * as UserRepository from '../_lib/repositories/users.js';
 
 interface LoginBody {
   username?: string;
@@ -41,12 +41,9 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const store = await readStore();
-  const user = store.users.find(
-    (u) => u.username === username && verifyPassword(password, u.password)
-  );
+  const user = await UserRepository.findByUsername(username);
 
-  if (!user) {
+  if (!user || !verifyPassword(password, user.password)) {
     await recordLoginFailure(req, username);
     clearSessionCookie(res);
     sendJson(res, 200, null);

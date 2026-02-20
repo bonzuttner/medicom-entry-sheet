@@ -1,7 +1,7 @@
 import { isAdmin, requireUser } from './_lib/auth.js';
 import { getMethod, methodNotAllowed, sendJson } from './_lib/http.js';
-import { pruneSheetsByRetention } from './_lib/retention.js';
-import { readStore, writeStore } from './_lib/store.js';
+import * as SheetRepository from './_lib/repositories/sheets.js';
+import * as UserRepository from './_lib/repositories/users.js';
 
 export default async function handler(req: any, res: any) {
   if (getMethod(req) !== 'GET') {
@@ -9,18 +9,20 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const store = await readStore();
-  const prunedSheets = pruneSheetsByRetention(store.sheets);
-  if (prunedSheets.length !== store.sheets.length) {
-    store.sheets = prunedSheets;
-    await writeStore(store);
-  }
-  const currentUser = requireUser(req, res, store);
+  const currentUser = await requireUser(req, res);
   if (!currentUser) return;
 
+  // Prune old sheets (retention policy)
+  const cutoffDate = new Date();
+  cutoffDate.setFullYear(cutoffDate.getFullYear() - 3);
+  await SheetRepository.pruneByRetention(cutoffDate);
+
+  // Get sheets based on user role
   const sheets = isAdmin(currentUser)
-    ? store.sheets
-    : store.sheets.filter((sheet) => sheet.manufacturerName === currentUser.manufacturerName);
+    ? await SheetRepository.findAll()
+    : await SheetRepository.findByManufacturerId(
+        (await UserRepository.getManufacturerId(currentUser.manufacturerName)) || ''
+      );
 
   sendJson(res, 200, sheets);
 }

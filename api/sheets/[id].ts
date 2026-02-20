@@ -1,9 +1,8 @@
 import { canAccessManufacturer, requireUser } from '../_lib/auth.js';
 import { getMethod, methodNotAllowed, readJsonBody, sendError, sendJson } from '../_lib/http.js';
-import { normalizeSheetMedia } from '../_lib/media.js';
-import { pruneSheetsByRetention } from '../_lib/retention.js';
-import { readStore, writeStore } from '../_lib/store.js';
+import { deleteUnusedManagedBlobUrls, normalizeSheetMedia } from '../_lib/media.js';
 import { EntrySheet } from '../_lib/types.js';
+import * as SheetRepository from '../_lib/repositories/sheets.js';
 
 interface PutSheetBody {
   sheet?: EntrySheet;
@@ -28,13 +27,7 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const store = await readStore();
-  const prunedSheets = pruneSheetsByRetention(store.sheets);
-  if (prunedSheets.length !== store.sheets.length) {
-    store.sheets = prunedSheets;
-    await writeStore(store);
-  }
-  const currentUser = requireUser(req, res, store);
+  const currentUser = await requireUser(req, res);
   if (!currentUser) return;
 
   if (method === 'PUT') {
@@ -50,6 +43,11 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
+    // Get existing sheet for blob cleanup
+    const existingSheet = await SheetRepository.findById(sheetId);
+    const beforeSheets = existingSheet ? [existingSheet] : [];
+
+    // Normalize media URLs (convert data URLs to Vercel Blob)
     let normalizedSheet: EntrySheet;
     try {
       normalizedSheet = await normalizeSheetMedia(
@@ -62,25 +60,24 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    const existingIndex = store.sheets.findIndex((s) => s.id === sheetId);
-    if (existingIndex >= 0) {
-      const existingSheet = store.sheets[existingIndex];
-      if (!canAccessManufacturer(currentUser, existingSheet.manufacturerName)) {
-        sendError(res, 403, 'You cannot modify this sheet');
-        return;
-      }
-      store.sheets[existingIndex] = { ...normalizedSheet, id: sheetId };
-    } else {
-      store.sheets.push({ ...normalizedSheet, id: sheetId });
+    // Permission check for existing sheet
+    if (existingSheet && !canAccessManufacturer(currentUser, existingSheet.manufacturerName)) {
+      sendError(res, 403, 'You cannot modify this sheet');
+      return;
     }
 
-    store.sheets = pruneSheetsByRetention(store.sheets);
-    await writeStore(store);
+    // Save to database
+    const savedSheet = await SheetRepository.upsert({ ...normalizedSheet, id: sheetId });
+
+    // Clean up unused blob URLs
+    await deleteUnusedManagedBlobUrls(beforeSheets, [savedSheet]);
+
     sendJson(res, 200, { ok: true });
     return;
   }
 
-  const target = store.sheets.find((sheet) => sheet.id === sheetId);
+  // DELETE
+  const target = await SheetRepository.findById(sheetId);
   if (!target) {
     sendError(res, 404, 'Sheet not found');
     return;
@@ -91,8 +88,11 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  store.sheets = store.sheets.filter((sheet) => sheet.id !== sheetId);
-  store.sheets = pruneSheetsByRetention(store.sheets);
-  await writeStore(store);
+  // Delete from database
+  await SheetRepository.deleteById(sheetId);
+
+  // Clean up blob URLs
+  await deleteUnusedManagedBlobUrls([target], []);
+
   sendJson(res, 200, { ok: true });
 }
