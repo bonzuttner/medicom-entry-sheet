@@ -72,6 +72,43 @@ const App: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const masterSaveSeqRef = useRef(0);
 
+  const handleNavigate = (page: Page) => {
+    if (!currentUser) return;
+    if (page === Page.MASTERS && currentUser.role !== UserRole.ADMIN) {
+      setCurrentPage(Page.LIST);
+      return;
+    }
+    setCurrentPage(page);
+  };
+
+  const loadAuthenticatedData = async (): Promise<{
+    sheets: EntrySheet[];
+    users: User[];
+    masterData: MasterData;
+  }> => {
+    const [sheetsResult, usersResult, masterResult] = await Promise.allSettled([
+      dataService.getSheets(),
+      dataService.getUsers(),
+      dataService.getMasterData(),
+    ]);
+
+    if (sheetsResult.status === 'rejected') {
+      console.error('Failed to load sheets:', sheetsResult.reason);
+    }
+    if (usersResult.status === 'rejected') {
+      console.error('Failed to load users:', usersResult.reason);
+    }
+    if (masterResult.status === 'rejected') {
+      console.error('Failed to load master data:', masterResult.reason);
+    }
+
+    return {
+      sheets: sheetsResult.status === 'fulfilled' ? sheetsResult.value : [],
+      users: usersResult.status === 'fulfilled' ? usersResult.value : [],
+      masterData: masterResult.status === 'fulfilled' ? masterResult.value : EMPTY_MASTER_DATA,
+    };
+  };
+
   // Initialize
   useEffect(() => {
     let mounted = true;
@@ -86,15 +123,11 @@ const App: React.FC = () => {
           setCurrentUser(savedUser);
           setCurrentPage(Page.LIST);
           try {
-            const [loadedSheets, loadedUsers, loadedMaster] = await Promise.all([
-              dataService.getSheets(),
-              dataService.getUsers(),
-              dataService.getMasterData(),
-            ]);
+            const loaded = await loadAuthenticatedData();
             if (!mounted) return;
-            setSheets(loadedSheets);
-            setUsers(loadedUsers);
-            setMasterData(loadedMaster);
+            setSheets(loaded.sheets);
+            setUsers(loaded.users);
+            setMasterData(loaded.masterData);
           } catch (error) {
             console.error('Failed to load authenticated data:', error);
           }
@@ -126,14 +159,10 @@ const App: React.FC = () => {
       setCurrentUser(user);
       setCurrentPage(Page.LIST);
       await dataService.setCurrentUser(user);
-      const [loadedSheets, loadedUsers, loadedMaster] = await Promise.all([
-        dataService.getSheets(),
-        dataService.getUsers(),
-        dataService.getMasterData(),
-      ]);
-      setSheets(loadedSheets);
-      setUsers(loadedUsers);
-      setMasterData(loadedMaster);
+      const loaded = await loadAuthenticatedData();
+      setSheets(loaded.sheets);
+      setUsers(loaded.users);
+      setMasterData(loaded.masterData);
     } catch (error) {
       console.error('Failed to persist login session:', error);
     }
@@ -330,7 +359,7 @@ const App: React.FC = () => {
     <Layout
         currentUser={currentUser}
         currentPage={currentPage}
-        onNavigate={setCurrentPage}
+        onNavigate={handleNavigate}
         onLogout={handleLogout}
     >
         {currentPage === Page.LIST && (

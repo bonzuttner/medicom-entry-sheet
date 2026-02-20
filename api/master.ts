@@ -30,22 +30,17 @@ const findTooLongMasterValue = (data: MasterData): string | null => {
 
 export default async function handler(req: any, res: any) {
   const method = getMethod(req);
+  const currentUser = await requireUser(req, res);
+  if (!currentUser) return;
 
   if (method === 'GET') {
-    const currentUser = await requireUser(req, res);
-    if (!currentUser) return;
-    if (!isAdmin(currentUser)) {
-      sendError(res, 403, 'Only admin can view master data');
-      return;
-    }
+    // Read-only master values are required for entry form dropdowns for all authenticated users.
     const masterData = await MasterRepository.getAll();
     sendJson(res, 200, masterData);
     return;
   }
 
   if (method === 'PUT') {
-    const currentUser = await requireUser(req, res);
-    if (!currentUser) return;
     if (!isAdmin(currentUser)) {
       sendError(res, 403, 'Only admin can update master data');
       return;

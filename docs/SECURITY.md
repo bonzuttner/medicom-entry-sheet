@@ -74,7 +74,9 @@
 - `ADMIN`: 全メーカー操作可
 - `STAFF`: 自社メーカーのみ操作可
 - APIで毎回 `requireUser` + 境界チェック
-- マスターデータ API は `ADMIN` のみ
+- マスターデータ API:
+  - `GET /api/master` は認証済みユーザー全員可（入力用参照）
+  - `PUT /api/master` は `ADMIN` のみ可（更新）
 
 実装:
 - `api/_lib/auth.ts`

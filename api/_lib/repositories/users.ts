@@ -103,6 +103,19 @@ export const findByManufacturerId = async (manufacturerId: string): Promise<User
 };
 
 /**
+ * Get manufacturer ID by user ID
+ */
+export const getManufacturerIdByUserId = async (userId: string): Promise<string | null> => {
+  const result = await db.query<{ manufacturer_id: string }>(
+    `SELECT manufacturer_id FROM users WHERE id = $1`,
+    [userId]
+  );
+
+  if (result.rows.length === 0) return null;
+  return result.rows[0].manufacturer_id;
+};
+
+/**
  * Get manufacturer ID by name
  */
 export const getManufacturerId = async (manufacturerName: string): Promise<string | null> => {
@@ -227,6 +240,7 @@ export default {
   findByUsername,
   findAll,
   findByManufacturerId,
+  getManufacturerIdByUserId,
   getManufacturerId,
   getOrCreateManufacturerId,
   ensureManufacturer,
