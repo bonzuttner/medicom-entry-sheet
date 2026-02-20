@@ -19,6 +19,17 @@ const EMPTY_MASTER_DATA: MasterData = {
 
 const normalizeProductName = (value: string): string => value.trim().toLowerCase();
 const normalizeManufacturerKey = (value: string): string => value.trim();
+const upsertSheetInList = (source: EntrySheet[], saved: EntrySheet): EntrySheet[] => {
+  const idx = source.findIndex((sheet) => sheet.id === saved.id);
+  if (idx === -1) {
+    return [saved, ...source];
+  }
+  const next = [...source];
+  next[idx] = saved;
+  return next;
+};
+const removeSheetFromList = (source: EntrySheet[], id: string): EntrySheet[] =>
+  source.filter((sheet) => sheet.id !== id);
 
 const cloneProductTemplate = (product: ProductEntry): ProductEntry => ({
   ...product,
@@ -202,7 +213,11 @@ const App: React.FC = () => {
           products: duplicatedProducts,
       };
       await dataService.saveSheet(duplicated);
-      setSheets(await dataService.getSheets());
+      setSheets((prev) => upsertSheetInList(prev, duplicated));
+      void dataService
+        .getSheets()
+        .then((latest) => setSheets(latest))
+        .catch((error) => console.error('Failed to refresh sheets after duplicate:', error));
     } catch (error) {
       console.error('Failed to duplicate sheet:', error);
       alert('複製の保存に失敗しました。時間をおいて再試行してください。');
@@ -212,9 +227,13 @@ const App: React.FC = () => {
   const handleSaveSheet = async (sheet: EntrySheet) => {
     try {
       await dataService.saveSheet(sheet);
-      setSheets(await dataService.getSheets());
       setEditingSheet(null);
       setCurrentPage(Page.LIST);
+      setSheets((prev) => upsertSheetInList(prev, sheet));
+      void dataService
+        .getSheets()
+        .then((latest) => setSheets(latest))
+        .catch((error) => console.error('Failed to refresh sheets after save:', error));
     } catch (error) {
       console.error('Failed to save sheet:', error);
       const message = error instanceof Error ? error.message : '保存に失敗しました';
@@ -225,7 +244,11 @@ const App: React.FC = () => {
   const handleDeleteSheet = async (id: string) => {
     try {
       await dataService.deleteSheet(id);
-      setSheets(await dataService.getSheets());
+      setSheets((prev) => removeSheetFromList(prev, id));
+      void dataService
+        .getSheets()
+        .then((latest) => setSheets(latest))
+        .catch((error) => console.error('Failed to refresh sheets after delete:', error));
     } catch (error) {
       console.error('Failed to delete sheet:', error);
     }

@@ -41,6 +41,8 @@ CREATE INDEX IF NOT EXISTS idx_sheets_manufacturer ON entry_sheets(manufacturer_
 CREATE INDEX IF NOT EXISTS idx_sheets_creator ON entry_sheets(creator_id);
 CREATE INDEX IF NOT EXISTS idx_sheets_status ON entry_sheets(status);
 CREATE INDEX IF NOT EXISTS idx_sheets_created_at ON entry_sheets(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sheets_manufacturer_updated_at
+  ON entry_sheets(manufacturer_id, updated_at DESC);
 
 -- 商品エントリー
 CREATE TABLE IF NOT EXISTS product_entries (

@@ -208,11 +208,26 @@ export const EntryList: React.FC<EntryListProps> = ({ sheets, currentUser, onCre
     try {
       setIsDownloadingImages(true);
       const zip = new JSZip();
+      const fetched = await Promise.allSettled(
+        images.map(async (img) => {
+          const { blob, mimeType } = await fetchImageAsBlob(img.src);
+          const ext = getExtensionFromMime(mimeType);
+          return { fileName: `${img.fileName}.${ext}`, blob };
+        })
+      );
 
-      for (const img of images) {
-        const { blob, mimeType } = await fetchImageAsBlob(img.src);
-        const ext = getExtensionFromMime(mimeType);
-        zip.file(`${img.fileName}.${ext}`, blob);
+      let successCount = 0;
+      let failedCount = 0;
+      for (const result of fetched) {
+        if (result.status === 'fulfilled') {
+          zip.file(result.value.fileName, result.value.blob);
+          successCount += 1;
+        } else {
+          failedCount += 1;
+        }
+      }
+      if (successCount === 0) {
+        throw new Error('No images could be downloaded');
       }
 
       const zipBlob = await zip.generateAsync({ type: 'blob' });
@@ -225,6 +240,9 @@ export const EntryList: React.FC<EntryListProps> = ({ sheets, currentUser, onCre
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+      if (failedCount > 0) {
+        alert(`一部の画像取得に失敗しました（成功: ${successCount}件 / 失敗: ${failedCount}件）。`);
+      }
     } catch (err) {
       alert('画像の一括ダウンロードに失敗しました。');
       console.error(err);

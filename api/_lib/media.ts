@@ -314,6 +314,22 @@ export const normalizeSheetMedia = async (
   sheet: EntrySheet,
   pathPrefix: string
 ): Promise<EntrySheet> => {
+  const hasInlineMedia =
+    (sheet.attachments || []).some((attachment) =>
+      Boolean((attachment.url || attachment.dataUrl || '').startsWith('data:'))
+    ) ||
+    sheet.products.some((product) => {
+      if ((product.productImage || '').startsWith('data:')) return true;
+      if ((product.promoImage || '').startsWith('data:')) return true;
+      return (product.productAttachments || []).some((attachment) =>
+        Boolean((attachment.url || attachment.dataUrl || '').startsWith('data:'))
+      );
+    });
+
+  if (!hasInlineMedia) {
+    return sheet;
+  }
+
   const normalizedProducts = await Promise.all(
     sheet.products.map((product) => normalizeProduct(product, `${pathPrefix}/products`))
   );

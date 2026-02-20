@@ -117,17 +117,20 @@ export const updateAll = async (masterData: MasterData): Promise<MasterData> => 
       [aliases, desired.length > 0 ? desired : ['__EMPTY__']]
     );
 
-    // Upsert desired rows with correct order/category
-    for (let index = 0; index < desired.length; index += 1) {
-      const value = desired[index];
+    // Upsert desired rows with correct order/category in a single query.
+    if (desired.length > 0) {
       await db.query(
         `
         INSERT INTO master_data (category, value, display_order)
-        VALUES ($1, $2, $3)
+        SELECT
+          $1,
+          items.value,
+          (items.ord - 1)::int
+        FROM unnest($2::text[]) WITH ORDINALITY AS items(value, ord)
         ON CONFLICT (category, value) DO UPDATE
         SET display_order = EXCLUDED.display_order
         `,
-        [categoryValue, value, index]
+        [categoryValue, desired]
       );
     }
 

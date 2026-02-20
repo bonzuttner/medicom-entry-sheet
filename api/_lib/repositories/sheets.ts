@@ -88,24 +88,16 @@ interface AttachmentRow {
 /**
  * Convert database rows to EntrySheet object
  */
-const rowsToSheet = async (
+const rowsToSheet = (
   sheetRow: SheetRow,
   productRows: ProductRow[],
-  ingredientRows: IngredientRow[],
-  attachmentRows: AttachmentRow[]
-): Promise<EntrySheet> => {
+  ingredientsByProductId: Map<string, string[]>,
+  attachmentsByProductId: Map<string, Attachment[]>,
+  sheetAttachments: Attachment[]
+): EntrySheet => {
   const products: ProductEntry[] = productRows.map((p) => {
-    const ingredients = ingredientRows
-      .filter((i) => i.product_id === p.id)
-      .map((i) => i.ingredient_name);
-    const productAttachments: Attachment[] = attachmentRows
-      .filter((a) => a.product_id === p.id)
-      .map((a) => ({
-        name: a.name,
-        size: a.size,
-        type: a.type,
-        url: a.url,
-      }));
+    const ingredients = ingredientsByProductId.get(p.id) || [];
+    const productAttachments = attachmentsByProductId.get(p.id) || [];
 
     return {
       id: p.id,
@@ -135,15 +127,6 @@ const rowsToSheet = async (
     };
   });
 
-  const attachments: Attachment[] = attachmentRows
-    .filter((a) => a.sheet_id === sheetRow.id && !a.product_id)
-    .map((a) => ({
-      name: a.name,
-      size: a.size,
-      type: a.type,
-      url: a.url,
-    }));
-
   return {
     id: sheetRow.id,
     creatorId: sheetRow.creator_id,
@@ -157,8 +140,56 @@ const rowsToSheet = async (
     createdAt: toIsoString(sheetRow.created_at),
     updatedAt: toIsoString(sheetRow.updated_at),
     products,
-    attachments: attachments.length > 0 ? attachments : undefined,
+    attachments: sheetAttachments.length > 0 ? sheetAttachments : undefined,
   };
+};
+
+const buildAttachmentsByProductId = (
+  rows: AttachmentRow[]
+): Map<string, Attachment[]> => {
+  const map = new Map<string, Attachment[]>();
+  for (const row of rows) {
+    if (!row.product_id) continue;
+    const list = map.get(row.product_id) || [];
+    list.push({
+      name: row.name,
+      size: row.size,
+      type: row.type,
+      url: row.url,
+    });
+    map.set(row.product_id, list);
+  }
+  return map;
+};
+
+const buildSheetAttachmentsBySheetId = (
+  rows: AttachmentRow[]
+): Map<string, Attachment[]> => {
+  const map = new Map<string, Attachment[]>();
+  for (const row of rows) {
+    if (!row.sheet_id || row.product_id) continue;
+    const list = map.get(row.sheet_id) || [];
+    list.push({
+      name: row.name,
+      size: row.size,
+      type: row.type,
+      url: row.url,
+    });
+    map.set(row.sheet_id, list);
+  }
+  return map;
+};
+
+const buildIngredientsByProductId = (
+  rows: IngredientRow[]
+): Map<string, string[]> => {
+  const map = new Map<string, string[]>();
+  for (const row of rows) {
+    const list = map.get(row.product_id) || [];
+    list.push(row.ingredient_name);
+    map.set(row.product_id, list);
+  }
+  return map;
 };
 
 /**
@@ -218,11 +249,24 @@ export const findAll = async (): Promise<EntrySheet[]> => {
     ),
   ]);
 
-  const sheets = await Promise.all(
-    sheetResult.rows.map((sheetRow) => {
-      const productRows = productResult.rows.filter((p) => p.sheet_id === sheetRow.id);
-      return rowsToSheet(sheetRow, productRows, ingredientResult.rows, attachmentResult.rows);
-    })
+  const productsBySheetId = new Map<string, ProductRow[]>();
+  for (const productRow of productResult.rows) {
+    const list = productsBySheetId.get(productRow.sheet_id) || [];
+    list.push(productRow);
+    productsBySheetId.set(productRow.sheet_id, list);
+  }
+  const ingredientsByProductId = buildIngredientsByProductId(ingredientResult.rows);
+  const attachmentsByProductId = buildAttachmentsByProductId(attachmentResult.rows);
+  const sheetAttachmentsBySheetId = buildSheetAttachmentsBySheetId(attachmentResult.rows);
+
+  const sheets = sheetResult.rows.map((sheetRow) =>
+    rowsToSheet(
+      sheetRow,
+      productsBySheetId.get(sheetRow.id) || [],
+      ingredientsByProductId,
+      attachmentsByProductId,
+      sheetAttachmentsBySheetId.get(sheetRow.id) || []
+    )
   );
 
   return sheets;
@@ -287,11 +331,24 @@ export const findByManufacturerId = async (manufacturerId: string): Promise<Entr
     ),
   ]);
 
-  const sheets = await Promise.all(
-    sheetResult.rows.map((sheetRow) => {
-      const productRows = productResult.rows.filter((p) => p.sheet_id === sheetRow.id);
-      return rowsToSheet(sheetRow, productRows, ingredientResult.rows, attachmentResult.rows);
-    })
+  const productsBySheetId = new Map<string, ProductRow[]>();
+  for (const productRow of productResult.rows) {
+    const list = productsBySheetId.get(productRow.sheet_id) || [];
+    list.push(productRow);
+    productsBySheetId.set(productRow.sheet_id, list);
+  }
+  const ingredientsByProductId = buildIngredientsByProductId(ingredientResult.rows);
+  const attachmentsByProductId = buildAttachmentsByProductId(attachmentResult.rows);
+  const sheetAttachmentsBySheetId = buildSheetAttachmentsBySheetId(attachmentResult.rows);
+
+  const sheets = sheetResult.rows.map((sheetRow) =>
+    rowsToSheet(
+      sheetRow,
+      productsBySheetId.get(sheetRow.id) || [],
+      ingredientsByProductId,
+      attachmentsByProductId,
+      sheetAttachmentsBySheetId.get(sheetRow.id) || []
+    )
   );
 
   return sheets;
@@ -353,18 +410,23 @@ export const findById = async (sheetId: string): Promise<EntrySheet | null> => {
     ),
   ]);
 
+  const ingredientsByProductId = buildIngredientsByProductId(ingredientResult.rows);
+  const attachmentsByProductId = buildAttachmentsByProductId(attachmentResult.rows);
+  const sheetAttachmentsBySheetId = buildSheetAttachmentsBySheetId(attachmentResult.rows);
+
   return rowsToSheet(
     sheetResult.rows[0],
     productResult.rows,
-    ingredientResult.rows,
-    attachmentResult.rows
+    ingredientsByProductId,
+    attachmentsByProductId,
+    sheetAttachmentsBySheetId.get(sheetResult.rows[0].id) || []
   );
 };
 
 /**
  * Upsert sheet with products (transactional)
  */
-export const upsert = async (sheet: EntrySheet): Promise<EntrySheet> => {
+export const upsert = async (sheet: EntrySheet): Promise<void> => {
   return await db.transaction(async () => {
     const nowIso = new Date().toISOString();
     const normalizedSheet: EntrySheet = {
@@ -381,7 +443,17 @@ export const upsert = async (sheet: EntrySheet): Promise<EntrySheet> => {
       attachments: Array.isArray(sheet.attachments) ? sheet.attachments : [],
     };
 
-    const manufacturerId = await ensureManufacturer(normalizedSheet.manufacturerName);
+    const manufacturerIdCache = new Map<string, string>();
+    const getManufacturerIdCached = async (manufacturerName: string): Promise<string> => {
+      const key = manufacturerName.trim();
+      const cached = manufacturerIdCache.get(key);
+      if (cached) return cached;
+      const resolved = await ensureManufacturer(key);
+      manufacturerIdCache.set(key, resolved);
+      return resolved;
+    };
+
+    const manufacturerId = await getManufacturerIdCached(normalizedSheet.manufacturerName);
 
     // Upsert entry_sheet
     await db.query(
@@ -407,33 +479,46 @@ export const upsert = async (sheet: EntrySheet): Promise<EntrySheet> => {
       ]
     );
 
-    // Delete existing products (CASCADE will handle ingredients)
-    await db.query(`DELETE FROM product_entries WHERE sheet_id = $1`, [normalizedSheet.id]);
+    const existingProductRows = await db.query<{ id: string }>(
+      `SELECT id FROM product_entries WHERE sheet_id = $1`,
+      [normalizedSheet.id]
+    );
+    const existingProductIds = new Set(existingProductRows.rows.map((row) => row.id));
+    const incomingIds = normalizedSheet.products
+      .map((product) => product.id)
+      .filter((id): id is string => Boolean(id));
+    const incomingProductRows =
+      incomingIds.length > 0
+        ? await db.query<{ id: string; sheet_id: string }>(
+            `SELECT id, sheet_id FROM product_entries WHERE id = ANY($1)`,
+            [incomingIds]
+          )
+        : { rows: [] as { id: string; sheet_id: string }[] };
+    const productOwnerById = new Map(incomingProductRows.rows.map((row) => [row.id, row.sheet_id]));
 
-    // Insert products
+    // Upsert products
     const usedProductIds = new Set<string>();
+    const finalProductIds = new Set<string>();
     for (const product of normalizedSheet.products) {
       const productManufacturerName = String(
         product.manufacturerName || normalizedSheet.manufacturerName
       ).trim();
-      const productManufacturerId = await ensureManufacturer(productManufacturerName);
+      const productManufacturerId = await getManufacturerIdCached(productManufacturerName);
       let productId = product.id || randomUUID();
 
-      // Ensure product ID uniqueness within this save request and across sheets.
+      // Ensure product ID uniqueness within this save request.
       while (usedProductIds.has(productId)) {
         productId = randomUUID();
       }
-      while (true) {
-        const existing = await db.query<{ sheet_id: string }>(
-          `SELECT sheet_id FROM product_entries WHERE id = $1 LIMIT 1`,
-          [productId]
-        );
-        if (existing.rows.length === 0 || existing.rows[0].sheet_id === sheet.id) {
-          break;
-        }
+      // If provided ID already belongs to another sheet, replace with new UUID.
+      if (productOwnerById.has(productId) && productOwnerById.get(productId) !== normalizedSheet.id) {
         productId = randomUUID();
+        while (usedProductIds.has(productId)) {
+          productId = randomUUID();
+        }
       }
       usedProductIds.add(productId);
+      finalProductIds.add(productId);
 
       await db.query(
         `
@@ -447,6 +532,29 @@ export const upsert = async (sheet: EntrySheet): Promise<EntrySheet> => {
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
           $17, $18, $19, $20, $21, $22, $23
         )
+        ON CONFLICT (id) DO UPDATE SET
+          sheet_id = EXCLUDED.sheet_id,
+          shelf_name = EXCLUDED.shelf_name,
+          manufacturer_id = EXCLUDED.manufacturer_id,
+          jan_code = EXCLUDED.jan_code,
+          product_name = EXCLUDED.product_name,
+          product_image_url = EXCLUDED.product_image_url,
+          risk_classification = EXCLUDED.risk_classification,
+          catch_copy = EXCLUDED.catch_copy,
+          product_message = EXCLUDED.product_message,
+          product_notes = EXCLUDED.product_notes,
+          width = EXCLUDED.width,
+          height = EXCLUDED.height,
+          depth = EXCLUDED.depth,
+          facing_count = EXCLUDED.facing_count,
+          arrival_date = EXCLUDED.arrival_date,
+          has_promo_material = EXCLUDED.has_promo_material,
+          promo_sample = EXCLUDED.promo_sample,
+          special_fixture = EXCLUDED.special_fixture,
+          promo_width = EXCLUDED.promo_width,
+          promo_height = EXCLUDED.promo_height,
+          promo_depth = EXCLUDED.promo_depth,
+          promo_image_url = EXCLUDED.promo_image_url
         `,
         [
           productId,
@@ -475,6 +583,7 @@ export const upsert = async (sheet: EntrySheet): Promise<EntrySheet> => {
         ]
       );
 
+      await db.query(`DELETE FROM product_ingredients WHERE product_id = $1`, [productId]);
       // Insert ingredients
       if (product.specificIngredients && product.specificIngredients.length > 0) {
         for (const ingredient of product.specificIngredients) {
@@ -485,6 +594,7 @@ export const upsert = async (sheet: EntrySheet): Promise<EntrySheet> => {
         }
       }
 
+      await db.query(`DELETE FROM attachments WHERE product_id = $1`, [productId]);
       // Insert product attachments
       if (product.productAttachments && product.productAttachments.length > 0) {
         for (const attachment of product.productAttachments) {
@@ -497,6 +607,11 @@ export const upsert = async (sheet: EntrySheet): Promise<EntrySheet> => {
           );
         }
       }
+    }
+
+    const removedProductIds = [...existingProductIds].filter((id) => !finalProductIds.has(id));
+    if (removedProductIds.length > 0) {
+      await db.query(`DELETE FROM product_entries WHERE id = ANY($1)`, [removedProductIds]);
     }
 
     // Delete existing attachments
@@ -518,10 +633,7 @@ export const upsert = async (sheet: EntrySheet): Promise<EntrySheet> => {
       }
     }
 
-    // Return saved sheet
-    const saved = await findById(normalizedSheet.id);
-    if (!saved) throw new Error('Failed to save sheet');
-    return saved;
+    return;
   });
 };
 

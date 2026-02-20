@@ -8,7 +8,7 @@ interface EntryFormProps {
   initialActiveTab?: number;
   masterData: MasterData;
   reusableProductTemplates: Record<string, ProductEntry>;
-  onSave: (sheet: EntrySheet) => void;
+  onSave: (sheet: EntrySheet) => Promise<void> | void;
   onCancel: () => void;
 }
 
@@ -24,6 +24,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 }) => {
   const [formData, setFormData] = useState<EntrySheet>(initialData);
   const [activeTab, setActiveTab] = useState<number>(initialActiveTab); // Index of the product being edited
+  const [isSaving, setIsSaving] = useState(false);
   const askedPrefillByProductRef = useRef<Map<number, string>>(new Map());
 
   const parseRequiredNumber = (value: string): number => {
@@ -95,23 +96,33 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     if (!files || files.length === 0) return;
     const MAX_FILE_BYTES = 25 * 1024 * 1024;
     const next = [...(formData.attachments ?? [])];
-    for (const file of Array.from(files)) {
+    const candidates = Array.from(files);
+    const validFiles: File[] = [];
+    for (const file of candidates) {
       if (file.size > MAX_FILE_BYTES) {
         alert(`ファイルサイズは25MB以下にしてください: ${file.name}`);
         continue;
       }
-      try {
-        const url = await uploadFile(file, 'attachment');
+      validFiles.push(file);
+    }
+
+    const uploadResults = await Promise.allSettled(
+      validFiles.map((file) => uploadFile(file, 'attachment'))
+    );
+
+    uploadResults.forEach((result, index) => {
+      const file = validFiles[index];
+      if (result.status === 'fulfilled') {
         next.push({
           name: file.name,
           size: file.size,
           type: file.type || '',
-          url,
+          url: result.value,
         });
-      } catch {
-        alert(`ファイルの読み込みに失敗しました: ${file.name}`);
+        return;
       }
-    }
+      alert(`ファイルの読み込みに失敗しました: ${file.name}`);
+    });
     setFormData(prev => ({ ...prev, attachments: next }));
   };
 
@@ -126,23 +137,33 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     const MAX_FILE_BYTES = 25 * 1024 * 1024;
     const current = formData.products[productIndex];
     const next = [...(current.productAttachments ?? [])];
-    for (const file of Array.from(files)) {
+    const candidates = Array.from(files);
+    const validFiles: File[] = [];
+    for (const file of candidates) {
       if (file.size > MAX_FILE_BYTES) {
         alert(`ファイルサイズは25MB以下にしてください: ${file.name}`);
         continue;
       }
-      try {
-        const url = await uploadFile(file, 'attachment');
+      validFiles.push(file);
+    }
+
+    const uploadResults = await Promise.allSettled(
+      validFiles.map((file) => uploadFile(file, 'attachment'))
+    );
+
+    uploadResults.forEach((result, index) => {
+      const file = validFiles[index];
+      if (result.status === 'fulfilled') {
         next.push({
           name: file.name,
           size: file.size,
           type: file.type || '',
-          url,
+          url: result.value,
         });
-      } catch {
-        alert(`ファイルの読み込みに失敗しました: ${file.name}`);
+        return;
       }
-    }
+      alert(`ファイルの読み込みに失敗しました: ${file.name}`);
+    });
     handleProductChange(productIndex, 'productAttachments', next);
   };
 
@@ -359,7 +380,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     if (activeTab >= newProducts.length) setActiveTab(newProducts.length - 1);
   };
 
-  const saveSheet = (status: 'draft' | 'completed') => {
+  const saveSheet = async (status: 'draft' | 'completed') => {
+    if (isSaving) return;
     // Basic validation
     if (!formData.creatorName) {
         alert("作成者を入力してください");
@@ -400,7 +422,12 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         }
     }
 
-    onSave({ ...formData, status });
+    setIsSaving(true);
+    try {
+      await onSave({ ...formData, status });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Helper for mock image upload
@@ -465,23 +492,29 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-3 sm:p-4 z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="w-full sm:w-auto flex gap-3 order-2 sm:order-1">
-                <button onClick={onCancel} className="flex-1 sm:flex-none text-slate-600 font-medium px-4 py-3 hover:bg-slate-100 rounded-lg flex items-center justify-center gap-2 border border-slate-200 sm:border-transparent">
+                <button
+                  onClick={onCancel}
+                  disabled={isSaving}
+                  className="flex-1 sm:flex-none text-slate-600 font-medium px-4 py-3 hover:bg-slate-100 rounded-lg flex items-center justify-center gap-2 border border-slate-200 sm:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                     <ArrowLeft size={20} /> <span className="inline">キャンセル</span>
                 </button>
             </div>
             <div className="w-full sm:w-auto flex gap-3 order-1 sm:order-2">
                 <button 
-                    onClick={() => saveSheet('draft')} 
-                    className="flex-1 sm:flex-none px-4 py-3 bg-slate-200 text-slate-700 font-bold rounded-lg hover:bg-slate-300 transition-colors whitespace-nowrap"
+                    onClick={() => { void saveSheet('draft'); }}
+                    disabled={isSaving}
+                    className="flex-1 sm:flex-none px-4 py-3 bg-slate-200 text-slate-700 font-bold rounded-lg hover:bg-slate-300 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    一時保存
+                    {isSaving ? '保存中...' : '一時保存'}
                 </button>
                 <button 
-                    onClick={() => saveSheet('completed')}
-                    className="flex-[2] sm:flex-none px-6 py-3 bg-primary text-white font-bold rounded-lg hover:bg-sky-600 shadow-lg shadow-sky-200 flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
+                    onClick={() => { void saveSheet('completed'); }}
+                    disabled={isSaving}
+                    className="flex-[2] sm:flex-none px-6 py-3 bg-primary text-white font-bold rounded-lg hover:bg-sky-600 shadow-lg shadow-sky-200 flex items-center justify-center gap-2 transition-colors whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                     <Save size={20} />
-                    完了
+                    {isSaving ? '保存中...' : '完了'}
                 </button>
             </div>
          </div>

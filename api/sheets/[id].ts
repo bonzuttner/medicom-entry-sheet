@@ -120,9 +120,8 @@ export default async function handler(req: any, res: any) {
     }
 
     // Save to database
-    let savedSheet: EntrySheet;
     try {
-      savedSheet = await SheetRepository.upsert({ ...normalizedSheet, id: sheetId });
+      await SheetRepository.upsert({ ...normalizedSheet, id: sheetId });
     } catch (error) {
       // DB save failed after media normalization/upload.
       // Delete newly uploaded blobs that are not part of the previous persisted sheet.
@@ -132,10 +131,11 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    // Clean up unused blob URLs
-    await deleteUnusedManagedBlobUrls(beforeSheets, [savedSheet]);
-
     sendJson(res, 200, { ok: true });
+    // Clean up unused blob URLs in background to reduce response latency.
+    void deleteUnusedManagedBlobUrls(beforeSheets, [normalizedSheet]).catch((error) => {
+      console.warn('Deferred blob cleanup failed after save:', error);
+    });
     return;
   }
 
@@ -154,8 +154,9 @@ export default async function handler(req: any, res: any) {
   // Delete from database
   await SheetRepository.deleteById(sheetId);
 
-  // Clean up blob URLs
-  await deleteUnusedManagedBlobUrls([target], []);
-
   sendJson(res, 200, { ok: true });
+  // Clean up blob URLs in background to reduce response latency.
+  void deleteUnusedManagedBlobUrls([target], []).catch((error) => {
+    console.warn('Deferred blob cleanup failed after delete:', error);
+  });
 }
