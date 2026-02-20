@@ -64,6 +64,12 @@ const toDateOnlyString = (value: Date | string | null | undefined): string => {
   return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString().split('T')[0];
 };
 
+const toSafeIso = (value: string | undefined, fallback: string): string => {
+  if (!value) return fallback;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? fallback : parsed.toISOString();
+};
+
 interface IngredientRow {
   product_id: string;
   ingredient_name: string;
@@ -327,7 +333,22 @@ export const findById = async (sheetId: string): Promise<EntrySheet | null> => {
  */
 export const upsert = async (sheet: EntrySheet): Promise<EntrySheet> => {
   return await db.transaction(async () => {
-    const manufacturerId = await ensureManufacturer(sheet.manufacturerName);
+    const nowIso = new Date().toISOString();
+    const normalizedSheet: EntrySheet = {
+      ...sheet,
+      title: String(sheet.title || '').trim(),
+      notes: sheet.notes ? String(sheet.notes).trim() : '',
+      email: String(sheet.email || '').trim(),
+      phoneNumber: String(sheet.phoneNumber || '').trim(),
+      manufacturerName: String(sheet.manufacturerName || '').trim(),
+      createdAt: toSafeIso(sheet.createdAt, nowIso),
+      updatedAt: nowIso,
+      status: sheet.status === 'completed' ? 'completed' : 'draft',
+      products: Array.isArray(sheet.products) ? sheet.products : [],
+      attachments: Array.isArray(sheet.attachments) ? sheet.attachments : [],
+    };
+
+    const manufacturerId = await ensureManufacturer(normalizedSheet.manufacturerName);
 
     // Upsert entry_sheet
     await db.query(
@@ -342,24 +363,27 @@ export const upsert = async (sheet: EntrySheet): Promise<EntrySheet> => {
         updated_at = EXCLUDED.updated_at
       `,
       [
-        sheet.id,
-        sheet.creatorId,
+        normalizedSheet.id,
+        normalizedSheet.creatorId,
         manufacturerId,
-        sheet.title,
-        sheet.notes || null,
-        sheet.status,
-        sheet.createdAt,
-        new Date().toISOString(),
+        normalizedSheet.title,
+        normalizedSheet.notes || null,
+        normalizedSheet.status,
+        normalizedSheet.createdAt,
+        normalizedSheet.updatedAt,
       ]
     );
 
     // Delete existing products (CASCADE will handle ingredients)
-    await db.query(`DELETE FROM product_entries WHERE sheet_id = $1`, [sheet.id]);
+    await db.query(`DELETE FROM product_entries WHERE sheet_id = $1`, [normalizedSheet.id]);
 
     // Insert products
     const usedProductIds = new Set<string>();
-    for (const product of sheet.products) {
-      const productManufacturerId = await ensureManufacturer(product.manufacturerName);
+    for (const product of normalizedSheet.products) {
+      const productManufacturerName = String(
+        product.manufacturerName || normalizedSheet.manufacturerName
+      ).trim();
+      const productManufacturerId = await ensureManufacturer(productManufacturerName);
       let productId = product.id || randomUUID();
 
       // Ensure product ID uniqueness within this save request and across sheets.
@@ -393,11 +417,11 @@ export const upsert = async (sheet: EntrySheet): Promise<EntrySheet> => {
         `,
         [
           productId,
-          sheet.id,
-          product.shelfName,
+          normalizedSheet.id,
+          String(product.shelfName || '').trim(),
           productManufacturerId,
-          product.janCode,
-          product.productName,
+          String(product.janCode || '').trim(),
+          String(product.productName || '').trim(),
           product.productImage || null,
           product.riskClassification || null,
           product.catchCopy || null,
@@ -430,20 +454,26 @@ export const upsert = async (sheet: EntrySheet): Promise<EntrySheet> => {
     }
 
     // Delete existing attachments
-    await db.query(`DELETE FROM attachments WHERE sheet_id = $1`, [sheet.id]);
+    await db.query(`DELETE FROM attachments WHERE sheet_id = $1`, [normalizedSheet.id]);
 
     // Insert attachments
-    if (sheet.attachments && sheet.attachments.length > 0) {
-      for (const attachment of sheet.attachments) {
+    if (normalizedSheet.attachments && normalizedSheet.attachments.length > 0) {
+      for (const attachment of normalizedSheet.attachments) {
         await db.query(
           `INSERT INTO attachments (sheet_id, name, size, type, url) VALUES ($1, $2, $3, $4, $5)`,
-          [sheet.id, attachment.name, attachment.size, attachment.type, attachment.url]
+          [
+            normalizedSheet.id,
+            String(attachment.name || '').trim(),
+            attachment.size,
+            String(attachment.type || '').trim(),
+            String(attachment.url || '').trim(),
+          ]
         );
       }
     }
 
     // Return saved sheet
-    const saved = await findById(sheet.id);
+    const saved = await findById(normalizedSheet.id);
     if (!saved) throw new Error('Failed to save sheet');
     return saved;
   });

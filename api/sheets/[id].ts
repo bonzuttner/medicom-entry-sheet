@@ -14,6 +14,23 @@ const getSheetId = (req: any): string | null => {
   return raw || null;
 };
 
+const normalizeStatus = (value: string | undefined): 'draft' | 'completed' =>
+  value === 'completed' ? 'completed' : 'draft';
+
+const normalizeProducts = (
+  incoming: EntrySheet['products'] | undefined,
+  fallbackManufacturerName: string
+): EntrySheet['products'] => {
+  if (!Array.isArray(incoming)) return [];
+  return incoming.map((product) => ({
+    ...product,
+    manufacturerName: product.manufacturerName || fallbackManufacturerName,
+    janCode: String(product.janCode || '').trim(),
+    productName: String(product.productName || '').trim(),
+    shelfName: String(product.shelfName || '').trim(),
+  }));
+};
+
 export default async function handler(req: any, res: any) {
   const method = getMethod(req);
   if (method !== 'PUT' && method !== 'DELETE') {
@@ -40,18 +57,34 @@ export default async function handler(req: any, res: any) {
 
     const existingSheet = await SheetRepository.findById(sheetId);
 
-    // For STAFF users, enforce manufacturer/creator to avoid client-side mismatch causing save failures.
-    const safeSheet: EntrySheet = isAdmin(currentUser)
-      ? { ...sheet, id: sheetId }
-      : {
-          ...sheet,
-          id: sheetId,
-          manufacturerName: currentUser.manufacturerName,
-          creatorId: existingSheet?.creatorId || currentUser.id,
-          creatorName: existingSheet?.creatorName || currentUser.displayName,
-          email: sheet.email || currentUser.email,
-          phoneNumber: sheet.phoneNumber || currentUser.phoneNumber,
-        };
+    // Server-authoritative save DTO:
+    // - New sheet: always owned by current session user
+    // - Existing sheet: preserve immutable ownership fields from existing record
+    const ownerManufacturer = existingSheet?.manufacturerName || currentUser.manufacturerName;
+    const ownerCreatorId = existingSheet?.creatorId || currentUser.id;
+    const ownerCreatorName = existingSheet?.creatorName || currentUser.displayName;
+
+    const safeSheet: EntrySheet = {
+      ...sheet,
+      id: sheetId,
+      manufacturerName: ownerManufacturer,
+      creatorId: ownerCreatorId,
+      creatorName: ownerCreatorName,
+      email: String(sheet.email || existingSheet?.email || currentUser.email || '').trim(),
+      phoneNumber: String(sheet.phoneNumber || existingSheet?.phoneNumber || currentUser.phoneNumber || '').trim(),
+      title: String(sheet.title || '').trim(),
+      notes: sheet.notes ? String(sheet.notes).trim() : '',
+      status: normalizeStatus(sheet.status),
+      createdAt: existingSheet?.createdAt || sheet.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      products: normalizeProducts(sheet.products, ownerManufacturer),
+      attachments: Array.isArray(sheet.attachments) ? sheet.attachments : [],
+    };
+
+    if (safeSheet.products.length === 0) {
+      sendError(res, 400, 'At least one product is required');
+      return;
+    }
 
     if (!canAccessManufacturer(currentUser, safeSheet.manufacturerName)) {
       sendError(res, 403, 'You can only save sheets in your manufacturer');
@@ -77,6 +110,12 @@ export default async function handler(req: any, res: any) {
     // Permission check for existing sheet
     if (existingSheet && !canAccessManufacturer(currentUser, existingSheet.manufacturerName)) {
       sendError(res, 403, 'You cannot modify this sheet');
+      return;
+    }
+
+    // STAFF cannot mark completed for other manufacturers (defense-in-depth).
+    if (!isAdmin(currentUser) && safeSheet.manufacturerName !== currentUser.manufacturerName) {
+      sendError(res, 403, 'You can only save sheets in your manufacturer');
       return;
     }
 
