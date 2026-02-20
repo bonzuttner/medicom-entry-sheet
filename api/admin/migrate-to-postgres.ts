@@ -10,6 +10,7 @@
  */
 
 import { sql } from '@vercel/postgres';
+import { createHash } from 'crypto';
 import { isAdmin, requireUser } from '../_lib/auth.js';
 import {
   getMethod,
@@ -27,6 +28,60 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 const isValidStoreData = (data: unknown): data is StoreData => {
   if (!isObject(data)) return false;
   return Array.isArray(data.users) && Array.isArray(data.sheets) && isObject(data.master);
+};
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const isUuid = (value: string): boolean => UUID_PATTERN.test(value);
+
+const deterministicUuid = (value: string): string => {
+  const hex = createHash('md5').update(value).digest('hex').split('');
+  hex[12] = '4';
+  const variant = (parseInt(hex[16], 16) & 0x3) | 0x8;
+  hex[16] = variant.toString(16);
+  return `${hex.slice(0, 8).join('')}-${hex.slice(8, 12).join('')}-${hex.slice(12, 16).join('')}-${hex.slice(16, 20).join('')}-${hex.slice(20, 32).join('')}`;
+};
+
+const ensureUuid = (value: string, scope: string): string =>
+  isUuid(value) ? value : deterministicUuid(`${scope}:${value}`);
+
+const normalizeStoreDataForPostgres = (data: StoreData): StoreData => {
+  const userIdMap = new Map<string, string>();
+  const users = data.users.map((user) => {
+    const nextId = ensureUuid(user.id, 'user');
+    userIdMap.set(user.id, nextId);
+    return { ...user, id: nextId };
+  });
+
+  const sheetIdMap = new Map<string, string>();
+  const productIdMap = new Map<string, string>();
+
+  const sheets = data.sheets.map((sheet) => {
+    const nextSheetId = ensureUuid(sheet.id, 'sheet');
+    sheetIdMap.set(sheet.id, nextSheetId);
+
+    const nextCreatorId = userIdMap.get(sheet.creatorId) || ensureUuid(sheet.creatorId, 'user');
+
+    const products = sheet.products.map((product) => {
+      const nextProductId = ensureUuid(product.id, 'product');
+      productIdMap.set(product.id, nextProductId);
+      return { ...product, id: nextProductId };
+    });
+
+    return {
+      ...sheet,
+      id: nextSheetId,
+      creatorId: nextCreatorId,
+      products,
+    };
+  });
+
+  return {
+    ...data,
+    users,
+    sheets,
+  };
 };
 
 /**
@@ -67,26 +122,27 @@ const migrateUsers = async (
       throw new Error(`Manufacturer not found: ${user.manufacturerName}`);
     }
 
-    // 既存ユーザーがあれば削除（UUIDが変わるため）
-    await sql`DELETE FROM users WHERE id = ${user.id}::uuid`;
+    // 既存ユーザーがあれば削除（旧ID形式からの移行を考慮してusername基準）
+    await sql`DELETE FROM users WHERE username = ${user.username}`;
 
     const result = await sql`
       INSERT INTO users (
         id, username, password_hash, display_name, manufacturer_id,
         email, phone_number, role, created_at, updated_at
       ) VALUES (
-        ${user.id}::uuid,
+        ${user.id},
         ${user.username},
         ${user.password || ''},
         ${user.displayName},
-        ${manufacturerId}::uuid,
+        ${manufacturerId},
         ${user.email},
         ${user.phoneNumber || ''},
         ${user.role},
         NOW(),
         NOW()
       )
-      ON CONFLICT (id) DO UPDATE SET
+      ON CONFLICT (username) DO UPDATE SET
+        id = EXCLUDED.id,
         username = EXCLUDED.username,
         password_hash = EXCLUDED.password_hash,
         display_name = EXCLUDED.display_name,
@@ -117,7 +173,7 @@ const migrateSheets = async (
     }
 
     // 既存シートがあれば削除（CASCADE で商品・添付ファイルも削除）
-    await sql`DELETE FROM entry_sheets WHERE id = ${sheet.id}::uuid`;
+    await sql`DELETE FROM entry_sheets WHERE id = ${sheet.id}`;
 
     // シート本体を投入
     await sql`
@@ -125,9 +181,9 @@ const migrateSheets = async (
         id, creator_id, manufacturer_id, title, notes, status,
         created_at, updated_at
       ) VALUES (
-        ${sheet.id}::uuid,
-        ${sheet.creatorId}::uuid,
-        ${manufacturerId}::uuid,
+        ${sheet.id},
+        ${sheet.creatorId},
+        ${manufacturerId},
         ${sheet.title},
         ${sheet.notes || null},
         ${sheet.status},
@@ -169,10 +225,10 @@ const migrateProducts = async (
         promo_width, promo_height, promo_depth, promo_image_url,
         created_at, updated_at
       ) VALUES (
-        ${product.id}::uuid,
-        ${sheetId}::uuid,
+        ${product.id},
+        ${sheetId},
         ${product.shelfName},
-        ${manufacturerId}::uuid,
+        ${manufacturerId},
         ${product.janCode},
         ${product.productName},
         ${product.productImage || null},
@@ -202,7 +258,7 @@ const migrateProducts = async (
       for (const ingredient of product.specificIngredients) {
         await sql`
           INSERT INTO product_ingredients (product_id, ingredient_name)
-          VALUES (${product.id}::uuid, ${ingredient})
+          VALUES (${product.id}, ${ingredient})
           ON CONFLICT (product_id, ingredient_name) DO NOTHING
         `;
       }
@@ -228,8 +284,8 @@ const migrateAttachments = async (
       INSERT INTO attachments (
         sheet_id, product_id, name, size, type, url, created_at
       ) VALUES (
-        ${sheetId ? `${sheetId}::uuid` : null},
-        ${productId ? `${productId}::uuid` : null},
+        ${sheetId},
+        ${productId},
         ${attachment.name},
         ${attachment.size},
         ${attachment.type},
@@ -269,7 +325,7 @@ export default async function handler(req: any, res: any) {
   }
 
   // 認証・認可チェック
-  const store = await readStore();
+  await readStore();
   const currentUser = await requireUser(req, res);
   if (!currentUser) return;
   if (!isAdmin(currentUser)) {
@@ -283,23 +339,25 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  const normalizedData = normalizeStoreDataForPostgres(body.data);
+
   try {
     // トランザクション開始
     await sql`BEGIN`;
 
     // 1. メーカーマスターを投入
     const manufacturerMapping = await migrateManufacturers(
-      body.data.master.manufacturerNames
+      normalizedData.master.manufacturerNames
     );
 
     // 2. ユーザーを投入
-    await migrateUsers(body.data.users, manufacturerMapping);
+    await migrateUsers(normalizedData.users, manufacturerMapping);
 
     // 3. エントリーシートを投入（商品・添付ファイルも含む）
-    await migrateSheets(body.data.sheets, manufacturerMapping);
+    await migrateSheets(normalizedData.sheets, manufacturerMapping);
 
     // 4. マスターデータを投入
-    await migrateMasterData(body.data.master);
+    await migrateMasterData(normalizedData.master);
 
     // トランザクションコミット
     await sql`COMMIT`;
@@ -308,9 +366,9 @@ export default async function handler(req: any, res: any) {
       ok: true,
       migrated: {
         manufacturers: manufacturerMapping.size,
-        users: body.data.users.length,
-        sheets: body.data.sheets.length,
-        products: body.data.sheets.reduce((sum, s) => sum + s.products.length, 0),
+        users: normalizedData.users.length,
+        sheets: normalizedData.sheets.length,
+        products: normalizedData.sheets.reduce((sum, s) => sum + s.products.length, 0),
       },
     });
   } catch (error) {
