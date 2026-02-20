@@ -51,3 +51,25 @@
 - `npm run dev`: Vite（主にUI確認）
 - `npm run dev:api`: Vercel Functions を含む実行
 - 本番: Vercel 上で `src/` と `api/` を同居デプロイ
+
+## 6. 移行検討時に必ず見る場所
+
+### 6.1 実行基盤移行（Vercel Functions -> AWS）
+
+- `api/` 全体
+- 特に:
+  - `api/sheets/[id].ts`
+  - `api/users/[id].ts`
+  - `api/master.ts`
+
+### 6.2 DB移行（Neon -> AWS DB）
+
+- `api/_lib/db.ts`
+- `api/_lib/repositories/*.ts`
+- `api/admin/schema.sql`
+
+### 6.3 ストレージ移行（Blob -> S3）
+
+- `api/_lib/media.ts`
+- `api/upload.ts`
+- 参照先ドキュメント: `docs/AWS_S3_MIGRATION_PLAN.md`

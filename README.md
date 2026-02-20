@@ -105,6 +105,18 @@ npm run preview
 - ステータス管理（下書き/完了）
 - CSV出力
 
+#### CSV出力仕様（文字化け対策）
+- 文字コード: UTF-8（BOM付き）
+- 目的: Excelで日本語が文字化けしにくい形式で出力するため
+- CSVインジェクション対策: `=`, `+`, `-`, `@` で始まるセルは先頭に `'` を付与
+
+#### 画像一括ダウンロード仕様
+- 対象: 一覧画面で選択したエントリーシートに紐づく商品画像
+- 出力形式: ZIP（`entry_sheet_images_YYYY-MM-DD.zip`）
+- ZIP内ファイル名: `sheetId-productId-商品名.拡張子`
+- 画像が1件もない場合: ダウンロードせずメッセージ表示
+- 一部取得失敗時: 成功件数/失敗件数を表示（成功分のみZIP化）
+
 #### 2. アカウント管理
 - ユーザーアカウントの作成・編集・削除
 - メーカーごとのアカウント管理
@@ -128,11 +140,16 @@ npm run preview
 │   ├── PROJECT_STRUCTURE.md # 構成の見方
 │   ├── DATABASE_SCHEMA.md   # DB項目説明
 │   └── SYSTEM_OVERVIEW.md   # システム構成概要
-├── api/                      # APIエンドポイント（Vercel Functions）
-│   ├── _lib/                # 共通ライブラリ
-│   ├── auth/                # 認証API
-│   ├── admin/               # 管理者API
-│   └── *.ts                 # エンドポイント
+├── api/                      # バックエンド（Vercel Functions）
+│   ├── _lib/                # バックエンド共通ロジック
+│   │   ├── auth.ts          # 認証・認可
+│   │   ├── db.ts            # DB接続
+│   │   ├── repositories/    # DBアクセス層（users/sheets/masters）
+│   │   └── *.ts             # HTTP・media・password など
+│   ├── auth/                # 認証API（login）
+│   ├── admin/               # 管理者API・DBスキーマ
+│   │   └── schema.sql       # PostgreSQLテーブル定義
+│   └── *.ts                 # 業務API（users/sheets/master/upload など）
 ├── src/
 │   ├── components/          # Reactコンポーネント
 │   │   ├── Layout.tsx       # 共通レイアウト

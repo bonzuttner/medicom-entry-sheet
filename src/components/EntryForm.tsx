@@ -769,8 +769,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                             )}
                         </div>
                         <div className="flex-1 text-sm text-slate-600">
-                            <p className="mb-2"><strong>推奨:</strong> 2500px × 3508px程度。</p>
-                            <p className="mb-2 text-slate-500">※ 短辺1500px未満は解像度不足で登録できません。</p>
+                            <p className="mb-2"><strong>推奨:</strong> 300dpi相当 (2500px以上)。</p>
                             <p className="mb-3 text-slate-500">※A4で印刷可能な高解像度画像をアップロードしてください。容量が大きい場合は担当者へメール送付してください。</p>
                             <button 
                                 onClick={() => handleImageUpload(activeTab, 'productImage')}

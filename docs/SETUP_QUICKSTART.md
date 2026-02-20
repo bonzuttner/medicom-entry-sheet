@@ -12,6 +12,14 @@
 npm install -g vercel
 ```
 
+## 1.1 最初に把握する場所（移行検討者向け）
+
+1. バックエンド入口: `api/`
+2. DBアクセス層: `api/_lib/repositories/`
+3. DBスキーマ: `api/admin/schema.sql`
+4. ストレージ依存: `api/_lib/media.ts`
+5. 全体像: `docs/SYSTEM_OVERVIEW.md`
+
 ## 2. 初回セットアップ
 
 ```bash
@@ -123,3 +131,11 @@ ORDER BY table_name;
   - 画像/添付のアップロードAPIが失敗
 - `テーブルが存在しない`
   - `schema.sql` の実行先 DB が違う（Branch/Database の選択ミス）
+
+## 8. 移行計画のための最小確認
+
+1. `api/sheets/[id].ts` で保存時の業務ルールを確認
+2. `api/_lib/repositories/sheets.ts` で保存SQLとトランザクション境界を確認
+3. `api/_lib/media.ts` で Blob 依存箇所を確認
+4. `api/_lib/db.ts` で DB クライアント依存を確認
+5. `docs/AWS_S3_MIGRATION_PLAN.md` で段階移行手順を確認

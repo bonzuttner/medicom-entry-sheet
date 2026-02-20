@@ -52,6 +52,20 @@
   - `api/upload.ts`
   - `api/admin/*`（移行系）
 
+### 3.4 バックエンド内部の責務分離
+
+- API層（`api/*.ts`）:
+  - 認証・認可、リクエストバリデーション、レスポンス制御
+- ドメイン共通層（`api/_lib/*.ts`）:
+  - 認証、セッション、メディア処理、DB接続、パスワード処理
+- 永続化層（`api/_lib/repositories/*.ts`）:
+  - SQL定義とテーブル更新整合を担当
+
+移行時の原則:
+- 実行基盤移行（Vercel -> AWS）は API層+共通層が主対象
+- DB移行（Neon -> RDS/Aurora）は `db.ts` とSQL互換確認が主対象
+- ストレージ移行（Blob -> S3）は `media.ts` が主対象
+
 ### 3.3 DB設計
 
 - スキーマ定義: `api/admin/schema.sql`
@@ -135,7 +149,16 @@
 - ログイン試行制限のカウンタは現状 `/tmp` ファイル利用
   - 無料サーバーレス環境では永続性が弱いため、将来 Redis 等への移行が望ましい
 
-## 9. 参照ドキュメント
+## 9. 移行影響の早見表
+
+| 移行対象 | 主な修正ファイル | 影響範囲 |
+|---|---|---|
+| Blob -> S3 | `api/_lib/media.ts`, `api/upload.ts` | 画像/添付アップロード・参照 |
+| Neon -> AWS DB | `api/_lib/db.ts`, `api/_lib/repositories/*.ts` | 全APIの永続化 |
+| Vercel Functions -> AWS実行基盤 | `api/*`, デプロイ設定 | API全体 |
+| CDN/配信変更 | フロント配信設定、`VITE_API_BASE` | UIの接続先 |
+
+## 10. 参照ドキュメント
 
 - 権限設計: `docs/PERMISSIONS.md`
 - セキュリティ設計: `docs/SECURITY.md`
