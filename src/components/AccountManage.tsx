@@ -18,6 +18,34 @@ export const AccountManage: React.FC<AccountManageProps> = ({
   onSaveUser,
   onDeleteUser,
 }) => {
+  const getUserSaveErrorMessage = (error: unknown): string => {
+    const raw = error instanceof Error ? error.message : '';
+    if (!raw) return '保存に失敗しました。時間をおいて再試行してください。';
+
+    if (raw.includes('username, displayName, manufacturerName are required')) {
+      return '必須項目が不足しています。ログインID・担当者名・メーカー名を入力してください。';
+    }
+    if (raw.includes('Username is already taken')) {
+      return 'ログインIDが重複しています。別のログインIDを入力してください。';
+    }
+    if (raw.includes('Password is required for new users')) {
+      return '新規アカウント作成時はパスワードの入力が必須です。';
+    }
+    if (raw.includes('Password must include uppercase')) {
+      return 'パスワードは8文字以上で、大文字・小文字・数字・記号をそれぞれ1文字以上含めてください。';
+    }
+    if (raw.includes('You can only manage users in your manufacturer')) {
+      return '他メーカーのアカウントは作成・編集できません。';
+    }
+    if (raw.includes('Only admins can manage admin users')) {
+      return '管理者アカウントの操作は管理者ユーザーのみ可能です。';
+    }
+    if (raw.includes('最後の管理者アカウントは削除できません')) {
+      return '最後の管理者アカウントは削除できません。';
+    }
+    return raw;
+  };
+
   const normalizeManufacturerKey = (value: string): string => value.trim();
   const [editingUser, setEditingUser] = useState<Partial<User> | null>(null);
   const [validationError, setValidationError] = useState<string>('');
@@ -117,8 +145,7 @@ export const AccountManage: React.FC<AccountManageProps> = ({
       setEditingUser(null);
       setValidationError('');
     } catch (error) {
-      const message = error instanceof Error ? error.message : '保存に失敗しました';
-      setValidationError(message);
+      setValidationError(getUserSaveErrorMessage(error));
     }
   };
 

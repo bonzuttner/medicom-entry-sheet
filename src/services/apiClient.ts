@@ -10,6 +10,34 @@ const buildUrl = (path: string): string => {
   return `${baseUrl}${path}`;
 };
 
+const fallbackErrorMessageByStatus = (status: number): string => {
+  if (status === 400) return '入力内容を確認してください。';
+  if (status === 401) return 'ログインが必要です。再ログインしてください。';
+  if (status === 403) return 'この操作を行う権限がありません。';
+  if (status === 404) return '対象データが見つかりません。';
+  if (status >= 500) return 'サーバーエラーが発生しました。時間をおいて再試行してください。';
+  return '処理に失敗しました。時間をおいて再試行してください。';
+};
+
+const parseErrorMessage = (status: number, raw: string): string => {
+  const trimmed = raw.trim();
+  if (!trimmed) return fallbackErrorMessageByStatus(status);
+
+  try {
+    const parsed = JSON.parse(trimmed) as { error?: unknown; message?: unknown };
+    if (typeof parsed.error === 'string' && parsed.error.trim()) return parsed.error.trim();
+    if (typeof parsed.message === 'string' && parsed.message.trim()) return parsed.message.trim();
+  } catch {
+    // not JSON
+  }
+
+  if (trimmed.startsWith('<!doctype html') || trimmed.startsWith('<html')) {
+    return fallbackErrorMessageByStatus(status);
+  }
+
+  return trimmed;
+};
+
 const request = async <T>(
   method: HttpMethod,
   path: string,
@@ -26,9 +54,7 @@ const request = async <T>(
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => '');
-    throw new Error(
-      `API request failed (${response.status} ${response.statusText}): ${errorText}`
-    );
+    throw new Error(parseErrorMessage(response.status, errorText));
   }
 
   if (response.status === 204) {

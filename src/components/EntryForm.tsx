@@ -83,7 +83,23 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => '');
-      throw new Error(errorText || `Upload failed (${response.status})`);
+      const trimmed = errorText.trim();
+      if (!trimmed) {
+        throw new Error('アップロードに失敗しました。時間をおいて再試行してください。');
+      }
+      let parsedMessage = '';
+      try {
+        const parsed = JSON.parse(trimmed) as { error?: unknown; message?: unknown };
+        if (typeof parsed.error === 'string' && parsed.error.trim()) {
+          parsedMessage = parsed.error.trim();
+        }
+        if (!parsedMessage && typeof parsed.message === 'string' && parsed.message.trim()) {
+          parsedMessage = parsed.message.trim();
+        }
+      } catch {
+        // not JSON
+      }
+      throw new Error(parsedMessage || trimmed);
     }
 
     const payload = (await response.json()) as { url?: string };
@@ -420,17 +436,30 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             return;
         }
         // Strict validation
-        for (const p of formData.products) {
-            if (!p.productName || !p.janCode || !p.productImage) {
-                alert("必須項目が未入力の商品があります（商品名、JAN、商品画像など）");
+        for (const [index, p] of formData.products.entries()) {
+            const missing: string[] = [];
+            if (!p.productName) missing.push('商品名');
+            if (!p.janCode) missing.push('JANコード');
+            if (!p.productImage) missing.push('商品画像');
+            if (missing.length > 0) {
+                alert(`商品${index + 1}の必須項目が不足しています: ${missing.join('、')}`);
                 return;
             }
             if ((p.janCode.length !== 8 && p.janCode.length !== 13 && p.janCode.length !== 16)) { // 13 is standard JAN
-                alert(`JANコードの桁数が正しくありません: ${p.productName}`);
+                alert(`商品${index + 1}（${p.productName}）のJANコードは8桁 / 13桁 / 16桁で入力してください。`);
                 return;
             }
-            if (p.hasPromoMaterial === 'yes' && (!p.promoWidth || !p.promoImage)) {
-                alert(`販促物情報が不足しています: ${p.productName}`);
+            if (p.hasPromoMaterial === 'yes') {
+                const promoMissing: string[] = [];
+                if (!p.promoWidth) promoMissing.push('販促物幅');
+                if (!p.promoImage) promoMissing.push('販促物画像');
+                if (promoMissing.length > 0) {
+                  alert(`商品${index + 1}（${p.productName}）の販促物情報が不足しています: ${promoMissing.join('、')}`);
+                  return;
+                }
+            }
+            if (!/^\d+$/.test(p.janCode)) {
+                alert(`商品${index + 1}（${p.productName}）のJANコードは半角数字のみ入力してください。`);
                 return;
             }
         }
@@ -483,8 +512,17 @@ export const EntryForm: React.FC<EntryFormProps> = ({
               }
               const url = await runTrackedUpload(() => uploadFile(file, 'image'));
               handleProductChange(index, field, url);
-            } catch {
-              alert(`画像のアップロードに失敗しました: ${file.name}`);
+            } catch (error) {
+              const message = error instanceof Error ? error.message : '';
+              if (message.includes('解像度不足')) {
+                alert(`商品画像の解像度が不足しています（${file.name}）。短辺1500px以上の画像を選択してください。`);
+                return;
+              }
+              if (message.includes('画像の解像度を判定できない') || message.includes('Unsupported file type')) {
+                alert(`商品画像の形式に問題があります（${file.name}）。JPEG/PNG/WebP/GIF/BMPを使用してください。`);
+                return;
+              }
+              alert(`画像のアップロードに失敗しました（${file.name}）。時間をおいて再試行してください。`);
             }
         }
     };
@@ -770,7 +808,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                         </div>
                         <div className="flex-1 text-sm text-slate-600">
                             <p className="mb-2"><strong>推奨:</strong> 300dpi相当 (2500px以上)。</p>
-                            <p className="mb-3 text-slate-500">※A4で印刷可能な高解像度画像をアップロードしてください。容量が大きい場合は担当者へメール送付してください。</p>
+                            <p className="mb-3 text-slate-500">※A4で印刷可能な高解像度画像をアップロードしてください。保存できない場合は担当者へメール送付してください。</p>
                             <button 
                                 onClick={() => handleImageUpload(activeTab, 'productImage')}
                                 className="w-full sm:w-auto px-4 py-2 bg-white border border-slate-300 rounded shadow-sm hover:bg-slate-50 text-slate-700 font-medium"

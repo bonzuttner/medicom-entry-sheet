@@ -31,6 +31,25 @@ const upsertSheetInList = (source: EntrySheet[], saved: EntrySheet): EntrySheet[
 const removeSheetFromList = (source: EntrySheet[], id: string): EntrySheet[] =>
   source.filter((sheet) => sheet.id !== id);
 
+const getSheetSaveErrorMessage = (error: unknown): string => {
+  const raw = error instanceof Error ? error.message : '';
+  if (!raw) return '保存処理に失敗しました。時間をおいて再試行してください。';
+
+  if (raw.includes('解像度不足')) {
+    return '商品画像の解像度が不足しています。短辺1500px以上の画像に差し替えてください。';
+  }
+  if (raw.includes('画像の解像度を判定できない') || raw.includes('Unsupported file type')) {
+    return '商品画像の形式が未対応です。JPEG/PNG/WebP/GIF/BMPのいずれかを使用してください。';
+  }
+  if (raw.includes('Blob storage is not configured')) {
+    return '画像保存先の設定が未完了です。管理者に連絡してください。';
+  }
+  if (raw.includes('入力内容を確認してください')) {
+    return '入力内容に誤りがあります。必須項目・桁数・形式を確認してください。';
+  }
+  return raw;
+};
+
 const cloneProductTemplate = (product: ProductEntry): ProductEntry => ({
   ...product,
   specificIngredients: [...product.specificIngredients],
@@ -265,8 +284,7 @@ const App: React.FC = () => {
         .catch((error) => console.error('Failed to refresh sheets after save:', error));
     } catch (error) {
       console.error('Failed to save sheet:', error);
-      const message = error instanceof Error ? error.message : '保存に失敗しました';
-      alert(`保存に失敗しました: ${message}`);
+      alert(`保存に失敗しました。\n${getSheetSaveErrorMessage(error)}`);
     }
   };
 
