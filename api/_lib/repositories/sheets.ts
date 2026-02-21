@@ -499,6 +499,14 @@ export const upsert = async (sheet: EntrySheet): Promise<void> => {
     // Upsert products
     const usedProductIds = new Set<string>();
     const finalProductIds = new Set<string>();
+    const ingredientRows: Array<{ productId: string; ingredientName: string }> = [];
+    const productAttachmentRows: Array<{
+      productId: string;
+      name: string;
+      size: number;
+      type: string;
+      url: string;
+    }> = [];
     for (const product of normalizedSheet.products) {
       const productManufacturerName = String(
         product.manufacturerName || normalizedSheet.manufacturerName
@@ -583,24 +591,13 @@ export const upsert = async (sheet: EntrySheet): Promise<void> => {
         ]
       );
 
-      await db.query(`DELETE FROM product_ingredients WHERE product_id = $1`, [productId]);
-      // Insert ingredients in bulk
       if (product.specificIngredients && product.specificIngredients.length > 0) {
         const ingredients = [...new Set(product.specificIngredients.map((value) => value.trim()).filter(Boolean))];
-        if (ingredients.length > 0) {
-          await db.query(
-            `
-            INSERT INTO product_ingredients (product_id, ingredient_name)
-            SELECT $1, items.ingredient_name
-            FROM unnest($2::text[]) AS items(ingredient_name)
-            `,
-            [productId, ingredients]
-          );
-        }
+        ingredients.forEach((ingredientName) => {
+          ingredientRows.push({ productId, ingredientName });
+        });
       }
 
-      await db.query(`DELETE FROM attachments WHERE product_id = $1`, [productId]);
-      // Insert product attachments in bulk
       if (product.productAttachments && product.productAttachments.length > 0) {
         const normalizedAttachments = product.productAttachments
           .map((attachment) => ({
@@ -611,38 +608,68 @@ export const upsert = async (sheet: EntrySheet): Promise<void> => {
           }))
           .filter((attachment) => attachment.name && attachment.url);
 
-        if (normalizedAttachments.length > 0) {
-          await db.query(
-            `
-            INSERT INTO attachments (product_id, name, size, type, url)
-            SELECT
-              $1,
-              items.name,
-              items.size,
-              items.type,
-              items.url
-            FROM unnest(
-              $2::text[],
-              $3::bigint[],
-              $4::text[],
-              $5::text[]
-            ) AS items(name, size, type, url)
-            `,
-            [
-              productId,
-              normalizedAttachments.map((attachment) => attachment.name),
-              normalizedAttachments.map((attachment) => attachment.size),
-              normalizedAttachments.map((attachment) => attachment.type),
-              normalizedAttachments.map((attachment) => attachment.url),
-            ]
-          );
-        }
+        normalizedAttachments.forEach((attachment) => {
+          productAttachmentRows.push({
+            productId,
+            name: attachment.name,
+            size: attachment.size,
+            type: attachment.type,
+            url: attachment.url,
+          });
+        });
       }
     }
 
     const removedProductIds = [...existingProductIds].filter((id) => !finalProductIds.has(id));
     if (removedProductIds.length > 0) {
       await db.query(`DELETE FROM product_entries WHERE id = ANY($1)`, [removedProductIds]);
+    }
+
+    const finalProductIdsArray = [...finalProductIds];
+    if (finalProductIdsArray.length > 0) {
+      await db.query(`DELETE FROM product_ingredients WHERE product_id = ANY($1)`, [finalProductIdsArray]);
+      if (ingredientRows.length > 0) {
+        await db.query(
+          `
+          INSERT INTO product_ingredients (product_id, ingredient_name)
+          SELECT items.product_id, items.ingredient_name
+          FROM unnest(
+            $1::uuid[],
+            $2::text[]
+          ) AS items(product_id, ingredient_name)
+          `,
+          [ingredientRows.map((row) => row.productId), ingredientRows.map((row) => row.ingredientName)]
+        );
+      }
+
+      await db.query(`DELETE FROM attachments WHERE product_id = ANY($1)`, [finalProductIdsArray]);
+      if (productAttachmentRows.length > 0) {
+        await db.query(
+          `
+          INSERT INTO attachments (product_id, name, size, type, url)
+          SELECT
+            items.product_id,
+            items.name,
+            items.size,
+            items.type,
+            items.url
+          FROM unnest(
+            $1::uuid[],
+            $2::text[],
+            $3::bigint[],
+            $4::text[],
+            $5::text[]
+          ) AS items(product_id, name, size, type, url)
+          `,
+          [
+            productAttachmentRows.map((row) => row.productId),
+            productAttachmentRows.map((row) => row.name),
+            productAttachmentRows.map((row) => row.size),
+            productAttachmentRows.map((row) => row.type),
+            productAttachmentRows.map((row) => row.url),
+          ]
+        );
+      }
     }
 
     // Delete existing attachments
