@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import JSZip from 'jszip';
 import { EntrySheet, User, UserRole } from '../types';
-import { Plus, Copy, Edit3, Trash2, Search, FileWarning, ChevronDown, ChevronUp, Download, CheckSquare, Square, Image as ImageIcon, X, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Plus, Copy, Edit3, Trash2, Search, FileWarning, ChevronDown, ChevronUp, Download, CheckSquare, Square, Image as ImageIcon, X, AlertCircle, AlertTriangle, ArrowUpDown } from 'lucide-react';
 
 interface EntryListProps {
   sheets: EntrySheet[];
@@ -27,10 +27,9 @@ export const EntryList: React.FC<EntryListProps> = ({
   isLoadingMore = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<'updatedAt' | 'arrivalDate'>('updatedAt');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
-  const [dateFilterBy, setDateFilterBy] = useState<'updatedAt' | 'arrivalDate'>('updatedAt');
-  const [dateFrom, setDateFrom] = useState('');
+  const [dateFilterBy, setDateFilterBy] = useState<'createdAt' | 'updatedAt' | 'arrivalDate'>('updatedAt');
+  const [dateSince, setDateSince] = useState('');
   const [expandedSheets, setExpandedSheets] = useState<Set<string>>(new Set());
   const [selectedSheets, setSelectedSheets] = useState<Set<string>>(new Set());
   const [showExportModal, setShowExportModal] = useState(false);
@@ -62,8 +61,11 @@ export const EntryList: React.FC<EntryListProps> = ({
 
   const getSheetTimestampBy = (
     sheet: EntrySheet,
-    field: 'updatedAt' | 'arrivalDate'
+    field: 'createdAt' | 'updatedAt' | 'arrivalDate'
   ): number | null => {
+    if (field === 'createdAt') {
+      return new Date(sheet.createdAt).getTime();
+    }
     if (field === 'updatedAt') {
       return new Date(sheet.updatedAt).getTime();
     }
@@ -74,8 +76,8 @@ export const EntryList: React.FC<EntryListProps> = ({
   const filteredSheets = sheets
     .filter((sheet) => {
       const keyword = searchTerm.trim().toLowerCase();
-      if (!keyword) return true;
       const matchesSheet =
+        !keyword ||
         sheet.title.toLowerCase().includes(keyword) ||
         sheet.manufacturerName.toLowerCase().includes(keyword);
       const matchesProduct = sheet.products.some((product) =>
@@ -83,26 +85,17 @@ export const EntryList: React.FC<EntryListProps> = ({
       );
       if (!(matchesSheet || matchesProduct)) return false;
 
-      if (!dateFrom) return true;
-      const filterStart = new Date(`${dateFrom}T00:00:00`).getTime();
+      if (!dateSince) return true;
+      const filterStart = new Date(`${dateSince}T00:00:00`).getTime();
       const targetTs = getSheetTimestampBy(sheet, dateFilterBy);
       if (targetTs === null) return false;
       return targetTs >= filterStart;
     })
     .sort((a, b) => {
       const direction = sortOrder === 'asc' ? 1 : -1;
-      if (sortBy === 'updatedAt') {
-        const aTs = new Date(a.updatedAt).getTime();
-        const bTs = new Date(b.updatedAt).getTime();
-        return (aTs - bTs) * direction;
-      }
-
-      const aArrival = getSheetArrivalTimestamp(a);
-      const bArrival = getSheetArrivalTimestamp(b);
-      if (aArrival === null && bArrival === null) return 0;
-      if (aArrival === null) return 1;
-      if (bArrival === null) return -1;
-      return (aArrival - bArrival) * direction;
+      const aTs = new Date(a.updatedAt).getTime();
+      const bTs = new Date(b.updatedAt).getTime();
+      return (aTs - bTs) * direction;
     });
 
   // Toggle Expansion
@@ -395,7 +388,17 @@ export const EntryList: React.FC<EntryListProps> = ({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="w-full sm:w-auto">
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-800">エントリーシート履歴</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-800">エントリーシート履歴</h2>
+              <button
+                onClick={() => setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition-colors text-xs font-bold"
+                title="更新日の並び順を切り替え"
+              >
+                <ArrowUpDown size={14} />
+                <span>更新日: {sortOrder === 'desc' ? '新しい順' : '古い順'}</span>
+              </button>
+            </div>
             <p className="text-slate-500 text-sm mt-1">
               {selectedSheets.size > 0 
                 ? `${selectedSheets.size}件 選択中` 
@@ -444,53 +447,40 @@ export const EntryList: React.FC<EntryListProps> = ({
         />
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3 sm:items-center flex-wrap">
-        <div className="flex items-center gap-2">
-          <label className="text-sm text-slate-600 font-medium">絞り込み:</label>
-          <select
-            value={dateFilterBy}
-            onChange={(e) => setDateFilterBy(e.target.value as 'updatedAt' | 'arrivalDate')}
-            className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"
-          >
-            <option value="updatedAt">更新日</option>
-            <option value="arrivalDate">店舗到着日</option>
-          </select>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"
-          />
-          {dateFrom && (
-            <button
-              onClick={() => setDateFrom('')}
-              className="text-sm text-slate-600 hover:text-slate-800"
+      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-slate-500">絞り込み対象</label>
+            <select
+              value={dateFilterBy}
+              onChange={(e) => setDateFilterBy(e.target.value as 'createdAt' | 'updatedAt' | 'arrivalDate')}
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white min-w-[120px]"
             >
-              解除
+              <option value="createdAt">作成日</option>
+              <option value="updatedAt">更新日</option>
+              <option value="arrivalDate">到着日</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-slate-500">日付</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={dateSince}
+                onChange={(e) => setDateSince(e.target.value)}
+                className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"
+              />
+              <span className="text-sm text-slate-600 font-medium">以降</span>
+            </div>
+          </div>
+          {dateSince && (
+            <button
+              onClick={() => setDateSince('')}
+              className="h-10 px-3 rounded-lg border border-slate-300 text-slate-600 text-sm hover:bg-slate-50"
+            >
+              絞り込み解除
             </button>
           )}
-        </div>
-        <div className="flex items-center gap-2">
-          <label className="text-sm text-slate-600 font-medium">並び順:</label>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as 'updatedAt' | 'arrivalDate')}
-            className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"
-          >
-            <option value="updatedAt">更新日</option>
-            <option value="arrivalDate">店舗到着日</option>
-          </select>
-        </div>
-        <div className="flex items-center gap-2">
-          <label className="text-sm text-slate-600 font-medium">順序:</label>
-          <select
-            value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value as 'desc' | 'asc')}
-            className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"
-          >
-            <option value="desc">新しい順</option>
-            <option value="asc">古い順</option>
-          </select>
         </div>
       </div>
 
@@ -726,7 +716,7 @@ export const EntryList: React.FC<EntryListProps> = ({
         </>
       )}
 
-      {hasMore && !searchTerm.trim() && (
+      {hasMore && !searchTerm.trim() && !dateSince && (
         <div className="flex justify-center">
           <button
             onClick={() => onLoadMore?.()}
