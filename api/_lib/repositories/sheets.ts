@@ -11,7 +11,7 @@ import { randomUUID } from 'crypto';
 
 interface SheetRow {
   id: string;
-  creator_id: string;
+  creator_id: string | null;
   creator_name: string;
   manufacturer_id: string;
   manufacturer_name: string;
@@ -71,6 +71,7 @@ const toSafeIso = (value: string | undefined, fallback: string): string => {
 };
 
 let ensureSnapshotColumnsPromise: Promise<void> | null = null;
+let ensureCreatorReferencePromise: Promise<void> | null = null;
 
 const ensureSheetSnapshotColumns = async (): Promise<void> => {
   if (!ensureSnapshotColumnsPromise) {
@@ -93,6 +94,30 @@ const ensureSheetSnapshotColumns = async (): Promise<void> => {
     });
   }
   await ensureSnapshotColumnsPromise;
+};
+
+const ensureSheetCreatorReference = async (): Promise<void> => {
+  if (!ensureCreatorReferencePromise) {
+    ensureCreatorReferencePromise = (async () => {
+      await db.query(
+        `ALTER TABLE entry_sheets
+         ALTER COLUMN creator_id DROP NOT NULL`
+      );
+      await db.query(
+        `ALTER TABLE entry_sheets
+         DROP CONSTRAINT IF EXISTS entry_sheets_creator_id_fkey`
+      );
+      await db.query(
+        `ALTER TABLE entry_sheets
+         ADD CONSTRAINT entry_sheets_creator_id_fkey
+         FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE SET NULL`
+      );
+    })().catch((error) => {
+      ensureCreatorReferencePromise = null;
+      throw error;
+    });
+  }
+  await ensureCreatorReferencePromise;
 };
 
 interface IngredientRow {
@@ -154,7 +179,7 @@ const rowsToSheet = (
 
   return {
     id: sheetRow.id,
-    creatorId: sheetRow.creator_id,
+    creatorId: sheetRow.creator_id || '',
     creatorName: sheetRow.creator_name,
     manufacturerName: sheetRow.manufacturer_name,
     email: sheetRow.creator_email,
@@ -221,18 +246,19 @@ const buildIngredientsByProductId = (
  * Get all sheets (for ADMIN)
  */
 export const findAll = async (limit?: number, offset: number = 0): Promise<EntrySheet[]> => {
+  await ensureSheetCreatorReference();
   await ensureSheetSnapshotColumns();
   const hasPaging = typeof limit === 'number';
   const sheetQuery = `
     SELECT
       s.id, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
       s.created_at, s.updated_at,
-      COALESCE(s.creator_name_snapshot, u.display_name) as creator_name,
-      COALESCE(s.creator_email_snapshot, u.email) as creator_email,
-      COALESCE(s.creator_phone_snapshot, u.phone_number) as creator_phone,
+      COALESCE(s.creator_name_snapshot, u.display_name, '') as creator_name,
+      COALESCE(s.creator_email_snapshot, u.email, '') as creator_email,
+      COALESCE(s.creator_phone_snapshot, u.phone_number, '') as creator_phone,
       m.name as manufacturer_name
     FROM entry_sheets s
-    JOIN users u ON s.creator_id = u.id
+    LEFT JOIN users u ON s.creator_id = u.id
     JOIN manufacturers m ON s.manufacturer_id = m.id
     ORDER BY s.created_at DESC
     ${hasPaging ? 'LIMIT $1 OFFSET $2' : ''}
@@ -311,18 +337,19 @@ export const findByManufacturerId = async (
   limit?: number,
   offset: number = 0
 ): Promise<EntrySheet[]> => {
+  await ensureSheetCreatorReference();
   await ensureSheetSnapshotColumns();
   const hasPaging = typeof limit === 'number';
   const sheetQuery = `
     SELECT
       s.id, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
       s.created_at, s.updated_at,
-      COALESCE(s.creator_name_snapshot, u.display_name) as creator_name,
-      COALESCE(s.creator_email_snapshot, u.email) as creator_email,
-      COALESCE(s.creator_phone_snapshot, u.phone_number) as creator_phone,
+      COALESCE(s.creator_name_snapshot, u.display_name, '') as creator_name,
+      COALESCE(s.creator_email_snapshot, u.email, '') as creator_email,
+      COALESCE(s.creator_phone_snapshot, u.phone_number, '') as creator_phone,
       m.name as manufacturer_name
     FROM entry_sheets s
-    JOIN users u ON s.creator_id = u.id
+    LEFT JOIN users u ON s.creator_id = u.id
     JOIN manufacturers m ON s.manufacturer_id = m.id
     WHERE s.manufacturer_id = $1
     ORDER BY s.created_at DESC
@@ -398,18 +425,19 @@ export const findByManufacturerId = async (
  * Get single sheet by ID
  */
 export const findById = async (sheetId: string): Promise<EntrySheet | null> => {
+  await ensureSheetCreatorReference();
   await ensureSheetSnapshotColumns();
   const sheetResult = await db.query<SheetRow>(
     `
     SELECT
       s.id, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
       s.created_at, s.updated_at,
-      COALESCE(s.creator_name_snapshot, u.display_name) as creator_name,
-      COALESCE(s.creator_email_snapshot, u.email) as creator_email,
-      COALESCE(s.creator_phone_snapshot, u.phone_number) as creator_phone,
+      COALESCE(s.creator_name_snapshot, u.display_name, '') as creator_name,
+      COALESCE(s.creator_email_snapshot, u.email, '') as creator_email,
+      COALESCE(s.creator_phone_snapshot, u.phone_number, '') as creator_phone,
       m.name as manufacturer_name
     FROM entry_sheets s
-    JOIN users u ON s.creator_id = u.id
+    LEFT JOIN users u ON s.creator_id = u.id
     JOIN manufacturers m ON s.manufacturer_id = m.id
     WHERE s.id = $1
     `,
@@ -468,6 +496,7 @@ export const findById = async (sheetId: string): Promise<EntrySheet | null> => {
  * Upsert sheet with products (transactional)
  */
 export const upsert = async (sheet: EntrySheet): Promise<void> => {
+  await ensureSheetCreatorReference();
   await ensureSheetSnapshotColumns();
   return await db.transaction(async () => {
     const nowIso = new Date().toISOString();
@@ -497,6 +526,7 @@ export const upsert = async (sheet: EntrySheet): Promise<void> => {
     };
 
     const manufacturerId = await getManufacturerIdCached(normalizedSheet.manufacturerName);
+    const creatorId = String(normalizedSheet.creatorId || '').trim() || null;
 
     // Upsert entry_sheet
     await db.query(
@@ -517,7 +547,7 @@ export const upsert = async (sheet: EntrySheet): Promise<void> => {
       `,
       [
         normalizedSheet.id,
-        normalizedSheet.creatorId,
+        creatorId,
         manufacturerId,
         normalizedSheet.creatorName || null,
         normalizedSheet.email || null,

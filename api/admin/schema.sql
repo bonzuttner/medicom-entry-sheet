@@ -29,7 +29,7 @@ CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 -- エントリーシート
 CREATE TABLE IF NOT EXISTS entry_sheets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  creator_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  creator_id UUID REFERENCES users(id) ON DELETE SET NULL,
   manufacturer_id UUID NOT NULL REFERENCES manufacturers(id) ON DELETE RESTRICT,
   creator_name_snapshot VARCHAR(200),
   creator_email_snapshot VARCHAR(255),
