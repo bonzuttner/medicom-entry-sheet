@@ -23,10 +23,22 @@ const parseErrorMessage = (status: number, raw: string): string => {
   const trimmed = raw.trim();
   if (!trimmed) return fallbackErrorMessageByStatus(status);
 
+  const normalizeKnownMessage = (message: string): string => {
+    const normalized = message.trim().toLowerCase();
+    if (normalized === 'unauthorized') {
+      return 'セッションの有効期限が切れました。再ログインしてから、もう一度保存してください。';
+    }
+    return message.trim();
+  };
+
   try {
     const parsed = JSON.parse(trimmed) as { error?: unknown; message?: unknown };
-    if (typeof parsed.error === 'string' && parsed.error.trim()) return parsed.error.trim();
-    if (typeof parsed.message === 'string' && parsed.message.trim()) return parsed.message.trim();
+    if (typeof parsed.error === 'string' && parsed.error.trim()) {
+      return normalizeKnownMessage(parsed.error);
+    }
+    if (typeof parsed.message === 'string' && parsed.message.trim()) {
+      return normalizeKnownMessage(parsed.message);
+    }
   } catch {
     // not JSON
   }
