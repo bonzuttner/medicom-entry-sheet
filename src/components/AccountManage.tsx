@@ -73,6 +73,7 @@ export const AccountManage: React.FC<AccountManageProps> = ({
   // Permission check: Can the current user edit/delete this user?
   const canModifyUser = (targetUser: User): boolean => {
     if (currentUser.role === UserRole.ADMIN) return true;
+    if (targetUser.role === UserRole.ADMIN) return false;
     return (
       normalizeManufacturerKey(targetUser.manufacturerName) ===
       normalizeManufacturerKey(currentUser.manufacturerName)
@@ -112,6 +113,11 @@ export const AccountManage: React.FC<AccountManageProps> = ({
         normalizeManufacturerKey(currentUser.manufacturerName)
     ) {
       setValidationError(`他社（${editingUser.manufacturerName}）のアカウントは作成・編集できません`);
+      return;
+    }
+
+    if (currentUser.role !== UserRole.ADMIN && editingUser.role === UserRole.ADMIN) {
+      setValidationError('管理者権限への変更は管理者ユーザーのみ可能です');
       return;
     }
 
@@ -212,6 +218,22 @@ export const AccountManage: React.FC<AccountManageProps> = ({
                         </select>
                         {currentUser.role === UserRole.STAFF && (
                             <p className="text-xs text-slate-500 mt-1">※ 自社アカウントのみ作成できます</p>
+                        )}
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700">権限 <span className="text-red-500">*</span></label>
+                        <select
+                            className="w-full border p-2 rounded bg-white"
+                            value={editingUser.role || UserRole.STAFF}
+                            onChange={e => setEditingUser({ ...editingUser, role: e.target.value as UserRole })}
+                            disabled={currentUser.role !== UserRole.ADMIN}
+                            title={currentUser.role !== UserRole.ADMIN ? '権限変更は管理者ユーザーのみ可能です' : ''}
+                        >
+                            <option value={UserRole.STAFF}>一般</option>
+                            <option value={UserRole.ADMIN}>管理者</option>
+                        </select>
+                        {currentUser.role !== UserRole.ADMIN && (
+                            <p className="text-xs text-slate-500 mt-1">※ 権限変更は管理者ユーザーのみ可能です</p>
                         )}
                     </div>
                      <div>

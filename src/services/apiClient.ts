@@ -24,11 +24,46 @@ const parseErrorMessage = (status: number, raw: string): string => {
   if (!trimmed) return fallbackErrorMessageByStatus(status);
 
   const normalizeKnownMessage = (message: string): string => {
-    const normalized = message.trim().toLowerCase();
-    if (normalized === 'unauthorized') {
+    const normalized = message.trim();
+    const lower = normalized.toLowerCase();
+
+    if (lower === 'unauthorized') {
       return 'セッションの有効期限が切れました。再ログインしてから、もう一度保存してください。';
     }
-    return message.trim();
+
+    const exactMap: Record<string, string> = {
+      'Method not allowed': 'この操作は現在利用できません。',
+      'User not found': '対象のアカウントが見つかりません。',
+      'User id is required': 'アカウントIDが不足しています。画面を再読み込みして再試行してください。',
+      'user is required': '保存データが不足しています。入力内容を確認して再試行してください。',
+      'Only admin can update master data': 'マスタを更新できるのは管理者のみです。',
+      'data is required': '保存データが不足しています。入力内容を確認して再試行してください。',
+      'Sheet id is required': 'シートIDが不足しています。画面を再読み込みして再試行してください。',
+      'sheet is required': 'シート情報が不足しています。入力内容を確認して再試行してください。',
+      'At least one product is required': '商品を1件以上入力してください。',
+      'You can only save sheets in your manufacturer': '自社メーカーのシートのみ保存できます。',
+      'You cannot modify this sheet': 'このシートを編集する権限がありません。',
+      'Sheet not found': '対象のシートが見つかりません。',
+      'You cannot delete this sheet': 'このシートを削除する権限がありません。',
+      'dataUrl and fileName are required': 'アップロード情報が不足しています。もう一度やり直してください。',
+      'Blob storage is not configured': '画像保存先の設定が未完了です。管理者に連絡してください。',
+      'Bulk update is deprecated. Use /api/users/:id': '一括更新は利用できません。個別更新で実行してください。',
+      'Deprecated endpoint. Use /api/sheets.': '古いAPIは利用できません。画面を再読み込みして再試行してください。',
+      'Only admin can migrate data': '移行処理を実行できるのは管理者のみです。',
+      'Only admin can migrate data to PostgreSQL': 'PostgreSQL移行を実行できるのは管理者のみです。',
+      'data with users/sheets/master is required': '移行データが不足しています。users/sheets/masterを確認してください。',
+    };
+
+    if (exactMap[normalized]) {
+      return exactMap[normalized];
+    }
+
+    const retryMatch = normalized.match(/^Too many login attempts\. Retry in (\d+) seconds\.$/);
+    if (retryMatch) {
+      return `ログイン試行回数が上限に達しました。${retryMatch[1]}秒後に再試行してください。`;
+    }
+
+    return normalized;
   };
 
   try {
