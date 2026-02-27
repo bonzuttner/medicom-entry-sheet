@@ -185,15 +185,20 @@ const migrateSheets = async (
     // シート本体を投入
     await dbClient.query(
       `INSERT INTO entry_sheets (
-         id, creator_id, manufacturer_id, title, notes, status,
+         id, creator_id, manufacturer_id,
+         creator_name_snapshot, creator_email_snapshot, creator_phone_snapshot,
+         title, notes, status,
          created_at, updated_at
        ) VALUES (
-         $1, $2, $3, $4, $5, $6, $7, $8
+         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
        )`,
       [
         sheet.id,
         sheet.creatorId,
         manufacturerId,
+        sheet.creatorName || null,
+        sheet.email || null,
+        sheet.phoneNumber || null,
         sheet.title,
         sheet.notes || null,
         sheet.status,

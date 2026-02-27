@@ -13,6 +13,8 @@ interface EntryFormProps {
 }
 
 const normalizeProductName = (value: string): string => value.trim().toLowerCase();
+const LARGE_IMAGE_UPLOAD_ERROR =
+  '画像サイズが大きすぎてアップロードできません。BMPは通信量が大きくなりやすいため、JPEG/PNGに変換するか画像サイズを下げて再試行してください。それでもできない場合は、担当者へメールで画像を送信ください。';
 
 export const EntryForm: React.FC<EntryFormProps> = ({
   initialData,
@@ -65,23 +67,41 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
   const uploadFile = async (
     file: File,
-    kind: 'image' | 'attachment'
+    kind: 'image' | 'attachment' | 'promo'
   ): Promise<string> => {
     const dataUrl = await readFileAsDataUrl(file);
-    const response = await fetch('/api/upload', {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        dataUrl,
-        fileName: file.name,
-        kind,
-      }),
-    });
+    let response: Response;
+    try {
+      response = await fetch('/api/upload', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          dataUrl,
+          fileName: file.name,
+          kind,
+        }),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      // Request can fail before reaching API when payload is too large.
+      if (
+        message.includes('Payload Too Large') ||
+        message.includes('Request Entity Too Large') ||
+        message.toLowerCase().includes('body') ||
+        message.toLowerCase().includes('too large')
+      ) {
+        throw new Error(LARGE_IMAGE_UPLOAD_ERROR);
+      }
+      throw error;
+    }
 
     if (!response.ok) {
+      if (response.status === 413) {
+        throw new Error(LARGE_IMAGE_UPLOAD_ERROR);
+      }
       const errorText = await response.text().catch(() => '');
       const trimmed = errorText.trim();
       if (!trimmed) {
@@ -98,6 +118,16 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         }
       } catch {
         // not JSON
+      }
+      const lowered = (parsedMessage || trimmed).toLowerCase();
+      if (
+        lowered.includes('payload too large') ||
+        lowered.includes('request entity too large') ||
+        lowered.includes('body exceeded') ||
+        lowered.includes('body too large') ||
+        lowered.includes('function payload')
+      ) {
+        throw new Error(LARGE_IMAGE_UPLOAD_ERROR);
       }
       throw new Error(parsedMessage || trimmed);
     }
@@ -499,23 +529,38 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     input.onchange = async (e) => {
         const file = (e.target as HTMLInputElement).files?.[0];
         if (file) {
-            if (file.size <= 0 || file.size > MAX_IMAGE_BYTES) {
+            if (field === 'productImage' && (file.size <= 0 || file.size > MAX_IMAGE_BYTES)) {
                 alert("画像容量は50MB以下にしてください。");
                 return;
             }
             try {
-              const { width, height } = await getImageDimensions(file);
-              const shortSide = Math.min(width, height);
-              if (shortSide < MIN_SHORT_SIDE_PX) {
-                alert(`解像度不足です（短辺${MIN_SHORT_SIDE_PX}px未満）。`);
-                return;
+              if (field === 'productImage') {
+                const { width, height } = await getImageDimensions(file);
+                const shortSide = Math.min(width, height);
+                if (shortSide < MIN_SHORT_SIDE_PX) {
+                  alert(`解像度不足です（短辺${MIN_SHORT_SIDE_PX}px未満）。`);
+                  return;
+                }
               }
-              const url = await runTrackedUpload(() => uploadFile(file, 'image'));
+              const uploadKind = field === 'promoImage' ? 'promo' : 'image';
+              const url = await runTrackedUpload(() => uploadFile(file, uploadKind));
               handleProductChange(index, field, url);
             } catch (error) {
               const message = error instanceof Error ? error.message : '';
+              if (
+                message.includes('Payload Too Large') ||
+                message.includes('Request Entity Too Large') ||
+                message.includes('画像サイズが大きすぎてアップロードできません')
+              ) {
+                alert(LARGE_IMAGE_UPLOAD_ERROR);
+                return;
+              }
               if (message.includes('解像度不足')) {
-                alert(`商品画像の解像度が不足しています（${file.name}）。短辺1500px以上の画像を選択してください。`);
+                if (field === 'productImage') {
+                  alert(`商品画像の解像度が不足しています（${file.name}）。短辺1500px以上の画像を選択してください。`);
+                  return;
+                }
+                alert(`画像の解像度要件に合致していません（${file.name}）。`);
                 return;
               }
               if (message.includes('画像の解像度を判定できない') || message.includes('Unsupported file type')) {
@@ -654,8 +699,13 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     <input
                         type="file"
                         multiple
-                        className="block w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
-                        onChange={(e) => handleAddAttachments(e.target.files)}
+                        className="block w-full text-transparent file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
+                        onChange={(e) => {
+                          const input = e.target;
+                          void handleAddAttachments(input.files).finally(() => {
+                            input.value = '';
+                          });
+                        }}
                     />
                     <p className="text-xs text-slate-500 mt-1">※ 25MB以下</p>
                     {(formData.attachments ?? []).length > 0 && (
@@ -1086,8 +1136,13 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     <input
                         type="file"
                         multiple
-                        className="block w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
-                        onChange={(e) => handleAddProductAttachments(activeTab, e.target.files)}
+                        className="block w-full text-transparent file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
+                        onChange={(e) => {
+                          const input = e.target;
+                          void handleAddProductAttachments(activeTab, input.files).finally(() => {
+                            input.value = '';
+                          });
+                        }}
                     />
                     <p className="text-xs text-slate-500 mt-1">※ 25MB以下</p>
                     {(activeProduct.productAttachments ?? []).length > 0 && (

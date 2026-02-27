@@ -25,6 +25,9 @@ export const AccountManage: React.FC<AccountManageProps> = ({
     if (raw.includes('username, displayName, manufacturerName are required')) {
       return '必須項目が不足しています。ログインID・担当者名・メーカー名を入力してください。';
     }
+    if (raw.includes('email and phoneNumber are required')) {
+      return 'メールアドレスと電話番号は必須です。入力してください。';
+    }
     if (raw.includes('Username is already taken')) {
       return 'ログインIDが重複しています。別のログインIDを入力してください。';
     }
@@ -49,6 +52,7 @@ export const AccountManage: React.FC<AccountManageProps> = ({
   const normalizeManufacturerKey = (value: string): string => value.trim();
   const [editingUser, setEditingUser] = useState<Partial<User> | null>(null);
   const [validationError, setValidationError] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
   const passwordRule = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
   const emailRule = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
   const phoneRule = /^[0-9]{10,11}$/;
@@ -81,6 +85,7 @@ export const AccountManage: React.FC<AccountManageProps> = ({
   };
 
   const handleSave = async () => {
+    if (isSaving) return;
     const isNewUser = !editingUser?.id;
 
     if (!editingUser?.username || !editingUser?.displayName || !editingUser?.manufacturerName) {
@@ -124,12 +129,22 @@ export const AccountManage: React.FC<AccountManageProps> = ({
     const normalizedEmail = (editingUser.email || '').trim();
     const normalizedPhone = normalizePhoneNumber(editingUser.phoneNumber || '');
 
-    if (normalizedEmail && !emailRule.test(normalizedEmail)) {
+    if (!normalizedEmail) {
+      setValidationError('メールアドレスは必須です');
+      return;
+    }
+
+    if (!normalizedPhone) {
+      setValidationError('電話番号は必須です');
+      return;
+    }
+
+    if (!emailRule.test(normalizedEmail)) {
       setValidationError('メールアドレスの形式が正しくありません');
       return;
     }
 
-    if (normalizedPhone && !phoneRule.test(normalizedPhone)) {
+    if (!phoneRule.test(normalizedPhone)) {
       setValidationError('電話番号はハイフンなしの10〜11桁の半角数字で入力してください');
       return;
     }
@@ -147,11 +162,14 @@ export const AccountManage: React.FC<AccountManageProps> = ({
         password: editingUser.password?.trim() || (isNewUser ? '' : existingUser?.password),
     };
     try {
+      setIsSaving(true);
       await onSaveUser(newUser);
       setEditingUser(null);
       setValidationError('');
     } catch (error) {
       setValidationError(getUserSaveErrorMessage(error));
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -237,7 +255,7 @@ export const AccountManage: React.FC<AccountManageProps> = ({
                         )}
                     </div>
                      <div>
-                        <label className="block text-sm font-medium text-slate-700">メールアドレス</label>
+                        <label className="block text-sm font-medium text-slate-700">メールアドレス <span className="text-red-500">*</span></label>
                         <input
                             type="email"
                             className="w-full border p-2 rounded"
@@ -247,7 +265,7 @@ export const AccountManage: React.FC<AccountManageProps> = ({
                         />
                     </div>
                      <div>
-                        <label className="block text-sm font-medium text-slate-700">電話番号</label>
+                        <label className="block text-sm font-medium text-slate-700">電話番号 <span className="text-red-500">*</span></label>
                         <input
                             inputMode="numeric"
                             className="w-full border p-2 rounded"
@@ -276,8 +294,20 @@ export const AccountManage: React.FC<AccountManageProps> = ({
                     </div>
                 </div>
                 <div className="mt-4 flex gap-2 justify-end">
-                    <button onClick={() => { setEditingUser(null); setValidationError(''); }} className="px-4 py-2 text-slate-600">キャンセル</button>
-                    <button onClick={handleSave} className="px-4 py-2 bg-primary text-white rounded">保存</button>
+                    <button
+                      onClick={() => { setEditingUser(null); setValidationError(''); }}
+                      disabled={isSaving}
+                      className="px-4 py-2 text-slate-600 disabled:text-slate-400 disabled:cursor-not-allowed"
+                    >
+                      キャンセル
+                    </button>
+                    <button
+                      onClick={handleSave}
+                      disabled={isSaving}
+                      className="px-4 py-2 bg-primary text-white rounded disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {isSaving ? '保存中...' : '保存'}
+                    </button>
                 </div>
             </div>
         )}

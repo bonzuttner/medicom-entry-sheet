@@ -24,18 +24,31 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE INDEX IF NOT EXISTS idx_users_manufacturer ON users(manufacturer_id);
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 
 -- エントリーシート
 CREATE TABLE IF NOT EXISTS entry_sheets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   creator_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   manufacturer_id UUID NOT NULL REFERENCES manufacturers(id) ON DELETE RESTRICT,
+  creator_name_snapshot VARCHAR(200),
+  creator_email_snapshot VARCHAR(255),
+  creator_phone_snapshot VARCHAR(50),
   title VARCHAR(500) NOT NULL,
   notes TEXT,
   status VARCHAR(20) NOT NULL CHECK (status IN ('draft', 'completed')),
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS creator_name_snapshot VARCHAR(200);
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS creator_email_snapshot VARCHAR(255);
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS creator_phone_snapshot VARCHAR(50);
 
 CREATE INDEX IF NOT EXISTS idx_sheets_manufacturer ON entry_sheets(manufacturer_id);
 CREATE INDEX IF NOT EXISTS idx_sheets_creator ON entry_sheets(creator_id);

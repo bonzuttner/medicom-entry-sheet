@@ -27,6 +27,7 @@ const ATTACHMENT_MIME_TYPES = new Set([
 const MAX_IMAGE_BYTES = 50 * 1024 * 1024;
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 const MIN_IMAGE_SHORT_SIDE_PX = 1500;
+type UploadKind = 'image' | 'attachment' | 'promo';
 
 const safeFileName = (name: string): string =>
   name.replace(/[^\w.\-]/g, '_').slice(0, 120) || 'file';
@@ -64,15 +65,15 @@ const parseDataUrl = (value: string): { mimeType: string; bytes: Uint8Array } =>
   return { mimeType, bytes: new Uint8Array(buffer) };
 };
 
-const ensureAllowedMime = (mimeType: string, isAttachment: boolean): void => {
-  const allowed = isAttachment ? ATTACHMENT_MIME_TYPES : IMAGE_MIME_TYPES;
+const ensureAllowedMime = (mimeType: string, kind: UploadKind): void => {
+  const allowed = kind === 'attachment' ? ATTACHMENT_MIME_TYPES : IMAGE_MIME_TYPES;
   if (!allowed.has(mimeType)) {
     throw new Error(`Unsupported file type: ${mimeType}`);
   }
 };
 
-const ensureAllowedSize = (size: number, isAttachment: boolean): void => {
-  const max = isAttachment ? MAX_ATTACHMENT_BYTES : MAX_IMAGE_BYTES;
+const ensureAllowedSize = (size: number, kind: UploadKind): void => {
+  const max = kind === 'attachment' ? MAX_ATTACHMENT_BYTES : MAX_IMAGE_BYTES;
   if (!Number.isFinite(size) || size <= 0 || size > max) {
     throw new Error(
       `File size must be between 1 byte and ${Math.floor(max / (1024 * 1024))}MB`
@@ -235,14 +236,14 @@ const normalizeMediaUrl = async (
   value: string | undefined,
   pathPrefix: string,
   fileName: string,
-  isAttachment: boolean
+  kind: UploadKind
 ): Promise<string | undefined> => {
   if (!value) return undefined;
   if (value.startsWith('data:')) {
     const { mimeType, bytes } = parseDataUrl(value);
-    ensureAllowedMime(mimeType, isAttachment);
-    ensureAllowedSize(bytes.byteLength, isAttachment);
-    if (!isAttachment) {
+    ensureAllowedMime(mimeType, kind);
+    ensureAllowedSize(bytes.byteLength, kind);
+    if (kind === 'image') {
       ensureImageResolution(mimeType, bytes);
     }
     return uploadBinary(bytes, mimeType, pathPrefix, fileName);
@@ -263,7 +264,7 @@ const normalizeAttachment = async (
     sourceUrl,
     pathPrefix,
     attachment.name || 'attachment',
-    true
+    'attachment'
   );
   if (!normalizedUrl) {
     throw new Error('Attachment URL is required');
@@ -284,13 +285,13 @@ const normalizeProduct = async (
     product.productImage,
     `${pathPrefix}/product-image`,
     `${product.id}-product`,
-    false
+    'image'
   );
   const normalizedPromoImage = await normalizeMediaUrl(
     product.promoImage,
     `${pathPrefix}/promo-image`,
     `${product.id}-promo`,
-    false
+    'promo'
   );
   const normalizedAttachments = product.productAttachments
     ? await Promise.all(
@@ -350,12 +351,12 @@ export const uploadMediaDataUrl = async (
   dataUrl: string,
   fileName: string,
   pathPrefix: string,
-  isAttachment: boolean
+  kind: UploadKind
 ): Promise<string> => {
   const { mimeType, bytes } = parseDataUrl(dataUrl);
-  ensureAllowedMime(mimeType, isAttachment);
-  ensureAllowedSize(bytes.byteLength, isAttachment);
-  if (!isAttachment) {
+  ensureAllowedMime(mimeType, kind);
+  ensureAllowedSize(bytes.byteLength, kind);
+  if (kind === 'image') {
     ensureImageResolution(mimeType, bytes);
   }
   return uploadBinary(bytes, mimeType, pathPrefix, fileName);

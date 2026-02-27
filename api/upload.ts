@@ -5,7 +5,7 @@ import { uploadMediaDataUrl } from './_lib/media.js';
 interface UploadBody {
   dataUrl?: string;
   fileName?: string;
-  kind?: 'image' | 'attachment';
+  kind?: 'image' | 'attachment' | 'promo';
 }
 
 export default async function handler(req: any, res: any) {
@@ -28,14 +28,15 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const kind = body.kind === 'attachment' ? 'attachment' : 'image';
+  const kind =
+    body.kind === 'attachment' || body.kind === 'promo' ? body.kind : 'image';
 
   try {
     const url = await uploadMediaDataUrl(
       body.dataUrl,
       body.fileName,
       `pharmapop/upload/${user.id}/${kind}`,
-      kind === 'attachment'
+      kind
     );
     sendJson(res, 200, { url });
   } catch (error) {

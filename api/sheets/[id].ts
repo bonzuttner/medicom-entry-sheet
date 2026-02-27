@@ -87,17 +87,17 @@ export default async function handler(req: any, res: any) {
 
     // Server-authoritative save DTO:
     // - New sheet: always owned by current session user
-    // - Existing sheet: preserve immutable ownership fields from existing record
+    // - Existing sheet: preserve immutable owner id/manufacturer from existing record
+    // - Header fields (creatorName/email/phoneNumber) are editable and stored as snapshots
     const ownerManufacturer = existingSheet?.manufacturerName || currentUser.manufacturerName;
     const ownerCreatorId = existingSheet?.creatorId || currentUser.id;
-    const ownerCreatorName = existingSheet?.creatorName || currentUser.displayName;
 
     const safeSheet: EntrySheet = {
       ...sheet,
       id: sheetId,
       manufacturerName: ownerManufacturer,
       creatorId: ownerCreatorId,
-      creatorName: ownerCreatorName,
+      creatorName: String(sheet.creatorName || existingSheet?.creatorName || currentUser.displayName || '').trim(),
       email: String(sheet.email || existingSheet?.email || currentUser.email || '').trim(),
       phoneNumber: String(sheet.phoneNumber || existingSheet?.phoneNumber || currentUser.phoneNumber || '').trim(),
       title: String(sheet.title || '').trim(),

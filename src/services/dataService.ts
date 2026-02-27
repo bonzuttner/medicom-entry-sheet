@@ -8,7 +8,7 @@ export interface PagedResult<T> {
 
 export interface DataService {
   getUsers: () => Promise<User[]>;
-  saveUser: (user: User) => Promise<void>;
+  saveUser: (user: User) => Promise<User>;
   deleteUser: (id: string) => Promise<void>;
   login: (username: string, password?: string) => Promise<User | null>;
   getCurrentUser: () => Promise<User | null>;
@@ -23,9 +23,7 @@ export interface DataService {
 
 const apiDataService: DataService = {
   getUsers: async () => apiClient.get<User[]>('/api/users'),
-  saveUser: async (user) => {
-    await apiClient.put<void>(`/api/users/${user.id}`, { user });
-  },
+  saveUser: async (user) => apiClient.put<User>(`/api/users/${user.id}`, { user }),
   deleteUser: async (id) => {
     await apiClient.delete<void>(`/api/users/${id}`);
   },

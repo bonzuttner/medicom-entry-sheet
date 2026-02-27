@@ -36,6 +36,7 @@ const parseErrorMessage = (status: number, raw: string): string => {
       'User not found': '対象のアカウントが見つかりません。',
       'User id is required': 'アカウントIDが不足しています。画面を再読み込みして再試行してください。',
       'user is required': '保存データが不足しています。入力内容を確認して再試行してください。',
+      'email and phoneNumber are required': 'メールアドレスと電話番号は必須です。入力してください。',
       'Only admin can update master data': 'マスタを更新できるのは管理者のみです。',
       'data is required': '保存データが不足しています。入力内容を確認して再試行してください。',
       'Sheet id is required': 'シートIDが不足しています。画面を再読み込みして再試行してください。',

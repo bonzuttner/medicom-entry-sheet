@@ -36,6 +36,17 @@ const appendUniqueSheets = (source: EntrySheet[], incoming: EntrySheet[]): Entry
   const addition = incoming.filter((sheet) => !seen.has(sheet.id));
   return source.concat(addition);
 };
+const upsertUserInList = (source: User[], saved: User): User[] => {
+  const idx = source.findIndex((user) => user.id === saved.id);
+  if (idx === -1) {
+    return [saved, ...source];
+  }
+  const next = [...source];
+  next[idx] = saved;
+  return next;
+};
+const removeUserFromList = (source: User[], id: string): User[] =>
+  source.filter((user) => user.id !== id);
 
 const getSheetSaveErrorMessage = (error: unknown): string => {
   const raw = error instanceof Error ? error.message : '';
@@ -341,9 +352,9 @@ const App: React.FC = () => {
   // User Management
   const handleSaveUser = async (user: User) => {
     try {
-      await dataService.saveUser(user);
-      const refreshedUsers = await dataService.getUsers();
-      setUsers(refreshedUsers);
+      const savedUser = await dataService.saveUser(user);
+      // Use API response as authoritative saved state.
+      setUsers((prev) => upsertUserInList(prev, savedUser));
     } catch (error) {
       console.error('Failed to save user:', error);
       throw error;
@@ -353,8 +364,7 @@ const App: React.FC = () => {
   const handleDeleteUser = async (id: string) => {
     try {
       await dataService.deleteUser(id);
-      const refreshedUsers = await dataService.getUsers();
-      setUsers(refreshedUsers);
+      setUsers((prev) => removeUserFromList(prev, id));
     } catch (error) {
       console.error('Failed to delete user:', error);
     }

@@ -70,6 +70,31 @@ const toSafeIso = (value: string | undefined, fallback: string): string => {
   return Number.isNaN(parsed.getTime()) ? fallback : parsed.toISOString();
 };
 
+let ensureSnapshotColumnsPromise: Promise<void> | null = null;
+
+const ensureSheetSnapshotColumns = async (): Promise<void> => {
+  if (!ensureSnapshotColumnsPromise) {
+    ensureSnapshotColumnsPromise = (async () => {
+      await db.query(
+        `ALTER TABLE entry_sheets
+         ADD COLUMN IF NOT EXISTS creator_name_snapshot VARCHAR(200)`
+      );
+      await db.query(
+        `ALTER TABLE entry_sheets
+         ADD COLUMN IF NOT EXISTS creator_email_snapshot VARCHAR(255)`
+      );
+      await db.query(
+        `ALTER TABLE entry_sheets
+         ADD COLUMN IF NOT EXISTS creator_phone_snapshot VARCHAR(50)`
+      );
+    })().catch((error) => {
+      ensureSnapshotColumnsPromise = null;
+      throw error;
+    });
+  }
+  await ensureSnapshotColumnsPromise;
+};
+
 interface IngredientRow {
   product_id: string;
   ingredient_name: string;
@@ -196,14 +221,15 @@ const buildIngredientsByProductId = (
  * Get all sheets (for ADMIN)
  */
 export const findAll = async (limit?: number, offset: number = 0): Promise<EntrySheet[]> => {
+  await ensureSheetSnapshotColumns();
   const hasPaging = typeof limit === 'number';
   const sheetQuery = `
     SELECT
       s.id, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
       s.created_at, s.updated_at,
-      u.display_name as creator_name,
-      u.email as creator_email,
-      u.phone_number as creator_phone,
+      COALESCE(s.creator_name_snapshot, u.display_name) as creator_name,
+      COALESCE(s.creator_email_snapshot, u.email) as creator_email,
+      COALESCE(s.creator_phone_snapshot, u.phone_number) as creator_phone,
       m.name as manufacturer_name
     FROM entry_sheets s
     JOIN users u ON s.creator_id = u.id
@@ -285,14 +311,15 @@ export const findByManufacturerId = async (
   limit?: number,
   offset: number = 0
 ): Promise<EntrySheet[]> => {
+  await ensureSheetSnapshotColumns();
   const hasPaging = typeof limit === 'number';
   const sheetQuery = `
     SELECT
       s.id, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
       s.created_at, s.updated_at,
-      u.display_name as creator_name,
-      u.email as creator_email,
-      u.phone_number as creator_phone,
+      COALESCE(s.creator_name_snapshot, u.display_name) as creator_name,
+      COALESCE(s.creator_email_snapshot, u.email) as creator_email,
+      COALESCE(s.creator_phone_snapshot, u.phone_number) as creator_phone,
       m.name as manufacturer_name
     FROM entry_sheets s
     JOIN users u ON s.creator_id = u.id
@@ -371,14 +398,15 @@ export const findByManufacturerId = async (
  * Get single sheet by ID
  */
 export const findById = async (sheetId: string): Promise<EntrySheet | null> => {
+  await ensureSheetSnapshotColumns();
   const sheetResult = await db.query<SheetRow>(
     `
     SELECT
       s.id, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
       s.created_at, s.updated_at,
-      u.display_name as creator_name,
-      u.email as creator_email,
-      u.phone_number as creator_phone,
+      COALESCE(s.creator_name_snapshot, u.display_name) as creator_name,
+      COALESCE(s.creator_email_snapshot, u.email) as creator_email,
+      COALESCE(s.creator_phone_snapshot, u.phone_number) as creator_phone,
       m.name as manufacturer_name
     FROM entry_sheets s
     JOIN users u ON s.creator_id = u.id
@@ -440,10 +468,12 @@ export const findById = async (sheetId: string): Promise<EntrySheet | null> => {
  * Upsert sheet with products (transactional)
  */
 export const upsert = async (sheet: EntrySheet): Promise<void> => {
+  await ensureSheetSnapshotColumns();
   return await db.transaction(async () => {
     const nowIso = new Date().toISOString();
     const normalizedSheet: EntrySheet = {
       ...sheet,
+      creatorName: String(sheet.creatorName || '').trim(),
       title: String(sheet.title || '').trim(),
       notes: sheet.notes ? String(sheet.notes).trim() : '',
       email: String(sheet.email || '').trim(),
@@ -472,9 +502,14 @@ export const upsert = async (sheet: EntrySheet): Promise<void> => {
     await db.query(
       `
       INSERT INTO entry_sheets (
-        id, creator_id, manufacturer_id, title, notes, status, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        id, creator_id, manufacturer_id,
+        creator_name_snapshot, creator_email_snapshot, creator_phone_snapshot,
+        title, notes, status, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       ON CONFLICT (id) DO UPDATE SET
+        creator_name_snapshot = EXCLUDED.creator_name_snapshot,
+        creator_email_snapshot = EXCLUDED.creator_email_snapshot,
+        creator_phone_snapshot = EXCLUDED.creator_phone_snapshot,
         title = EXCLUDED.title,
         notes = EXCLUDED.notes,
         status = EXCLUDED.status,
@@ -484,6 +519,9 @@ export const upsert = async (sheet: EntrySheet): Promise<void> => {
         normalizedSheet.id,
         normalizedSheet.creatorId,
         manufacturerId,
+        normalizedSheet.creatorName || null,
+        normalizedSheet.email || null,
+        normalizedSheet.phoneNumber || null,
         normalizedSheet.title,
         normalizedSheet.notes || null,
         normalizedSheet.status,

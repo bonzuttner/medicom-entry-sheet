@@ -100,6 +100,10 @@ export default async function handler(req: any, res: any) {
       sendError(res, 400, 'username, displayName, manufacturerName are required');
       return;
     }
+    if (!normalizedUser.email || !normalizedUser.phoneNumber) {
+      sendError(res, 400, 'email and phoneNumber are required');
+      return;
+    }
 
     const usernameTaken = await UserRepository.isUsernameTaken(
       normalizedUser.username,
@@ -141,8 +145,7 @@ export default async function handler(req: any, res: any) {
     return;
   }
   if (targetUser.role === 'ADMIN') {
-    const allUsers = await UserRepository.findAll();
-    const adminCount = allUsers.filter((user) => user.role === 'ADMIN').length;
+    const adminCount = await UserRepository.countAdmins();
     if (adminCount <= 1) {
       sendError(res, 400, '最後の管理者アカウントは削除できません');
       return;

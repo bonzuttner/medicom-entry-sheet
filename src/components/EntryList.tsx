@@ -31,6 +31,7 @@ export const EntryList: React.FC<EntryListProps> = ({
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [dateFilterBy, setDateFilterBy] = useState<'createdAt' | 'updatedAt' | 'arrivalDate'>('updatedAt');
   const [dateSince, setDateSince] = useState('');
+  const [dateFilterMode, setDateFilterMode] = useState<'since' | 'until'>('since');
   const [expandedSheets, setExpandedSheets] = useState<Set<string>>(new Set());
   const [selectedSheets, setSelectedSheets] = useState<Set<string>>(new Set());
   const [showExportModal, setShowExportModal] = useState(false);
@@ -97,9 +98,13 @@ export const EntryList: React.FC<EntryListProps> = ({
 
       if (!dateSince) return true;
       const filterStart = new Date(`${dateSince}T00:00:00`).getTime();
+      const filterEnd = new Date(`${dateSince}T23:59:59.999`).getTime();
       const targetTs = getSheetTimestampBy(sheet, dateFilterBy);
       if (targetTs === null) return false;
-      return targetTs >= filterStart;
+      if (dateFilterMode === 'since') {
+        return targetTs >= filterStart;
+      }
+      return targetTs <= filterEnd;
     })
     .sort((a, b) => {
       const direction = sortOrder === 'asc' ? 1 : -1;
@@ -153,41 +158,93 @@ export const EntryList: React.FC<EntryListProps> = ({
       return `"${formulaGuarded.replace(/"/g, '""')}"`;
     };
 
-    // Flatten data: 1 Row per Product
+    // Flatten data: 1 row per product. Covers all sheet/product fields.
     const csvRows: string[][] = [
-      // Header
       [
-        "シートID", "状態", "タイトル", "メーカー名", "作成者", "更新日", "担当者メール", "担当者電話",
-        "商品ID", "棚割名", "JANコード", "商品名", "リスク分類", "幅(mm)", "高さ(mm)", "奥行(mm)", "フェイシング数", 
-        "販促物有無", "販促物サイズ(幅)", "販促物サイズ(高さ)", "販促物サイズ(奥行)", "備考"
+        'シートID',
+        '状態',
+        'タイトル',
+        'シート補足情報',
+        'メーカー名',
+        '作成者ID',
+        '作成者',
+        '作成日',
+        '更新日',
+        '担当者メール',
+        '担当者電話',
+        'シート添付ファイル有無',
+        'シート添付ファイル数',
+        '商品ID',
+        '棚割名',
+        '商品メーカー名',
+        'JANコード',
+        '商品名',
+        '商品画像有無',
+        'リスク分類',
+        '特定成分',
+        'キャッチコピー',
+        '商品メッセージ',
+        '補足事項',
+        '商品添付ファイル有無',
+        '商品添付ファイル数',
+        '幅(mm)',
+        '高さ(mm)',
+        '奥行(mm)',
+        'フェイシング数',
+        '店舗到着日',
+        '販促物有無',
+        '香り・色見本',
+        '特殊な陳列什器',
+        '販促物サイズ(幅)',
+        '販促物サイズ(高さ)',
+        '販促物サイズ(奥行)',
+        '販促物画像有無',
       ]
     ];
 
     targetSheets.forEach(sheet => {
+      const sheetAttachmentCount = sheet.attachments?.length ?? 0;
       sheet.products.forEach(prod => {
+        const productAttachmentCount = prod.productAttachments?.length ?? 0;
         csvRows.push([
           toSafeCsvCell(sheet.id),
           toSafeCsvCell(normalizeSheetStatus(sheet.status) === 'completed' ? '完了' : '下書き'),
           toSafeCsvCell(sheet.title),
+          toSafeCsvCell(sheet.notes || ''),
           toSafeCsvCell(sheet.manufacturerName),
+          toSafeCsvCell(sheet.creatorId),
           toSafeCsvCell(sheet.creatorName),
+          toSafeCsvCell(new Date(sheet.createdAt).toLocaleDateString()),
           toSafeCsvCell(new Date(sheet.updatedAt).toLocaleDateString()),
           toSafeCsvCell(sheet.email),
           toSafeCsvCell(sheet.phoneNumber),
+          toSafeCsvCell(sheetAttachmentCount > 0 ? '有り' : '無し'),
+          toSafeCsvCell(sheetAttachmentCount),
           toSafeCsvCell(prod.id),
           toSafeCsvCell(prod.shelfName),
+          toSafeCsvCell(prod.manufacturerName),
           toSafeCsvCell(prod.janCode),
           toSafeCsvCell(prod.productName),
+          toSafeCsvCell(prod.productImage ? '有り' : '無し'),
           toSafeCsvCell(prod.riskClassification),
+          toSafeCsvCell((prod.specificIngredients || []).join(' / ')),
+          toSafeCsvCell(prod.catchCopy || ''),
+          toSafeCsvCell(prod.productMessage || ''),
+          toSafeCsvCell(prod.productNotes || ''),
+          toSafeCsvCell(productAttachmentCount > 0 ? '有り' : '無し'),
+          toSafeCsvCell(productAttachmentCount),
           toSafeCsvCell(prod.width),
           toSafeCsvCell(prod.height),
           toSafeCsvCell(prod.depth),
           toSafeCsvCell(prod.facingCount),
+          toSafeCsvCell(prod.arrivalDate || ''),
           toSafeCsvCell(prod.hasPromoMaterial === 'yes' ? '有り' : '無し'),
+          toSafeCsvCell(prod.promoSample || ''),
+          toSafeCsvCell(prod.specialFixture || ''),
           toSafeCsvCell(prod.promoWidth ?? ''),
           toSafeCsvCell(prod.promoHeight ?? ''),
           toSafeCsvCell(prod.promoDepth ?? ''),
-          toSafeCsvCell(prod.productMessage || ''),
+          toSafeCsvCell(prod.promoImage ? '有り' : '無し'),
         ]);
       });
     });
@@ -463,7 +520,7 @@ export const EntryList: React.FC<EntryListProps> = ({
           >
             <option value="createdAt">作成日</option>
             <option value="updatedAt">更新日</option>
-            <option value="arrivalDate">到着日</option>
+            <option value="arrivalDate">店舗到着日</option>
           </select>
           <input
             type="date"
@@ -471,7 +528,14 @@ export const EntryList: React.FC<EntryListProps> = ({
             onChange={(e) => setDateSince(e.target.value)}
             className="border border-slate-300 rounded-md px-2 py-1.5 text-xs bg-white"
           />
-          <span className="text-xs text-slate-600">以降</span>
+          <select
+            value={dateFilterMode}
+            onChange={(e) => setDateFilterMode(e.target.value as 'since' | 'until')}
+            className="border border-slate-300 rounded-md px-2 py-1.5 text-xs bg-white"
+          >
+            <option value="since">以降</option>
+            <option value="until">以前</option>
+          </select>
           {dateSince && (
             <button
               onClick={() => setDateSince('')}

@@ -219,6 +219,16 @@ export const deleteById = async (userId: string): Promise<boolean> => {
 };
 
 /**
+ * Count admin users
+ */
+export const countAdmins = async (): Promise<number> => {
+  const result = await db.query<{ count: string }>(
+    `SELECT COUNT(*) as count FROM users WHERE role = 'ADMIN'`
+  );
+  return parseInt(result.rows[0]?.count || '0', 10);
+};
+
+/**
  * Check if username is already taken (excluding specific user ID)
  */
 export const isUsernameTaken = async (
@@ -247,5 +257,6 @@ export default {
   upsert,
   upsertMany,
   deleteById,
+  countAdmins,
   isUsernameTaken,
 };
