@@ -27,6 +27,7 @@ export const EntryList: React.FC<EntryListProps> = ({
   isLoadingMore = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState<'updatedAt' | 'manufacturer'>('updatedAt');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [dateFilterBy, setDateFilterBy] = useState<'createdAt' | 'updatedAt' | 'arrivalDate'>('updatedAt');
   const [dateSince, setDateSince] = useState('');
@@ -72,6 +73,15 @@ export const EntryList: React.FC<EntryListProps> = ({
     return getSheetArrivalTimestamp(sheet);
   };
 
+  const toggleSort = (nextSortBy: 'updatedAt' | 'manufacturer') => {
+    if (sortBy === nextSortBy) {
+      setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'));
+      return;
+    }
+    setSortBy(nextSortBy);
+    setSortOrder('asc');
+  };
+
   // Search + Sort
   const filteredSheets = sheets
     .filter((sheet) => {
@@ -93,6 +103,12 @@ export const EntryList: React.FC<EntryListProps> = ({
     })
     .sort((a, b) => {
       const direction = sortOrder === 'asc' ? 1 : -1;
+      if (sortBy === 'manufacturer') {
+        const byManufacturer = a.manufacturerName.localeCompare(b.manufacturerName, 'ja');
+        if (byManufacturer !== 0) return byManufacturer * direction;
+        return a.creatorName.localeCompare(b.creatorName, 'ja') * direction;
+      }
+
       const aTs = new Date(a.updatedAt).getTime();
       const bTs = new Date(b.updatedAt).getTime();
       return (aTs - bTs) * direction;
@@ -388,17 +404,7 @@ export const EntryList: React.FC<EntryListProps> = ({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="w-full sm:w-auto">
-            <div className="flex items-center gap-3">
-              <h2 className="text-xl sm:text-2xl font-bold text-slate-800">エントリーシート履歴</h2>
-              <button
-                onClick={() => setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition-colors text-xs font-bold"
-                title="更新日の並び順を切り替え"
-              >
-                <ArrowUpDown size={14} />
-                <span>更新日: {sortOrder === 'desc' ? '新しい順' : '古い順'}</span>
-              </button>
-            </div>
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-800">エントリーシート履歴</h2>
             <p className="text-slate-500 text-sm mt-1">
               {selectedSheets.size > 0 
                 ? `${selectedSheets.size}件 選択中` 
@@ -433,52 +439,45 @@ export const EntryList: React.FC<EntryListProps> = ({
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="relative">
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <Search className="h-5 w-5 text-slate-400" />
+      <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+        {/* Search Bar */}
+        <div className="relative flex-1 min-w-0">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-4 w-4 text-slate-400" />
+          </div>
+          <input
+            type="text"
+            className="block w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-lg leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary text-sm shadow-sm"
+            placeholder="シート名、メーカー名、商品名で検索..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
-        <input
-          type="text"
-          className="block w-full pl-10 pr-3 py-3 border border-slate-300 rounded-lg leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:text-sm shadow-sm"
-          placeholder="シート名、メーカー名、商品名で検索..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-slate-500">絞り込み対象</label>
-            <select
-              value={dateFilterBy}
-              onChange={(e) => setDateFilterBy(e.target.value as 'createdAt' | 'updatedAt' | 'arrivalDate')}
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white min-w-[120px]"
-            >
-              <option value="createdAt">作成日</option>
-              <option value="updatedAt">更新日</option>
-              <option value="arrivalDate">到着日</option>
-            </select>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-slate-500">日付</label>
-            <div className="flex items-center gap-2">
-              <input
-                type="date"
-                value={dateSince}
-                onChange={(e) => setDateSince(e.target.value)}
-                className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"
-              />
-              <span className="text-sm text-slate-600 font-medium">以降</span>
-            </div>
-          </div>
+        <div className="flex flex-wrap items-center gap-2 bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-2">
+          <span className="text-[11px] font-bold text-slate-600">絞り込み</span>
+          <select
+            value={dateFilterBy}
+            onChange={(e) => setDateFilterBy(e.target.value as 'createdAt' | 'updatedAt' | 'arrivalDate')}
+            className="border border-slate-300 rounded-md px-2 py-1.5 text-xs bg-white"
+          >
+            <option value="createdAt">作成日</option>
+            <option value="updatedAt">更新日</option>
+            <option value="arrivalDate">到着日</option>
+          </select>
+          <input
+            type="date"
+            value={dateSince}
+            onChange={(e) => setDateSince(e.target.value)}
+            className="border border-slate-300 rounded-md px-2 py-1.5 text-xs bg-white"
+          />
+          <span className="text-xs text-slate-600">以降</span>
           {dateSince && (
             <button
               onClick={() => setDateSince('')}
-              className="h-10 px-3 rounded-lg border border-slate-300 text-slate-600 text-sm hover:bg-slate-50"
+              className="px-2 py-1.5 rounded-md border border-slate-300 text-xs text-slate-600 hover:bg-slate-50"
             >
-              絞り込み解除
+              解除
             </button>
           )}
         </div>
@@ -608,8 +607,30 @@ export const EntryList: React.FC<EntryListProps> = ({
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-24">状態</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">タイトル</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-48">メーカー / 更新者</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-32">更新日</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-48">
+                      <button
+                        onClick={() => toggleSort('manufacturer')}
+                        className={`inline-flex items-center gap-1 hover:text-slate-700 ${
+                          sortBy === 'manufacturer' ? 'text-slate-700' : ''
+                        }`}
+                        title="メーカー / 更新者の並び順を切り替え"
+                      >
+                        <span>メーカー / 更新者</span>
+                        <ArrowUpDown size={14} />
+                      </button>
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-32">
+                      <button
+                        onClick={() => toggleSort('updatedAt')}
+                        className={`inline-flex items-center gap-1 hover:text-slate-700 ${
+                          sortBy === 'updatedAt' ? 'text-slate-700' : ''
+                        }`}
+                        title="更新日の並び順を切り替え"
+                      >
+                        <span>更新日</span>
+                        <ArrowUpDown size={14} />
+                      </button>
+                    </th>
                     <th scope="col" className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider w-40">操作</th>
                     <th scope="col" className="w-10"></th>
                   </tr>
