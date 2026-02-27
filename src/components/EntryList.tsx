@@ -454,7 +454,7 @@ export const EntryList: React.FC<EntryListProps> = ({
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-[11px] font-bold text-slate-600">絞り込み</span>
           <select
             value={dateFilterBy}
