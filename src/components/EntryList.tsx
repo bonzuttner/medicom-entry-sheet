@@ -174,6 +174,9 @@ export const EntryList: React.FC<EntryListProps> = ({
         '担当者電話',
         'シート添付ファイル有無',
         'シート添付ファイル数',
+        'シート添付ファイル名一覧',
+        'シート添付ファイル種別一覧',
+        'シート添付ファイルURL一覧',
         '商品ID',
         '棚割名',
         '商品メーカー名',
@@ -187,6 +190,9 @@ export const EntryList: React.FC<EntryListProps> = ({
         '補足事項',
         '商品添付ファイル有無',
         '商品添付ファイル数',
+        '商品添付ファイル名一覧',
+        '商品添付ファイル種別一覧',
+        '商品添付ファイルURL一覧',
         '幅(mm)',
         '高さ(mm)',
         '奥行(mm)',
@@ -204,8 +210,14 @@ export const EntryList: React.FC<EntryListProps> = ({
 
     targetSheets.forEach(sheet => {
       const sheetAttachmentCount = sheet.attachments?.length ?? 0;
+      const sheetAttachmentNames = (sheet.attachments || []).map((file) => file.name).join(' / ');
+      const sheetAttachmentTypes = (sheet.attachments || []).map((file) => file.type).join(' / ');
+      const sheetAttachmentUrls = (sheet.attachments || []).map((file) => file.url).join(' / ');
       sheet.products.forEach(prod => {
         const productAttachmentCount = prod.productAttachments?.length ?? 0;
+        const productAttachmentNames = (prod.productAttachments || []).map((file) => file.name).join(' / ');
+        const productAttachmentTypes = (prod.productAttachments || []).map((file) => file.type).join(' / ');
+        const productAttachmentUrls = (prod.productAttachments || []).map((file) => file.url).join(' / ');
         csvRows.push([
           toSafeCsvCell(sheet.id),
           toSafeCsvCell(normalizeSheetStatus(sheet.status) === 'completed' ? '完了' : '下書き'),
@@ -220,6 +232,9 @@ export const EntryList: React.FC<EntryListProps> = ({
           toSafeCsvCell(sheet.phoneNumber),
           toSafeCsvCell(sheetAttachmentCount > 0 ? '有り' : '無し'),
           toSafeCsvCell(sheetAttachmentCount),
+          toSafeCsvCell(sheetAttachmentNames),
+          toSafeCsvCell(sheetAttachmentTypes),
+          toSafeCsvCell(sheetAttachmentUrls),
           toSafeCsvCell(prod.id),
           toSafeCsvCell(prod.shelfName),
           toSafeCsvCell(prod.manufacturerName),
@@ -233,6 +248,9 @@ export const EntryList: React.FC<EntryListProps> = ({
           toSafeCsvCell(prod.productNotes || ''),
           toSafeCsvCell(productAttachmentCount > 0 ? '有り' : '無し'),
           toSafeCsvCell(productAttachmentCount),
+          toSafeCsvCell(productAttachmentNames),
+          toSafeCsvCell(productAttachmentTypes),
+          toSafeCsvCell(productAttachmentUrls),
           toSafeCsvCell(prod.width),
           toSafeCsvCell(prod.height),
           toSafeCsvCell(prod.depth),
