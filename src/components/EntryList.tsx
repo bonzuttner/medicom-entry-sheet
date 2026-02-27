@@ -10,9 +10,22 @@ interface EntryListProps {
   onEdit: (sheet: EntrySheet, productIndex?: number) => void;
   onDuplicate: (sheet: EntrySheet) => void;
   onDelete: (id: string) => void;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
+  isLoadingMore?: boolean;
 }
 
-export const EntryList: React.FC<EntryListProps> = ({ sheets, currentUser, onCreate, onEdit, onDuplicate, onDelete }) => {
+export const EntryList: React.FC<EntryListProps> = ({
+  sheets,
+  currentUser,
+  onCreate,
+  onEdit,
+  onDuplicate,
+  onDelete,
+  hasMore = false,
+  onLoadMore,
+  isLoadingMore = false,
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedSheets, setExpandedSheets] = useState<Set<string>>(new Set());
   const [selectedSheets, setSelectedSheets] = useState<Set<string>>(new Set());
@@ -610,6 +623,22 @@ export const EntryList: React.FC<EntryListProps> = ({ sheets, currentUser, onCre
             </div>
           </div>
         </>
+      )}
+
+      {hasMore && !searchTerm.trim() && (
+        <div className="flex justify-center">
+          <button
+            onClick={() => onLoadMore?.()}
+            disabled={isLoadingMore}
+            className={`px-6 py-3 rounded-lg font-bold shadow-sm transition-all ${
+              isLoadingMore
+                ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            {isLoadingMore ? '読み込み中...' : 'さらに30件を読み込む'}
+          </button>
+        </div>
       )}
 
       {/* CSV Export Modal */}

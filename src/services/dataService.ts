@@ -1,6 +1,11 @@
 import { EntrySheet, MasterData, User } from '../types';
 import { apiClient } from './apiClient';
 
+export interface PagedResult<T> {
+  items: T[];
+  hasMore: boolean;
+}
+
 export interface DataService {
   getUsers: () => Promise<User[]>;
   saveUser: (user: User) => Promise<void>;
@@ -9,6 +14,7 @@ export interface DataService {
   getCurrentUser: () => Promise<User | null>;
   setCurrentUser: (user: User | null) => Promise<void>;
   getSheets: () => Promise<EntrySheet[]>;
+  getSheetsPage: (offset: number, limit: number) => Promise<PagedResult<EntrySheet>>;
   saveSheet: (sheet: EntrySheet) => Promise<void>;
   deleteSheet: (id: string) => Promise<void>;
   getMasterData: () => Promise<MasterData>;
@@ -34,6 +40,8 @@ const apiDataService: DataService = {
     // In API mode, successful login already sets the session cookie.
   },
   getSheets: async () => apiClient.get<EntrySheet[]>('/api/sheets'),
+  getSheetsPage: async (offset, limit) =>
+    apiClient.get<PagedResult<EntrySheet>>(`/api/sheets?offset=${offset}&limit=${limit}`),
   saveSheet: async (sheet) => {
     await apiClient.put<void>(`/api/sheets/${sheet.id}`, { sheet });
   },

@@ -195,9 +195,9 @@ const buildIngredientsByProductId = (
 /**
  * Get all sheets (for ADMIN)
  */
-export const findAll = async (): Promise<EntrySheet[]> => {
-  const sheetResult = await db.query<SheetRow>(
-    `
+export const findAll = async (limit?: number, offset: number = 0): Promise<EntrySheet[]> => {
+  const hasPaging = typeof limit === 'number';
+  const sheetQuery = `
     SELECT
       s.id, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
       s.created_at, s.updated_at,
@@ -209,7 +209,12 @@ export const findAll = async (): Promise<EntrySheet[]> => {
     JOIN users u ON s.creator_id = u.id
     JOIN manufacturers m ON s.manufacturer_id = m.id
     ORDER BY s.created_at DESC
-    `
+    ${hasPaging ? 'LIMIT $1 OFFSET $2' : ''}
+  `;
+  const sheetParams = hasPaging ? [limit!, offset] : undefined;
+  const sheetResult = await db.query<SheetRow>(
+    sheetQuery,
+    sheetParams
   );
 
   if (sheetResult.rows.length === 0) return [];
@@ -275,9 +280,13 @@ export const findAll = async (): Promise<EntrySheet[]> => {
 /**
  * Get sheets by manufacturer ID (for STAFF)
  */
-export const findByManufacturerId = async (manufacturerId: string): Promise<EntrySheet[]> => {
-  const sheetResult = await db.query<SheetRow>(
-    `
+export const findByManufacturerId = async (
+  manufacturerId: string,
+  limit?: number,
+  offset: number = 0
+): Promise<EntrySheet[]> => {
+  const hasPaging = typeof limit === 'number';
+  const sheetQuery = `
     SELECT
       s.id, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
       s.created_at, s.updated_at,
@@ -290,8 +299,12 @@ export const findByManufacturerId = async (manufacturerId: string): Promise<Entr
     JOIN manufacturers m ON s.manufacturer_id = m.id
     WHERE s.manufacturer_id = $1
     ORDER BY s.created_at DESC
-    `,
-    [manufacturerId]
+    ${hasPaging ? 'LIMIT $2 OFFSET $3' : ''}
+    `;
+  const sheetParams = hasPaging ? [manufacturerId, limit!, offset] : [manufacturerId];
+  const sheetResult = await db.query<SheetRow>(
+    sheetQuery,
+    sheetParams
   );
 
   if (sheetResult.rows.length === 0) return [];
