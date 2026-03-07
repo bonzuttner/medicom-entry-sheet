@@ -29,6 +29,7 @@ CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 -- エントリーシート
 CREATE TABLE IF NOT EXISTS entry_sheets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  version INTEGER NOT NULL DEFAULT 1,
   creator_id UUID REFERENCES users(id) ON DELETE SET NULL,
   manufacturer_id UUID NOT NULL REFERENCES manufacturers(id) ON DELETE RESTRICT,
   creator_name_snapshot VARCHAR(200),
@@ -37,22 +38,13 @@ CREATE TABLE IF NOT EXISTS entry_sheets (
   title VARCHAR(500) NOT NULL,
   notes TEXT,
   deployment_start_month SMALLINT,
-  admin_promo_code VARCHAR(50),
-  admin_board_picking_jan VARCHAR(13),
-  admin_deadline_table_url TEXT,
-  admin_band_pattern VARCHAR(100),
-  admin_target_store_count INTEGER,
-  admin_print_board1_count INTEGER,
-  admin_print_board2_count INTEGER,
-  admin_print_band1_count INTEGER,
-  admin_print_band2_count INTEGER,
-  admin_print_other TEXT,
-  admin_equipment_note TEXT,
-  admin_note TEXT,
   status VARCHAR(30) NOT NULL CHECK (status IN ('draft', 'completed', 'completed_no_image')),
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
 
 ALTER TABLE entry_sheets
   ADD COLUMN IF NOT EXISTS creator_name_snapshot VARCHAR(200);
@@ -67,40 +59,18 @@ ALTER TABLE entry_sheets
   ADD COLUMN IF NOT EXISTS deployment_start_month SMALLINT;
 
 ALTER TABLE entry_sheets
-  ADD COLUMN IF NOT EXISTS admin_promo_code VARCHAR(50);
-
-ALTER TABLE entry_sheets
-  ADD COLUMN IF NOT EXISTS admin_board_picking_jan VARCHAR(13);
-
-ALTER TABLE entry_sheets
-  ADD COLUMN IF NOT EXISTS admin_deadline_table_url TEXT;
-
-ALTER TABLE entry_sheets
-  ADD COLUMN IF NOT EXISTS admin_band_pattern VARCHAR(100);
-
-ALTER TABLE entry_sheets
-  ADD COLUMN IF NOT EXISTS admin_target_store_count INTEGER;
-
-ALTER TABLE entry_sheets
-  ADD COLUMN IF NOT EXISTS admin_print_board1_count INTEGER;
-
-ALTER TABLE entry_sheets
-  ADD COLUMN IF NOT EXISTS admin_print_board2_count INTEGER;
-
-ALTER TABLE entry_sheets
-  ADD COLUMN IF NOT EXISTS admin_print_band1_count INTEGER;
-
-ALTER TABLE entry_sheets
-  ADD COLUMN IF NOT EXISTS admin_print_band2_count INTEGER;
-
-ALTER TABLE entry_sheets
-  ADD COLUMN IF NOT EXISTS admin_print_other TEXT;
-
-ALTER TABLE entry_sheets
-  ADD COLUMN IF NOT EXISTS admin_equipment_note TEXT;
-
-ALTER TABLE entry_sheets
-  ADD COLUMN IF NOT EXISTS admin_note TEXT;
+  DROP COLUMN IF EXISTS admin_promo_code,
+  DROP COLUMN IF EXISTS admin_board_picking_jan,
+  DROP COLUMN IF EXISTS admin_deadline_table_url,
+  DROP COLUMN IF EXISTS admin_band_pattern,
+  DROP COLUMN IF EXISTS admin_target_store_count,
+  DROP COLUMN IF EXISTS admin_print_board1_count,
+  DROP COLUMN IF EXISTS admin_print_board2_count,
+  DROP COLUMN IF EXISTS admin_print_band1_count,
+  DROP COLUMN IF EXISTS admin_print_band2_count,
+  DROP COLUMN IF EXISTS admin_print_other,
+  DROP COLUMN IF EXISTS admin_equipment_note,
+  DROP COLUMN IF EXISTS admin_note;
 
 CREATE INDEX IF NOT EXISTS idx_sheets_manufacturer ON entry_sheets(manufacturer_id);
 CREATE INDEX IF NOT EXISTS idx_sheets_creator ON entry_sheets(creator_id);
@@ -108,6 +78,29 @@ CREATE INDEX IF NOT EXISTS idx_sheets_status ON entry_sheets(status);
 CREATE INDEX IF NOT EXISTS idx_sheets_created_at ON entry_sheets(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_sheets_manufacturer_updated_at
   ON entry_sheets(manufacturer_id, updated_at DESC);
+
+-- エントリーシート Adminメモ（分離）
+CREATE TABLE IF NOT EXISTS entry_sheet_admin_memos (
+  sheet_id UUID PRIMARY KEY REFERENCES entry_sheets(id) ON DELETE CASCADE,
+  version INTEGER NOT NULL DEFAULT 1,
+  promo_code VARCHAR(50),
+  board_picking_jan VARCHAR(13),
+  deadline_table_url TEXT,
+  band_pattern VARCHAR(100),
+  target_store_count INTEGER,
+  print_board1_count INTEGER,
+  print_board2_count INTEGER,
+  print_band1_count INTEGER,
+  print_band2_count INTEGER,
+  print_other TEXT,
+  equipment_note TEXT,
+  admin_note TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_entry_sheet_admin_memos_updated_at
+  ON entry_sheet_admin_memos(updated_at DESC);
 
 -- 商品エントリー
 CREATE TABLE IF NOT EXISTS product_entries (

@@ -78,6 +78,11 @@ const getSheetSaveErrorMessage = (error: unknown): string => {
   return raw;
 };
 
+const isVersionConflictError = (error: unknown): boolean => {
+  const raw = error instanceof Error ? error.message : '';
+  return raw.includes('VERSION_CONFLICT') || raw.includes('他のユーザーが先に更新');
+};
+
 const cloneProductTemplate = (product: ProductEntry): ProductEntry => ({
   ...product,
   specificIngredients: [...product.specificIngredients],
@@ -265,6 +270,7 @@ const App: React.FC = () => {
       setCurrentUser(null);
       setSheets([]);
       setUsers([]);
+      setMasterData(EMPTY_MASTER_DATA);
       setHasMoreSheets(false);
       setSheetOffset(0);
       setIsLoadingMoreSheets(false);
@@ -281,6 +287,7 @@ const App: React.FC = () => {
       masterData.manufacturerShelfNames?.[currentUser.manufacturerName] || masterData.shelfNames;
     const newSheet: EntrySheet = {
       id: uuidv4(),
+      version: 1,
       updatedAt: new Date().toISOString(),
       createdAt: new Date().toISOString(),
       creatorId: currentUser.id,
@@ -344,14 +351,15 @@ const App: React.FC = () => {
       const duplicated: EntrySheet = {
         ...sheet,
         id: uuidv4(),
+        version: 1,
         title: `${sheet.title} (コピー)`,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         status: 'draft',
         products: duplicatedProducts,
       };
-      await dataService.saveSheet(duplicated);
-      setSheets((prev) => upsertSheetInList(prev, duplicated));
+      const saved = await dataService.saveSheet(duplicated);
+      setSheets((prev) => upsertSheetInList(prev, saved));
       refreshFirstSheetsPage();
     } catch (error) {
       console.error('Failed to duplicate sheet:', error);
@@ -361,13 +369,33 @@ const App: React.FC = () => {
 
   const handleSaveSheet = async (sheet: EntrySheet) => {
     try {
-      await dataService.saveSheet(sheet);
+      const savedSheet = await dataService.saveSheet(sheet);
       setEditingSheet(null);
       setEditingSheetRevisions([]);
       setCurrentPage(Page.LIST);
-      setSheets((prev) => upsertSheetInList(prev, sheet));
+      setSheets((prev) => upsertSheetInList(prev, savedSheet));
       refreshFirstSheetsPage();
     } catch (error) {
+      if (isVersionConflictError(error)) {
+        const confirmOverwrite = window.confirm(
+          '他のユーザーが先にこのシートを更新しました。\n最新内容を上書きして保存しますか？'
+        );
+        if (confirmOverwrite) {
+          try {
+            const savedSheet = await dataService.saveSheet(sheet, { forceOverwrite: true });
+            setEditingSheet(null);
+            setEditingSheetRevisions([]);
+            setCurrentPage(Page.LIST);
+            setSheets((prev) => upsertSheetInList(prev, savedSheet));
+            refreshFirstSheetsPage();
+            return;
+          } catch (retryError) {
+            console.error('Failed to overwrite save sheet after conflict:', retryError);
+            alert(`上書き保存に失敗しました。\n${getSheetSaveErrorMessage(retryError)}`);
+            return;
+          }
+        }
+      }
       console.error('Failed to save sheet:', error);
       alert(`保存に失敗しました。\n${getSheetSaveErrorMessage(error)}`);
     }
@@ -376,29 +404,35 @@ const App: React.FC = () => {
   const handleSaveSheetAdminMemo = async (
     sheetId: string,
     adminMemo: EntrySheet['adminMemo']
-  ) => {
+  ): Promise<EntrySheet> => {
     const target = sheets.find((sheet) => sheet.id === sheetId);
     if (!target) {
       alert('対象シートが見つかりません。再読み込みして再試行してください。');
-      return;
+      throw new Error('Sheet not found');
     }
 
-    const merged: EntrySheet = {
-      ...target,
-      adminMemo: {
-        ...(target.adminMemo || {}),
-        ...(adminMemo || {}),
-      },
-      updatedAt: new Date().toISOString(),
-    };
-
     try {
-      await dataService.saveSheet(merged);
-      setSheets((prev) => upsertSheetInList(prev, merged));
+      const savedSheet = await dataService.saveSheetAdminMemo(sheetId, adminMemo);
+      setSheets((prev) => upsertSheetInList(prev, savedSheet));
       refreshFirstSheetsPage();
+      return savedSheet;
     } catch (error) {
+      if (isVersionConflictError(error)) {
+        const confirmOverwrite = window.confirm(
+          '他のユーザーが先にAdminメモを更新しました。\n上書き保存しますか？'
+        );
+        if (confirmOverwrite) {
+          const savedSheet = await dataService.saveSheetAdminMemo(sheetId, adminMemo, {
+            forceOverwrite: true,
+          });
+          setSheets((prev) => upsertSheetInList(prev, savedSheet));
+          refreshFirstSheetsPage();
+          return savedSheet;
+        }
+      }
       console.error('Failed to save admin memo:', error);
       alert(`Adminメモの保存に失敗しました。\n${getSheetSaveErrorMessage(error)}`);
+      throw error instanceof Error ? error : new Error('Failed to save admin memo');
     }
   };
 
@@ -507,6 +541,9 @@ const App: React.FC = () => {
       {currentPage === Page.ADMIN_LIST && currentUser.role === UserRole.ADMIN && (
         <AdminEntryList
           sheets={visibleSheets}
+          hasMore={hasMoreSheets}
+          onLoadMore={loadMoreSheets}
+          isLoadingMore={isLoadingMoreSheets}
           onSaveAdminMemo={handleSaveSheetAdminMemo}
         />
       )}

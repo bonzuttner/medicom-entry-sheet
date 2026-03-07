@@ -11,6 +11,7 @@ import { randomUUID } from 'crypto';
 
 interface SheetRow {
   id: string;
+  version: number;
   creator_id: string | null;
   creator_name: string;
   manufacturer_id: string;
@@ -20,21 +21,26 @@ interface SheetRow {
   title: string;
   notes: string | null;
   deployment_start_month: number | null;
-  admin_promo_code: string | null;
-  admin_board_picking_jan: string | null;
-  admin_deadline_table_url: string | null;
-  admin_band_pattern: string | null;
-  admin_target_store_count: number | null;
-  admin_print_board1_count: number | null;
-  admin_print_board2_count: number | null;
-  admin_print_band1_count: number | null;
-  admin_print_band2_count: number | null;
-  admin_print_other: string | null;
-  admin_equipment_note: string | null;
-  admin_note: string | null;
   status: string;
   created_at: Date | string;
   updated_at: Date | string;
+}
+
+interface AdminMemoRow {
+  sheet_id: string;
+  version: number;
+  promo_code: string | null;
+  board_picking_jan: string | null;
+  deadline_table_url: string | null;
+  band_pattern: string | null;
+  target_store_count: number | null;
+  print_board1_count: number | null;
+  print_board2_count: number | null;
+  print_band1_count: number | null;
+  print_band2_count: number | null;
+  print_other: string | null;
+  equipment_note: string | null;
+  admin_note: string | null;
 }
 
 interface EntrySheetRevisionRow {
@@ -94,7 +100,8 @@ const toSafeIso = (value: string | undefined, fallback: string): string => {
 
 let ensureSnapshotColumnsPromise: Promise<void> | null = null;
 let ensureCreatorReferencePromise: Promise<void> | null = null;
-let ensureAdminMemoColumnsPromise: Promise<void> | null = null;
+let ensureAdminMemoTablePromise: Promise<void> | null = null;
+let ensureSheetVersionColumnPromise: Promise<void> | null = null;
 let ensureSheetRevisionTablePromise: Promise<void> | null = null;
 let ensureSheetStatusConstraintPromise: Promise<void> | null = null;
 let ensureDeploymentColumnsPromise: Promise<void> | null = null;
@@ -122,63 +129,58 @@ const ensureSheetSnapshotColumns = async (): Promise<void> => {
   await ensureSnapshotColumnsPromise;
 };
 
-const ensureAdminMemoColumns = async (): Promise<void> => {
-  if (!ensureAdminMemoColumnsPromise) {
-    ensureAdminMemoColumnsPromise = (async () => {
+const ensureSheetVersionColumn = async (): Promise<void> => {
+  if (!ensureSheetVersionColumnPromise) {
+    ensureSheetVersionColumnPromise = (async () => {
       await db.query(
         `ALTER TABLE entry_sheets
-         ADD COLUMN IF NOT EXISTS admin_promo_code VARCHAR(50)`
-      );
-      await db.query(
-        `ALTER TABLE entry_sheets
-         ADD COLUMN IF NOT EXISTS admin_board_picking_jan VARCHAR(13)`
-      );
-      await db.query(
-        `ALTER TABLE entry_sheets
-         ADD COLUMN IF NOT EXISTS admin_deadline_table_url TEXT`
-      );
-      await db.query(
-        `ALTER TABLE entry_sheets
-         ADD COLUMN IF NOT EXISTS admin_band_pattern VARCHAR(100)`
-      );
-      await db.query(
-        `ALTER TABLE entry_sheets
-         ADD COLUMN IF NOT EXISTS admin_target_store_count INTEGER`
-      );
-      await db.query(
-        `ALTER TABLE entry_sheets
-         ADD COLUMN IF NOT EXISTS admin_print_board1_count INTEGER`
-      );
-      await db.query(
-        `ALTER TABLE entry_sheets
-         ADD COLUMN IF NOT EXISTS admin_print_board2_count INTEGER`
-      );
-      await db.query(
-        `ALTER TABLE entry_sheets
-         ADD COLUMN IF NOT EXISTS admin_print_band1_count INTEGER`
-      );
-      await db.query(
-        `ALTER TABLE entry_sheets
-         ADD COLUMN IF NOT EXISTS admin_print_band2_count INTEGER`
-      );
-      await db.query(
-        `ALTER TABLE entry_sheets
-         ADD COLUMN IF NOT EXISTS admin_print_other TEXT`
-      );
-      await db.query(
-        `ALTER TABLE entry_sheets
-         ADD COLUMN IF NOT EXISTS admin_equipment_note TEXT`
-      );
-      await db.query(
-        `ALTER TABLE entry_sheets
-         ADD COLUMN IF NOT EXISTS admin_note TEXT`
+         ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1`
       );
     })().catch((error) => {
-      ensureAdminMemoColumnsPromise = null;
+      ensureSheetVersionColumnPromise = null;
       throw error;
     });
   }
-  await ensureAdminMemoColumnsPromise;
+  await ensureSheetVersionColumnPromise;
+};
+
+const ensureAdminMemoTable = async (): Promise<void> => {
+  if (!ensureAdminMemoTablePromise) {
+    ensureAdminMemoTablePromise = (async () => {
+      await db.query(
+        `
+        CREATE TABLE IF NOT EXISTS entry_sheet_admin_memos (
+          sheet_id UUID PRIMARY KEY REFERENCES entry_sheets(id) ON DELETE CASCADE,
+          version INTEGER NOT NULL DEFAULT 1,
+          promo_code VARCHAR(50),
+          board_picking_jan VARCHAR(13),
+          deadline_table_url TEXT,
+          band_pattern VARCHAR(100),
+          target_store_count INTEGER,
+          print_board1_count INTEGER,
+          print_board2_count INTEGER,
+          print_band1_count INTEGER,
+          print_band2_count INTEGER,
+          print_other TEXT,
+          equipment_note TEXT,
+          admin_note TEXT,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+        `
+      );
+      await db.query(
+        `
+        CREATE INDEX IF NOT EXISTS idx_entry_sheet_admin_memos_updated_at
+        ON entry_sheet_admin_memos(updated_at DESC)
+        `
+      );
+    })().catch((error) => {
+      ensureAdminMemoTablePromise = null;
+      throw error;
+    });
+  }
+  await ensureAdminMemoTablePromise;
 };
 
 const ensureDeploymentColumns = async (): Promise<void> => {
@@ -296,7 +298,8 @@ const rowsToSheet = (
   productRows: ProductRow[],
   ingredientsByProductId: Map<string, string[]>,
   attachmentsByProductId: Map<string, Attachment[]>,
-  sheetAttachments: Attachment[]
+  sheetAttachments: Attachment[],
+  adminMemoBySheetId: Map<string, EntrySheet['adminMemo']>
 ): EntrySheet => {
   const products: ProductEntry[] = productRows.map((p) => {
     const ingredients = ingredientsByProductId.get(p.id) || [];
@@ -332,6 +335,7 @@ const rowsToSheet = (
 
   return {
     id: sheetRow.id,
+    version: sheetRow.version || 1,
     creatorId: sheetRow.creator_id || '',
     creatorName: sheetRow.creator_name,
     manufacturerName: sheetRow.manufacturer_name,
@@ -340,20 +344,7 @@ const rowsToSheet = (
     title: sheetRow.title,
     notes: sheetRow.notes || undefined,
     deploymentStartMonth: sheetRow.deployment_start_month ?? undefined,
-    adminMemo: {
-      promoCode: sheetRow.admin_promo_code || undefined,
-      boardPickingJan: sheetRow.admin_board_picking_jan || undefined,
-      deadlineTableUrl: sheetRow.admin_deadline_table_url || undefined,
-      bandPattern: sheetRow.admin_band_pattern || undefined,
-      targetStoreCount: sheetRow.admin_target_store_count ?? undefined,
-      printBoard1Count: sheetRow.admin_print_board1_count ?? undefined,
-      printBoard2Count: sheetRow.admin_print_board2_count ?? undefined,
-      printBand1Count: sheetRow.admin_print_band1_count ?? undefined,
-      printBand2Count: sheetRow.admin_print_band2_count ?? undefined,
-      printOther: sheetRow.admin_print_other || undefined,
-      equipmentNote: sheetRow.admin_equipment_note || undefined,
-      adminNote: sheetRow.admin_note || undefined,
-    },
+    adminMemo: adminMemoBySheetId.get(sheetRow.id),
     status: sheetRow.status as 'draft' | 'completed' | 'completed_no_image',
     createdAt: toIsoString(sheetRow.created_at),
     updatedAt: toIsoString(sheetRow.updated_at),
@@ -410,23 +401,63 @@ const buildIngredientsByProductId = (
   return map;
 };
 
+const buildAdminMemoBySheetId = (
+  rows: AdminMemoRow[]
+): Map<string, EntrySheet['adminMemo']> => {
+  const map = new Map<string, EntrySheet['adminMemo']>();
+  for (const row of rows) {
+    map.set(row.sheet_id, {
+      version: row.version || 1,
+      promoCode: row.promo_code || undefined,
+      boardPickingJan: row.board_picking_jan || undefined,
+      deadlineTableUrl: row.deadline_table_url || undefined,
+      bandPattern: row.band_pattern || undefined,
+      targetStoreCount: row.target_store_count ?? undefined,
+      printBoard1Count: row.print_board1_count ?? undefined,
+      printBoard2Count: row.print_board2_count ?? undefined,
+      printBand1Count: row.print_band1_count ?? undefined,
+      printBand2Count: row.print_band2_count ?? undefined,
+      printOther: row.print_other || undefined,
+      equipmentNote: row.equipment_note || undefined,
+      adminNote: row.admin_note || undefined,
+    });
+  }
+  return map;
+};
+
+const fetchAdminMemoBySheetIds = async (
+  sheetIds: string[]
+): Promise<Map<string, EntrySheet['adminMemo']>> => {
+  if (sheetIds.length === 0) return new Map();
+  await ensureAdminMemoTable();
+  const result = await db.query<AdminMemoRow>(
+    `
+    SELECT
+      sheet_id, version, promo_code, board_picking_jan, deadline_table_url, band_pattern,
+      target_store_count, print_board1_count, print_board2_count, print_band1_count,
+      print_band2_count, print_other, equipment_note, admin_note
+    FROM entry_sheet_admin_memos
+    WHERE sheet_id = ANY($1)
+    `,
+    [sheetIds]
+  );
+  return buildAdminMemoBySheetId(result.rows);
+};
+
 /**
  * Get all sheets (for ADMIN)
  */
 export const findAll = async (limit?: number, offset: number = 0): Promise<EntrySheet[]> => {
   await ensureSheetCreatorReference();
   await ensureSheetSnapshotColumns();
-  await ensureAdminMemoColumns();
+  await ensureAdminMemoTable();
+  await ensureSheetVersionColumn();
   await ensureDeploymentColumns();
   const hasPaging = typeof limit === 'number';
   const sheetQuery = `
     SELECT
-      s.id, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
+      s.id, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
       s.deployment_start_month,
-      s.admin_promo_code, s.admin_board_picking_jan, s.admin_deadline_table_url, s.admin_band_pattern,
-      s.admin_target_store_count, s.admin_print_board1_count, s.admin_print_board2_count,
-      s.admin_print_band1_count, s.admin_print_band2_count, s.admin_print_other,
-      s.admin_equipment_note, s.admin_note,
       s.created_at, s.updated_at,
       COALESCE(s.creator_name_snapshot, u.display_name, '') as creator_name,
       COALESCE(s.creator_email_snapshot, u.email, '') as creator_email,
@@ -490,6 +521,7 @@ export const findAll = async (limit?: number, offset: number = 0): Promise<Entry
   const ingredientsByProductId = buildIngredientsByProductId(ingredientResult.rows);
   const attachmentsByProductId = buildAttachmentsByProductId(attachmentResult.rows);
   const sheetAttachmentsBySheetId = buildSheetAttachmentsBySheetId(attachmentResult.rows);
+  const adminMemoBySheetId = await fetchAdminMemoBySheetIds(sheetIds);
 
   const sheets = sheetResult.rows.map((sheetRow) =>
     rowsToSheet(
@@ -497,7 +529,8 @@ export const findAll = async (limit?: number, offset: number = 0): Promise<Entry
       productsBySheetId.get(sheetRow.id) || [],
       ingredientsByProductId,
       attachmentsByProductId,
-      sheetAttachmentsBySheetId.get(sheetRow.id) || []
+      sheetAttachmentsBySheetId.get(sheetRow.id) || [],
+      adminMemoBySheetId
     )
   );
 
@@ -514,17 +547,14 @@ export const findByManufacturerId = async (
 ): Promise<EntrySheet[]> => {
   await ensureSheetCreatorReference();
   await ensureSheetSnapshotColumns();
-  await ensureAdminMemoColumns();
+  await ensureAdminMemoTable();
+  await ensureSheetVersionColumn();
   await ensureDeploymentColumns();
   const hasPaging = typeof limit === 'number';
   const sheetQuery = `
     SELECT
-      s.id, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
+      s.id, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
       s.deployment_start_month,
-      s.admin_promo_code, s.admin_board_picking_jan, s.admin_deadline_table_url, s.admin_band_pattern,
-      s.admin_target_store_count, s.admin_print_board1_count, s.admin_print_board2_count,
-      s.admin_print_band1_count, s.admin_print_band2_count, s.admin_print_other,
-      s.admin_equipment_note, s.admin_note,
       s.created_at, s.updated_at,
       COALESCE(s.creator_name_snapshot, u.display_name, '') as creator_name,
       COALESCE(s.creator_email_snapshot, u.email, '') as creator_email,
@@ -589,6 +619,7 @@ export const findByManufacturerId = async (
   const ingredientsByProductId = buildIngredientsByProductId(ingredientResult.rows);
   const attachmentsByProductId = buildAttachmentsByProductId(attachmentResult.rows);
   const sheetAttachmentsBySheetId = buildSheetAttachmentsBySheetId(attachmentResult.rows);
+  const adminMemoBySheetId = await fetchAdminMemoBySheetIds(sheetIds);
 
   const sheets = sheetResult.rows.map((sheetRow) =>
     rowsToSheet(
@@ -596,7 +627,8 @@ export const findByManufacturerId = async (
       productsBySheetId.get(sheetRow.id) || [],
       ingredientsByProductId,
       attachmentsByProductId,
-      sheetAttachmentsBySheetId.get(sheetRow.id) || []
+      sheetAttachmentsBySheetId.get(sheetRow.id) || [],
+      adminMemoBySheetId
     )
   );
 
@@ -609,17 +641,14 @@ export const findByManufacturerId = async (
 export const findById = async (sheetId: string): Promise<EntrySheet | null> => {
   await ensureSheetCreatorReference();
   await ensureSheetSnapshotColumns();
-  await ensureAdminMemoColumns();
+  await ensureAdminMemoTable();
+  await ensureSheetVersionColumn();
   await ensureDeploymentColumns();
   const sheetResult = await db.query<SheetRow>(
     `
     SELECT
-      s.id, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
+      s.id, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
       s.deployment_start_month,
-      s.admin_promo_code, s.admin_board_picking_jan, s.admin_deadline_table_url, s.admin_band_pattern,
-      s.admin_target_store_count, s.admin_print_board1_count, s.admin_print_board2_count,
-      s.admin_print_band1_count, s.admin_print_band2_count, s.admin_print_other,
-      s.admin_equipment_note, s.admin_note,
       s.created_at, s.updated_at,
       COALESCE(s.creator_name_snapshot, u.display_name, '') as creator_name,
       COALESCE(s.creator_email_snapshot, u.email, '') as creator_email,
@@ -671,13 +700,15 @@ export const findById = async (sheetId: string): Promise<EntrySheet | null> => {
   const ingredientsByProductId = buildIngredientsByProductId(ingredientResult.rows);
   const attachmentsByProductId = buildAttachmentsByProductId(attachmentResult.rows);
   const sheetAttachmentsBySheetId = buildSheetAttachmentsBySheetId(attachmentResult.rows);
+  const adminMemoBySheetId = await fetchAdminMemoBySheetIds([sheetResult.rows[0].id]);
 
   return rowsToSheet(
     sheetResult.rows[0],
     productResult.rows,
     ingredientsByProductId,
     attachmentsByProductId,
-    sheetAttachmentsBySheetId.get(sheetResult.rows[0].id) || []
+    sheetAttachmentsBySheetId.get(sheetResult.rows[0].id) || [],
+    adminMemoBySheetId
   );
 };
 
@@ -691,11 +722,15 @@ export const upsert = async (
     changedByName: string;
     summary: string;
     keepLatestCount?: number;
+    updateAdminMemo?: boolean;
+    expectedVersion?: number;
+    forceOverwrite?: boolean;
   }
 ): Promise<void> => {
   await ensureSheetCreatorReference();
   await ensureSheetSnapshotColumns();
-  await ensureAdminMemoColumns();
+  await ensureAdminMemoTable();
+  await ensureSheetVersionColumn();
   await ensureSheetRevisionTable();
   await ensureSheetStatusConstraint();
   await ensureDeploymentColumns();
@@ -703,6 +738,10 @@ export const upsert = async (
     const nowIso = new Date().toISOString();
     const normalizedSheet: EntrySheet = {
       ...sheet,
+      version:
+        Number.isInteger(Number(sheet.version)) && Number(sheet.version) > 0
+          ? Number(sheet.version)
+          : 1,
       creatorName: String(sheet.creatorName || '').trim(),
       title: String(sheet.title || '').trim(),
       notes: sheet.notes ? String(sheet.notes).trim() : '',
@@ -724,6 +763,10 @@ export const upsert = async (
             ? 'completed_no_image'
             : 'draft',
       adminMemo: {
+        version:
+          Number.isInteger(Number(sheet.adminMemo?.version)) && Number(sheet.adminMemo?.version) > 0
+            ? Number(sheet.adminMemo?.version)
+            : 1,
         promoCode: String(sheet.adminMemo?.promoCode || '').trim() || undefined,
         boardPickingJan: String(sheet.adminMemo?.boardPickingJan || '').trim() || undefined,
         deadlineTableUrl: String(sheet.adminMemo?.deadlineTableUrl || '').trim() || undefined,
@@ -753,43 +796,51 @@ export const upsert = async (
 
     const manufacturerId = await getManufacturerIdCached(normalizedSheet.manufacturerName);
     const creatorId = String(normalizedSheet.creatorId || '').trim() || null;
+    const existingVersionResult = await db.query<{ version: number }>(
+      `SELECT version FROM entry_sheets WHERE id = $1 FOR UPDATE`,
+      [normalizedSheet.id]
+    );
+    const existingVersion = existingVersionResult.rows[0]?.version;
+    const expectedVersion =
+      Number.isInteger(Number(revision?.expectedVersion)) && Number(revision?.expectedVersion) > 0
+        ? Number(revision?.expectedVersion)
+        : undefined;
+
+    if (
+      existingVersion !== undefined &&
+      expectedVersion !== undefined &&
+      expectedVersion !== existingVersion &&
+      !revision?.forceOverwrite
+    ) {
+      throw new Error('VERSION_CONFLICT');
+    }
+
+    normalizedSheet.version =
+      existingVersion !== undefined ? existingVersion + 1 : Math.max(1, normalizedSheet.version || 1);
 
     // Upsert entry_sheet
     await db.query(
       `
       INSERT INTO entry_sheets (
-        id, creator_id, manufacturer_id,
+        id, version, creator_id, manufacturer_id,
         creator_name_snapshot, creator_email_snapshot, creator_phone_snapshot,
         title, notes, deployment_start_month,
-        admin_promo_code, admin_board_picking_jan, admin_deadline_table_url, admin_band_pattern, admin_target_store_count,
-        admin_print_board1_count, admin_print_board2_count, admin_print_band1_count, admin_print_band2_count,
-        admin_print_other, admin_equipment_note, admin_note,
         status, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       ON CONFLICT (id) DO UPDATE SET
+        version = EXCLUDED.version,
         creator_name_snapshot = EXCLUDED.creator_name_snapshot,
         creator_email_snapshot = EXCLUDED.creator_email_snapshot,
         creator_phone_snapshot = EXCLUDED.creator_phone_snapshot,
         title = EXCLUDED.title,
         notes = EXCLUDED.notes,
         deployment_start_month = EXCLUDED.deployment_start_month,
-        admin_promo_code = EXCLUDED.admin_promo_code,
-        admin_board_picking_jan = EXCLUDED.admin_board_picking_jan,
-        admin_deadline_table_url = EXCLUDED.admin_deadline_table_url,
-        admin_band_pattern = EXCLUDED.admin_band_pattern,
-        admin_target_store_count = EXCLUDED.admin_target_store_count,
-        admin_print_board1_count = EXCLUDED.admin_print_board1_count,
-        admin_print_board2_count = EXCLUDED.admin_print_board2_count,
-        admin_print_band1_count = EXCLUDED.admin_print_band1_count,
-        admin_print_band2_count = EXCLUDED.admin_print_band2_count,
-        admin_print_other = EXCLUDED.admin_print_other,
-        admin_equipment_note = EXCLUDED.admin_equipment_note,
-        admin_note = EXCLUDED.admin_note,
         status = EXCLUDED.status,
         updated_at = EXCLUDED.updated_at
       `,
       [
         normalizedSheet.id,
+        normalizedSheet.version,
         creatorId,
         manufacturerId,
         normalizedSheet.creatorName || null,
@@ -798,18 +849,6 @@ export const upsert = async (
         normalizedSheet.title,
         normalizedSheet.notes || null,
         normalizedSheet.deploymentStartMonth ?? null,
-        normalizedSheet.adminMemo?.promoCode || null,
-        normalizedSheet.adminMemo?.boardPickingJan || null,
-        normalizedSheet.adminMemo?.deadlineTableUrl || null,
-        normalizedSheet.adminMemo?.bandPattern || null,
-        normalizedSheet.adminMemo?.targetStoreCount ?? null,
-        normalizedSheet.adminMemo?.printBoard1Count ?? null,
-        normalizedSheet.adminMemo?.printBoard2Count ?? null,
-        normalizedSheet.adminMemo?.printBand1Count ?? null,
-        normalizedSheet.adminMemo?.printBand2Count ?? null,
-        normalizedSheet.adminMemo?.printOther || null,
-        normalizedSheet.adminMemo?.equipmentNote || null,
-        normalizedSheet.adminMemo?.adminNote || null,
         normalizedSheet.status,
         normalizedSheet.createdAt,
         normalizedSheet.updatedAt,
@@ -1051,6 +1090,77 @@ export const upsert = async (
       }
     }
 
+    if (revision?.updateAdminMemo) {
+      const memoVersionResult = await db.query<{ version: number }>(
+        `SELECT version FROM entry_sheet_admin_memos WHERE sheet_id = $1 FOR UPDATE`,
+        [normalizedSheet.id]
+      );
+      const currentMemoVersion = memoVersionResult.rows[0]?.version;
+      const expectedMemoVersion =
+        Number.isInteger(Number(normalizedSheet.adminMemo?.version)) &&
+        Number(normalizedSheet.adminMemo?.version) > 0
+          ? Number(normalizedSheet.adminMemo?.version)
+          : undefined;
+
+      if (
+        currentMemoVersion !== undefined &&
+        expectedMemoVersion !== undefined &&
+        expectedMemoVersion !== currentMemoVersion &&
+        !revision?.forceOverwrite
+      ) {
+        throw new Error('ADMIN_MEMO_VERSION_CONFLICT');
+      }
+
+      const nextMemoVersion =
+        currentMemoVersion !== undefined ? currentMemoVersion + 1 : Math.max(1, expectedMemoVersion || 1);
+
+      await db.query(
+        `
+        INSERT INTO entry_sheet_admin_memos (
+          sheet_id, version, promo_code, board_picking_jan, deadline_table_url,
+          band_pattern, target_store_count, print_board1_count, print_board2_count,
+          print_band1_count, print_band2_count, print_other, equipment_note, admin_note, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5,
+          $6, $7, $8, $9,
+          $10, $11, $12, $13, $14, $15
+        )
+        ON CONFLICT (sheet_id) DO UPDATE SET
+          version = EXCLUDED.version,
+          promo_code = EXCLUDED.promo_code,
+          board_picking_jan = EXCLUDED.board_picking_jan,
+          deadline_table_url = EXCLUDED.deadline_table_url,
+          band_pattern = EXCLUDED.band_pattern,
+          target_store_count = EXCLUDED.target_store_count,
+          print_board1_count = EXCLUDED.print_board1_count,
+          print_board2_count = EXCLUDED.print_board2_count,
+          print_band1_count = EXCLUDED.print_band1_count,
+          print_band2_count = EXCLUDED.print_band2_count,
+          print_other = EXCLUDED.print_other,
+          equipment_note = EXCLUDED.equipment_note,
+          admin_note = EXCLUDED.admin_note,
+          updated_at = EXCLUDED.updated_at
+        `,
+        [
+          normalizedSheet.id,
+          nextMemoVersion,
+          normalizedSheet.adminMemo?.promoCode || null,
+          normalizedSheet.adminMemo?.boardPickingJan || null,
+          normalizedSheet.adminMemo?.deadlineTableUrl || null,
+          normalizedSheet.adminMemo?.bandPattern || null,
+          normalizedSheet.adminMemo?.targetStoreCount ?? null,
+          normalizedSheet.adminMemo?.printBoard1Count ?? null,
+          normalizedSheet.adminMemo?.printBoard2Count ?? null,
+          normalizedSheet.adminMemo?.printBand1Count ?? null,
+          normalizedSheet.adminMemo?.printBand2Count ?? null,
+          normalizedSheet.adminMemo?.printOther || null,
+          normalizedSheet.adminMemo?.equipmentNote || null,
+          normalizedSheet.adminMemo?.adminNote || null,
+          nowIso,
+        ]
+      );
+    }
+
     if (revision) {
       await db.query(
         `
@@ -1123,6 +1233,107 @@ export const addRevision = async (
     `,
     [sheetId, keepLatestCount]
   );
+};
+
+export const updateAdminMemoOnly = async (
+  sheetId: string,
+  adminMemo: EntrySheet['adminMemo'] | undefined,
+  revision?: {
+    changedByUserId: string | null;
+    changedByName: string;
+    summary: string;
+    keepLatestCount?: number;
+    expectedVersion?: number;
+    forceOverwrite?: boolean;
+  }
+): Promise<boolean> => {
+  await ensureAdminMemoTable();
+  await ensureSheetVersionColumn();
+  await ensureSheetRevisionTable();
+  const nowIso = new Date().toISOString();
+  const current = await db.query<{ id: string }>(
+    `SELECT id FROM entry_sheets WHERE id = $1`,
+    [sheetId]
+  );
+  if (current.rowCount === 0) return false;
+
+  const currentMemo = await db.query<{ version: number }>(
+    `SELECT version FROM entry_sheet_admin_memos WHERE sheet_id = $1 FOR UPDATE`,
+    [sheetId]
+  );
+  const currentVersion = currentMemo.rows[0]?.version;
+  const expectedVersion =
+    Number.isInteger(Number(revision?.expectedVersion)) && Number(revision?.expectedVersion) > 0
+      ? Number(revision?.expectedVersion)
+      : undefined;
+  if (
+    currentVersion !== undefined &&
+    expectedVersion !== undefined &&
+    currentVersion !== expectedVersion &&
+    !revision?.forceOverwrite
+  ) {
+    throw new Error('ADMIN_MEMO_VERSION_CONFLICT');
+  }
+  const nextVersion = currentVersion !== undefined ? currentVersion + 1 : Math.max(1, expectedVersion || 1);
+
+  const result = await db.query(
+    `
+    INSERT INTO entry_sheet_admin_memos (
+      sheet_id, version, promo_code, board_picking_jan, deadline_table_url,
+      band_pattern, target_store_count, print_board1_count, print_board2_count,
+      print_band1_count, print_band2_count, print_other, equipment_note, admin_note, updated_at
+    ) VALUES (
+      $1, $2, $3, $4, $5,
+      $6, $7, $8, $9,
+      $10, $11, $12, $13, $14, $15
+    )
+    ON CONFLICT (sheet_id) DO UPDATE SET
+      version = EXCLUDED.version,
+      promo_code = EXCLUDED.promo_code,
+      board_picking_jan = EXCLUDED.board_picking_jan,
+      deadline_table_url = EXCLUDED.deadline_table_url,
+      band_pattern = EXCLUDED.band_pattern,
+      target_store_count = EXCLUDED.target_store_count,
+      print_board1_count = EXCLUDED.print_board1_count,
+      print_board2_count = EXCLUDED.print_board2_count,
+      print_band1_count = EXCLUDED.print_band1_count,
+      print_band2_count = EXCLUDED.print_band2_count,
+      print_other = EXCLUDED.print_other,
+      equipment_note = EXCLUDED.equipment_note,
+      admin_note = EXCLUDED.admin_note,
+      updated_at = EXCLUDED.updated_at
+    `,
+    [
+      sheetId,
+      nextVersion,
+      adminMemo?.promoCode || null,
+      adminMemo?.boardPickingJan || null,
+      adminMemo?.deadlineTableUrl || null,
+      adminMemo?.bandPattern || null,
+      adminMemo?.targetStoreCount ?? null,
+      adminMemo?.printBoard1Count ?? null,
+      adminMemo?.printBoard2Count ?? null,
+      adminMemo?.printBand1Count ?? null,
+      adminMemo?.printBand2Count ?? null,
+      adminMemo?.printOther || null,
+      adminMemo?.equipmentNote || null,
+      adminMemo?.adminNote || null,
+      nowIso,
+    ]
+  );
+  if (result.rowCount === 0) return false;
+
+  if (revision) {
+    await addRevision(
+      sheetId,
+      revision.changedByUserId,
+      revision.changedByName,
+      revision.summary,
+      revision.keepLatestCount ?? 30
+    );
+  }
+
+  return true;
 };
 
 export const listRevisionsBySheetId = async (sheetId: string): Promise<EntrySheetRevision[]> => {
@@ -1287,6 +1498,7 @@ export default {
   addRevision,
   listRevisionsBySheetId,
   searchProductsByManufacturerId,
+  updateAdminMemoOnly,
   deleteById,
   pruneByRetention,
 };

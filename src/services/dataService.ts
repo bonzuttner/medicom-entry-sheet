@@ -15,7 +15,12 @@ export interface DataService {
   setCurrentUser: (user: User | null) => Promise<void>;
   getSheets: () => Promise<EntrySheet[]>;
   getSheetsPage: (offset: number, limit: number) => Promise<PagedResult<EntrySheet>>;
-  saveSheet: (sheet: EntrySheet) => Promise<void>;
+  saveSheet: (sheet: EntrySheet, options?: { forceOverwrite?: boolean }) => Promise<EntrySheet>;
+  saveSheetAdminMemo: (
+    sheetId: string,
+    adminMemo: EntrySheet['adminMemo'],
+    options?: { forceOverwrite?: boolean }
+  ) => Promise<EntrySheet>;
   deleteSheet: (id: string) => Promise<void>;
   getSheetRevisions: (sheetId: string) => Promise<EntrySheetRevision[]>;
   searchProducts: (params: {
@@ -46,9 +51,21 @@ const apiDataService: DataService = {
   getSheets: async () => apiClient.get<EntrySheet[]>('/api/sheets'),
   getSheetsPage: async (offset, limit) =>
     apiClient.get<PagedResult<EntrySheet>>(`/api/sheets?offset=${offset}&limit=${limit}`),
-  saveSheet: async (sheet) => {
-    await apiClient.put<void>(`/api/sheets/${sheet.id}`, { sheet });
-  },
+  saveSheet: async (sheet, options) =>
+    apiClient
+      .put<{ ok: boolean; sheet: EntrySheet }>(`/api/sheets/${sheet.id}`, {
+        sheet,
+        forceOverwrite: options?.forceOverwrite === true,
+      })
+      .then((result) => result.sheet),
+  saveSheetAdminMemo: async (sheetId, adminMemo, options) =>
+    apiClient
+      .put<{ ok: boolean; sheet: EntrySheet }>(`/api/sheets/${sheetId}`, {
+        mode: 'admin_memo',
+        adminMemo,
+        forceOverwrite: options?.forceOverwrite === true,
+      })
+      .then((result) => result.sheet),
   deleteSheet: async (id) => {
     await apiClient.delete<void>(`/api/sheets/${id}`);
   },

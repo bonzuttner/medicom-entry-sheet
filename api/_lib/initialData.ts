@@ -60,6 +60,7 @@ const buildInitialSheets = (): EntrySheet[] => {
   return [
     {
       id: 'sheet-1',
+      version: 1,
       updatedAt: now,
       createdAt: now,
       creatorId: 'user1',
@@ -90,6 +91,7 @@ const buildInitialSheets = (): EntrySheet[] => {
     },
     {
       id: 'sheet-2',
+      version: 1,
       updatedAt: now,
       createdAt: now,
       creatorId: 'user2',

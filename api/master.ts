@@ -63,12 +63,18 @@ export default async function handler(req: any, res: any) {
     const shelfNamesForCurrentUser = await MasterRepository.getShelfNamesByManufacturerName(
       currentUser.manufacturerName
     );
-    const manufacturerShelfNames = isAdmin(currentUser)
-      ? await MasterRepository.getManufacturerShelfNamesMap()
-      : undefined;
-    const manufacturerDefaultStartMonths = isAdmin(currentUser)
-      ? await MasterRepository.getManufacturerDefaultStartMonthsMap()
-      : undefined;
+    if (!isAdmin(currentUser)) {
+      sendJson(res, 200, {
+        manufacturerNames: [],
+        shelfNames: shelfNamesForCurrentUser,
+        riskClassifications: masterData.riskClassifications,
+        specificIngredients: masterData.specificIngredients,
+      });
+      return;
+    }
+    const manufacturerShelfNames = await MasterRepository.getManufacturerShelfNamesMap();
+    const manufacturerDefaultStartMonths =
+      await MasterRepository.getManufacturerDefaultStartMonthsMap();
     sendJson(res, 200, {
       ...masterData,
       shelfNames: shelfNamesForCurrentUser,

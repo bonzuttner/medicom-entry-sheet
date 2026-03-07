@@ -28,34 +28,73 @@ const parseErrorMessage = (status: number, raw: string): string => {
     const lower = normalized.toLowerCase();
 
     if (lower === 'unauthorized') {
-      return 'セッションの有効期限が切れました。再ログインしてから、もう一度保存してください。';
+      return 'セッションの有効期限が切れました。再ログインしてから、もう一度操作してください。';
     }
 
     const exactMap: Record<string, string> = {
-      'Method not allowed': 'この操作は現在利用できません。',
-      'User not found': '対象のアカウントが見つかりません。',
+      'Method not allowed': 'この操作は現在利用できません。画面を再読み込みして再試行してください。',
+      'User not found': '対象のアカウントが見つかりません。アカウント一覧を更新して確認してください。',
       'User id is required': 'アカウントIDが不足しています。画面を再読み込みして再試行してください。',
-      'user is required': '保存データが不足しています。入力内容を確認して再試行してください。',
-      'email and phoneNumber are required': 'メールアドレスと電話番号は必須です。入力してください。',
+      'user is required': 'アカウント情報が不足しています。入力内容を確認して再試行してください。',
+      'username, displayName, manufacturerName are required':
+        'アカウントの「ユーザー名・表示名・メーカー名」は必須です。未入力項目を入力してください。',
+      'email and phoneNumber are required':
+        'アカウントの「メールアドレス・電話番号」は必須です。未入力項目を入力してください。',
+      'Username is already taken': 'ユーザー名が重複しています。別のユーザー名を入力してください。',
+      'username and password are required':
+        'ログインには「ユーザー名・パスワード」の両方が必要です。入力して再試行してください。',
+      'Password is required for new users':
+        '新規アカウントではパスワードが必須です。パスワードを入力してください。',
+      'Password must include uppercase, lowercase, number, symbol, and be at least 8 characters':
+        'パスワードは8文字以上で「大文字・小文字・数字・記号」をすべて含めて入力してください。',
+      'You can only manage users in your manufacturer':
+        '他社メーカーのアカウントは操作できません。自社メーカーのアカウントを選択してください。',
+      'Only admins can manage admin users': '管理者アカウントを操作できるのは管理者のみです。',
       'Only admin can update master data': 'マスタを更新できるのは管理者のみです。',
+      'Only admin can update admin memo': 'Adminメモを更新できるのは管理者のみです。',
       'data is required': '保存データが不足しています。入力内容を確認して再試行してください。',
-      'Sheet id is required': 'シートIDが不足しています。画面を再読み込みして再試行してください。',
-      'sheet is required': 'シート情報が不足しています。入力内容を確認して再試行してください。',
-      'At least one product is required': '商品を1件以上入力してください。',
-      'You can only save sheets in your manufacturer': '自社メーカーのシートのみ保存できます。',
-      'You cannot modify this sheet': 'このシートを編集する権限がありません。',
-      'You cannot access this sheet': 'このシートを参照する権限がありません。',
-      'Sheet not found': '対象のシートが見つかりません。',
-      'You cannot delete this sheet': 'このシートを削除する権限がありません。',
-      'dataUrl and fileName are required': 'アップロード情報が不足しています。もう一度やり直してください。',
-      'Blob storage is not configured': '画像保存先の設定が未完了です。管理者に連絡してください。',
-      'Bulk update is deprecated. Use /api/users/:id': '一括更新は利用できません。個別更新で実行してください。',
+      'Sheet id is required': 'エントリーシートIDが不足しています。画面を再読み込みして再試行してください。',
+      'sheet is required': 'エントリーシート情報が不足しています。入力内容を確認して再試行してください。',
+      'At least one product is required': '商品情報は1件以上の入力が必要です。商品を追加してください。',
+      'You can only save sheets in your manufacturer':
+        '他社メーカーのエントリーシートは保存できません。自社メーカーのシートを編集してください。',
+      'You cannot modify this sheet': 'このエントリーシートを編集する権限がありません。',
+      'You cannot access this sheet': 'このエントリーシートを閲覧する権限がありません。',
+      'Sheet not found': '対象のエントリーシートが見つかりません。一覧を更新して確認してください。',
+      'Failed to reload saved sheet':
+        '保存は完了しましたが、最新データの再取得に失敗しました。画面を再読み込みして確認してください。',
+      'You cannot delete this sheet': 'このエントリーシートを削除する権限がありません。',
+      'dataUrl and fileName are required':
+        '画像アップロード情報が不足しています。画像を選択し直して再試行してください。',
+      'Blob storage is not configured':
+        '画像保存先の設定が未完了です。管理者に連絡してください。',
+      'Bulk update is deprecated. Use /api/users/:id':
+        '一括更新は利用できません。個別更新で実行してください。',
       'Only admin can migrate data': '移行処理を実行できるのは管理者のみです。',
-      'Only admin can migrate data to PostgreSQL': 'PostgreSQL移行を実行できるのは管理者のみです。',
-      'data with users/sheets/master is required': '移行データが不足しています。users/sheets/masterを確認してください。',
-      '販促CDは X000000 形式で入力してください': '販促CDは X000000 形式で入力してください。',
-      'ボードピッキングJANは13桁の数字で入力してください': 'ボードピッキングJANは13桁の数字で入力してください。',
-      'Manufacturer is required': 'メーカー情報が不足しています。',
+      'Only admin can migrate data to PostgreSQL':
+        'PostgreSQL移行を実行できるのは管理者のみです。',
+      'data with users/sheets/master is required':
+        '移行データが不足しています。users/sheets/master の各データを確認してください。',
+      'Manufacturer is required': 'メーカーが未選択です。メーカーを選択して再試行してください。',
+      'Invalid data URL':
+        '画像データの形式が不正です。画像を選択し直して再アップロードしてください。',
+      'Only allowed Blob URLs are accepted':
+        '添付URLの形式が不正です。画面から再アップロードした画像を選択してください。',
+      'Attachment URL is required': '添付ファイルのURLが未設定です。ファイルをアップロードしてください。',
+      'Unsupported image URL protocol':
+        '画像URLの形式が不正です。http/https 形式のURLを使用してください。',
+      'Invalid image URL':
+        '画像URLが不正です。URLを確認するか、画像を再アップロードしてください。',
+      'No images could be downloaded':
+        '画像を取得できませんでした。URLを確認するか、時間をおいて再試行してください。',
+      'Upload response does not include URL':
+        'アップロード結果に画像URLが含まれていません。時間をおいて再試行してください。',
+      VERSION_CONFLICT:
+        '他のユーザーが先に更新しました。最新内容を確認してから保存してください。',
+      '販促CDは X000000 形式で入力してください':
+        '販促CDは X000000 形式で入力してください。',
+      'ボードピッキングJANは13桁の数字で入力してください':
+        'ボードピッキングJANは13桁の数字で入力してください。',
     };
 
     if (exactMap[normalized]) {
@@ -65,6 +104,31 @@ const parseErrorMessage = (status: number, raw: string): string => {
     const retryMatch = normalized.match(/^Too many login attempts\. Retry in (\d+) seconds\.$/);
     if (retryMatch) {
       return `ログイン試行回数が上限に達しました。${retryMatch[1]}秒後に再試行してください。`;
+    }
+
+    const unsupportedFileTypeMatch = normalized.match(/^Unsupported file type: (.+)$/);
+    if (unsupportedFileTypeMatch) {
+      return `画像形式「${unsupportedFileTypeMatch[1]}」は未対応です。AI/PNG/JPEG/EPS 形式のファイルを選択してください。`;
+    }
+
+    const fetchImageFailedMatch = normalized.match(/^Failed to fetch image: (\d+)$/);
+    if (fetchImageFailedMatch) {
+      return `画像の取得に失敗しました（HTTP ${fetchImageFailedMatch[1]}）。URLを確認して再試行してください。`;
+    }
+
+    const migrationFailedMatch = normalized.match(/^Migration failed:\s*(.+)$/);
+    if (migrationFailedMatch) {
+      return `データ移行に失敗しました。内容を確認して再実行してください。（詳細: ${migrationFailedMatch[1]}）`;
+    }
+
+    const manufacturerNotFoundMatch = normalized.match(/^Manufacturer not found(?::| for .+:)\s*(.+)$/);
+    if (manufacturerNotFoundMatch) {
+      return `メーカー「${manufacturerNotFoundMatch[1]}」が見つかりません。メーカー情報を確認してください。`;
+    }
+
+    const passwordRequiredUserMatch = normalized.match(/^Password is required for user:\s*(.+)$/);
+    if (passwordRequiredUserMatch) {
+      return `ユーザー「${passwordRequiredUserMatch[1]}」のパスワードが未設定です。パスワードを入力してください。`;
     }
 
     return normalized;
@@ -86,7 +150,7 @@ const parseErrorMessage = (status: number, raw: string): string => {
     return fallbackErrorMessageByStatus(status);
   }
 
-  return trimmed;
+  return normalizeKnownMessage(trimmed);
 };
 
 const request = async <T>(

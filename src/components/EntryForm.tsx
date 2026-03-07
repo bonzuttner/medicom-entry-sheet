@@ -167,6 +167,33 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     }));
   };
 
+  const normalizeUploadErrorMessage = (message: string): string => {
+    const normalized = message.trim();
+    if (!normalized) return 'アップロードに失敗しました。時間をおいて再試行してください。';
+    const exactMap: Record<string, string> = {
+      'Method not allowed': 'この操作は現在利用できません。画面を再読み込みして再試行してください。',
+      'dataUrl and fileName are required':
+        'アップロード情報が不足しています。ファイルを選択し直して再試行してください。',
+      'Blob storage is not configured':
+        '画像保存先の設定が未完了です。管理者に連絡してください。',
+      'Invalid data URL': '画像データが不正です。別のファイルで再試行してください。',
+      'Only allowed Blob URLs are accepted':
+        '添付URLの形式が不正です。画面から再アップロードしたファイルを使用してください。',
+      'Attachment URL is required':
+        '添付URLが不足しています。ファイルを再アップロードしてください。',
+      'Upload response does not include URL':
+        'アップロード結果にURLが含まれていません。時間をおいて再試行してください。',
+      'failed to read file': 'ファイルの読み込みに失敗しました。別のファイルで再試行してください。',
+    };
+    if (exactMap[normalized]) return exactMap[normalized];
+
+    const unsupportedFileTypeMatch = normalized.match(/^Unsupported file type: (.+)$/);
+    if (unsupportedFileTypeMatch) {
+      return `ファイル形式「${unsupportedFileTypeMatch[1]}」は未対応です。AI/PNG/JPEG/EPS 形式を選択してください。`;
+    }
+    return normalized;
+  };
+
   const readFileAsDataUrl = (file: File): Promise<string> => new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result || ''));
@@ -238,12 +265,12 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       ) {
         throw new Error(LARGE_IMAGE_UPLOAD_ERROR);
       }
-      throw new Error(parsedMessage || trimmed);
+      throw new Error(normalizeUploadErrorMessage(parsedMessage || trimmed));
     }
 
     const payload = (await response.json()) as { url?: string };
     if (!payload.url) {
-      throw new Error('Upload response does not include URL');
+      throw new Error(normalizeUploadErrorMessage('Upload response does not include URL'));
     }
     return payload.url;
   };

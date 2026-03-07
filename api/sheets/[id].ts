@@ -6,6 +6,9 @@ import * as SheetRepository from '../_lib/repositories/sheets.js';
 
 interface PutSheetBody {
   sheet?: EntrySheet;
+  mode?: 'admin_memo';
+  adminMemo?: EntrySheetAdminMemo;
+  forceOverwrite?: boolean;
 }
 
 const MAX_GENERAL_TEXT_LENGTH = 4000;
@@ -93,6 +96,12 @@ const normalizeAdminMemo = (
 ): EntrySheetAdminMemo | undefined => {
   if (!editable) return existing;
   return {
+    version:
+      Number.isInteger(Number(incoming?.version)) && Number(incoming?.version) > 0
+        ? Number(incoming?.version)
+        : Number(existing?.version) > 0
+          ? Number(existing?.version)
+          : 1,
     promoCode: String(incoming?.promoCode || '').trim() || undefined,
     boardPickingJan: String(incoming?.boardPickingJan || '').trim() || undefined,
     deadlineTableUrl: String(incoming?.deadlineTableUrl || '').trim() || undefined,
@@ -107,6 +116,95 @@ const normalizeAdminMemo = (
     adminNote: String(incoming?.adminNote || '').trim() || undefined,
   };
 };
+
+const normalizeOptionalString = (value: unknown): string =>
+  typeof value === 'string' ? value.trim() : '';
+
+const normalizeOptionalNumberForCompare = (value: unknown): number | null => {
+  if (value === '' || value === null || value === undefined) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const toComparableAdminMemo = (memo: EntrySheetAdminMemo | undefined) => ({
+  promoCode: normalizeOptionalString(memo?.promoCode),
+  boardPickingJan: normalizeOptionalString(memo?.boardPickingJan),
+  deadlineTableUrl: normalizeOptionalString(memo?.deadlineTableUrl),
+  bandPattern: normalizeOptionalString(memo?.bandPattern),
+  targetStoreCount: normalizeOptionalNumberForCompare(memo?.targetStoreCount),
+  printBoard1Count: normalizeOptionalNumberForCompare(memo?.printBoard1Count),
+  printBoard2Count: normalizeOptionalNumberForCompare(memo?.printBoard2Count),
+  printBand1Count: normalizeOptionalNumberForCompare(memo?.printBand1Count),
+  printBand2Count: normalizeOptionalNumberForCompare(memo?.printBand2Count),
+  printOther: normalizeOptionalString(memo?.printOther),
+  equipmentNote: normalizeOptionalString(memo?.equipmentNote),
+  adminNote: normalizeOptionalString(memo?.adminNote),
+});
+
+const hasAdminMemoContent = (memo: EntrySheetAdminMemo | undefined): boolean => {
+  const comparable = toComparableAdminMemo(memo);
+  return Object.values(comparable).some((value) =>
+    typeof value === 'number' ? value !== null : value !== ''
+  );
+};
+
+const toComparableAttachments = (attachments: EntrySheet['attachments']) =>
+  (attachments || []).map((attachment) => ({
+    name: normalizeOptionalString(attachment.name),
+    size: Number(attachment.size) || 0,
+    type: normalizeOptionalString(attachment.type),
+    url: normalizeOptionalString(attachment.url),
+  }));
+
+const toComparableProducts = (products: EntrySheet['products']) =>
+  (products || []).map((product) => ({
+    id: normalizeOptionalString(product.id),
+    shelfName: normalizeOptionalString(product.shelfName),
+    manufacturerName: normalizeOptionalString(product.manufacturerName),
+    janCode: normalizeOptionalString(product.janCode),
+    productName: normalizeOptionalString(product.productName),
+    productImage: normalizeOptionalString(product.productImage),
+    riskClassification: normalizeOptionalString(product.riskClassification),
+    specificIngredients: [...(product.specificIngredients || [])]
+      .map((value) => normalizeOptionalString(value))
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b, 'ja')),
+    catchCopy: normalizeOptionalString(product.catchCopy),
+    productMessage: normalizeOptionalString(product.productMessage),
+    productNotes: normalizeOptionalString(product.productNotes),
+    width: normalizeOptionalNumberForCompare(product.width),
+    height: normalizeOptionalNumberForCompare(product.height),
+    depth: normalizeOptionalNumberForCompare(product.depth),
+    facingCount: normalizeOptionalNumberForCompare(product.facingCount),
+    arrivalDate: normalizeOptionalString(product.arrivalDate),
+    hasPromoMaterial: product.hasPromoMaterial === 'yes' ? 'yes' : 'no',
+    promoSample: normalizeOptionalString(product.promoSample),
+    specialFixture: normalizeOptionalString(product.specialFixture),
+    promoWidth: normalizeOptionalNumberForCompare(product.promoWidth),
+    promoHeight: normalizeOptionalNumberForCompare(product.promoHeight),
+    promoDepth: normalizeOptionalNumberForCompare(product.promoDepth),
+    promoImage: normalizeOptionalString(product.promoImage),
+    productAttachments: (product.productAttachments || []).map((attachment) => ({
+      name: normalizeOptionalString(attachment.name),
+      size: Number(attachment.size) || 0,
+      type: normalizeOptionalString(attachment.type),
+      url: normalizeOptionalString(attachment.url),
+    })),
+  }));
+
+const toComparableSheetCore = (sheet: EntrySheet) => ({
+  manufacturerName: normalizeOptionalString(sheet.manufacturerName),
+  creatorId: normalizeOptionalString(sheet.creatorId),
+  creatorName: normalizeOptionalString(sheet.creatorName),
+  email: normalizeOptionalString(sheet.email),
+  phoneNumber: normalizeOptionalString(sheet.phoneNumber),
+  title: normalizeOptionalString(sheet.title),
+  notes: normalizeOptionalString(sheet.notes),
+  deploymentStartMonth: normalizeOptionalNumberForCompare(sheet.deploymentStartMonth),
+  status: normalizeStatus(sheet.status),
+  products: toComparableProducts(sheet.products),
+  attachments: toComparableAttachments(sheet.attachments),
+});
 
 const validateAdminMemo = (memo: EntrySheetAdminMemo | undefined): string | null => {
   if (!memo) return null;
@@ -197,6 +295,93 @@ export default async function handler(req: any, res: any) {
 
   if (method === 'PUT') {
     const body = await readJsonBody<PutSheetBody>(req);
+    if (body.mode === 'admin_memo') {
+      if (!isAdmin(currentUser)) {
+        sendError(res, 403, 'Only admin can update admin memo');
+        return;
+      }
+
+      const existingSheet = await SheetRepository.findById(sheetId);
+      if (!existingSheet) {
+        sendError(res, 404, 'Sheet not found');
+        return;
+      }
+      if (!canAccessManufacturer(currentUser, existingSheet.manufacturerName)) {
+        sendError(res, 403, 'You cannot modify this sheet');
+        return;
+      }
+
+      const normalizedMemo = normalizeAdminMemo(body.adminMemo, existingSheet.adminMemo, true);
+      const adminMemoValidationError = validateAdminMemo(normalizedMemo);
+      if (adminMemoValidationError) {
+        sendError(res, 400, adminMemoValidationError);
+        return;
+      }
+      if (isTooLong(normalizedMemo?.deadlineTableUrl)) {
+        sendError(res, 400, `期限表URLは${MAX_GENERAL_TEXT_LENGTH}文字以内で入力してください`);
+        return;
+      }
+      if (isTooLong(normalizedMemo?.bandPattern)) {
+        sendError(res, 400, `帯パターンは${MAX_GENERAL_TEXT_LENGTH}文字以内で入力してください`);
+        return;
+      }
+      if (isTooLong(normalizedMemo?.printOther)) {
+        sendError(res, 400, `印刷依頼数量 その他は${MAX_GENERAL_TEXT_LENGTH}文字以内で入力してください`);
+        return;
+      }
+      if (isTooLong(normalizedMemo?.equipmentNote)) {
+        sendError(res, 400, `備品は${MAX_GENERAL_TEXT_LENGTH}文字以内で入力してください`);
+        return;
+      }
+      if (isTooLong(normalizedMemo?.adminNote)) {
+        sendError(res, 400, `備考は${MAX_GENERAL_TEXT_LENGTH}文字以内で入力してください`);
+        return;
+      }
+
+      const summary = buildRevisionSummary(existingSheet, {
+        ...existingSheet,
+        adminMemo: normalizedMemo,
+      });
+
+      let updated: boolean;
+      try {
+        updated = await SheetRepository.updateAdminMemoOnly(
+          sheetId,
+          normalizedMemo,
+          {
+            changedByUserId: currentUser.id,
+            changedByName: currentUser.displayName || currentUser.username,
+            summary,
+            keepLatestCount: 30,
+            expectedVersion: normalizedMemo?.version,
+            forceOverwrite: body.forceOverwrite === true,
+          }
+        );
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          (error.message === 'VERSION_CONFLICT' || error.message === 'ADMIN_MEMO_VERSION_CONFLICT')
+        ) {
+          sendError(res, 409, 'VERSION_CONFLICT');
+          return;
+        }
+        const message = error instanceof Error ? error.message : 'Failed to save admin memo';
+        sendError(res, 500, message);
+        return;
+      }
+      if (!updated) {
+        sendError(res, 404, 'Sheet not found');
+        return;
+      }
+      const updatedSheet = await SheetRepository.findById(sheetId);
+      if (!updatedSheet) {
+        sendError(res, 500, 'Failed to reload saved sheet');
+        return;
+      }
+      sendJson(res, 200, { ok: true, sheet: updatedSheet });
+      return;
+    }
+
     const sheet = body.sheet;
     if (!sheet) {
       sendError(res, 400, 'sheet is required');
@@ -216,6 +401,12 @@ export default async function handler(req: any, res: any) {
     const safeSheet: EntrySheet = {
       ...sheet,
       id: sheetId,
+      version:
+        Number.isInteger(Number(sheet.version)) && Number(sheet.version) > 0
+          ? Number(sheet.version)
+          : Number(existingSheet?.version) > 0
+            ? Number(existingSheet?.version)
+            : 1,
       manufacturerName: ownerManufacturer,
       creatorId: ownerCreatorId,
       creatorName: String(sheet.creatorName || existingSheet?.creatorName || currentUser.displayName || '').trim(),
@@ -231,6 +422,15 @@ export default async function handler(req: any, res: any) {
       products: normalizeProducts(sheet.products, ownerManufacturer),
       attachments: Array.isArray(sheet.attachments) ? sheet.attachments : [],
     };
+
+    const adminMemoChanged = existingSheet
+      ? JSON.stringify(toComparableAdminMemo(existingSheet.adminMemo)) !==
+        JSON.stringify(toComparableAdminMemo(safeSheet.adminMemo))
+      : hasAdminMemoContent(safeSheet.adminMemo);
+    const nonAdminSheetChanged = existingSheet
+      ? JSON.stringify(toComparableSheetCore(existingSheet)) !==
+        JSON.stringify(toComparableSheetCore(safeSheet))
+      : true;
 
     if (safeSheet.products.length === 0) {
       sendError(res, 400, 'At least one product is required');
@@ -281,6 +481,49 @@ export default async function handler(req: any, res: any) {
     }
 
     // Save to database
+    if (existingSheet && isAdmin(currentUser) && !nonAdminSheetChanged && adminMemoChanged) {
+      const memoOnlyNextSheet: EntrySheet = {
+        ...existingSheet,
+        adminMemo: safeSheet.adminMemo,
+      };
+      try {
+        const updated = await SheetRepository.updateAdminMemoOnly(
+          sheetId,
+          safeSheet.adminMemo,
+          {
+            changedByUserId: currentUser.id,
+            changedByName: currentUser.displayName || currentUser.username,
+            summary: buildRevisionSummary(existingSheet, memoOnlyNextSheet),
+            keepLatestCount: 30,
+            expectedVersion: safeSheet.adminMemo?.version,
+            forceOverwrite: body.forceOverwrite === true,
+          }
+        );
+        if (!updated) {
+          sendError(res, 404, 'Sheet not found');
+          return;
+        }
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          (error.message === 'VERSION_CONFLICT' || error.message === 'ADMIN_MEMO_VERSION_CONFLICT')
+        ) {
+          sendError(res, 409, 'VERSION_CONFLICT');
+          return;
+        }
+        const message = error instanceof Error ? error.message : 'Failed to save admin memo';
+        sendError(res, 500, message);
+        return;
+      }
+      const updatedSheet = await SheetRepository.findById(sheetId);
+      if (!updatedSheet) {
+        sendError(res, 500, 'Failed to reload saved sheet');
+        return;
+      }
+      sendJson(res, 200, { ok: true, sheet: updatedSheet });
+      return;
+    }
+
     try {
       await SheetRepository.upsert(
         { ...normalizedSheet, id: sheetId },
@@ -289,9 +532,20 @@ export default async function handler(req: any, res: any) {
           changedByName: currentUser.displayName || currentUser.username,
           summary: buildRevisionSummary(existingSheet, safeSheet),
           keepLatestCount: 30,
+          updateAdminMemo: canEditAdminMemo && adminMemoChanged,
+          expectedVersion: safeSheet.version,
+          forceOverwrite: body.forceOverwrite === true,
         }
       );
     } catch (error) {
+      if (
+        error instanceof Error &&
+        (error.message === 'VERSION_CONFLICT' || error.message === 'ADMIN_MEMO_VERSION_CONFLICT')
+      ) {
+        await deleteUnusedManagedBlobUrls([normalizedSheet], beforeSheets);
+        sendError(res, 409, 'VERSION_CONFLICT');
+        return;
+      }
       // DB save failed after media normalization/upload.
       // Delete newly uploaded blobs that are not part of the previous persisted sheet.
       await deleteUnusedManagedBlobUrls([normalizedSheet], beforeSheets);
@@ -300,7 +554,12 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    sendJson(res, 200, { ok: true });
+    const updatedSheet = await SheetRepository.findById(sheetId);
+    if (!updatedSheet) {
+      sendError(res, 500, 'Failed to reload saved sheet');
+      return;
+    }
+    sendJson(res, 200, { ok: true, sheet: updatedSheet });
     // Clean up unused blob URLs in background to reduce response latency.
     void deleteUnusedManagedBlobUrls(beforeSheets, [normalizedSheet]).catch((error) => {
       console.warn('Deferred blob cleanup failed after save:', error);

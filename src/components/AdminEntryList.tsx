@@ -4,10 +4,14 @@ import { CircleOff, Download, ExternalLink, Save, Search } from 'lucide-react';
 
 interface AdminEntryListProps {
   sheets: EntrySheet[];
-  onSaveAdminMemo: (sheetId: string, memo: EntrySheetAdminMemo) => Promise<void>;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
+  isLoadingMore?: boolean;
+  onSaveAdminMemo: (sheetId: string, memo: EntrySheetAdminMemo) => Promise<EntrySheet>;
 }
 
 type MemoDraft = {
+  version: number;
   promoCode: string;
   deadlineTableUrl: string;
   targetStoreCount: string;
@@ -15,6 +19,7 @@ type MemoDraft = {
 };
 
 const buildDraftFromSheet = (sheet: EntrySheet): MemoDraft => ({
+  version: sheet.adminMemo?.version || 1,
   promoCode: sheet.adminMemo?.promoCode || '',
   deadlineTableUrl: sheet.adminMemo?.deadlineTableUrl || '',
   targetStoreCount:
@@ -65,7 +70,13 @@ const getShelfNames = (sheet: EntrySheet): string =>
 
 const isHttpUrl = (value: string): boolean => /^https?:\/\/.+/i.test(value.trim());
 
-export const AdminEntryList: React.FC<AdminEntryListProps> = ({ sheets, onSaveAdminMemo }) => {
+export const AdminEntryList: React.FC<AdminEntryListProps> = ({
+  sheets,
+  hasMore = false,
+  onLoadMore,
+  isLoadingMore = false,
+  onSaveAdminMemo,
+}) => {
   const [keyword, setKeyword] = useState('');
   const [manufacturerFilter, setManufacturerFilter] = useState('');
   const [drafts, setDrafts] = useState<Record<string, MemoDraft>>({});
@@ -106,22 +117,34 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({ sheets, onSaveAd
       })
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   }, [sheets, keyword, manufacturerFilter]);
-
   const setDraftValue = (sheetId: string, field: keyof MemoDraft, value: string) => {
     setDrafts((prev) => ({
       ...prev,
       [sheetId]: {
-        ...(prev[sheetId] || { promoCode: '', deadlineTableUrl: '', targetStoreCount: '', adminNote: '' }),
+        ...(prev[sheetId] || {
+          version: 1,
+          promoCode: '',
+          deadlineTableUrl: '',
+          targetStoreCount: '',
+          adminNote: '',
+        }),
         [field]: value,
       },
     }));
   };
 
   const handleSave = async (sheetId: string) => {
-    const draft = drafts[sheetId] || { promoCode: '', deadlineTableUrl: '', targetStoreCount: '', adminNote: '' };
+    const draft = drafts[sheetId] || {
+      version: 1,
+      promoCode: '',
+      deadlineTableUrl: '',
+      targetStoreCount: '',
+      adminNote: '',
+    };
     const targetStoreCount =
       draft.targetStoreCount.trim() === '' ? undefined : Number(draft.targetStoreCount);
     const memo: EntrySheetAdminMemo = {
+      version: draft.version,
       promoCode: draft.promoCode.trim() || undefined,
       deadlineTableUrl: draft.deadlineTableUrl.trim() || undefined,
       targetStoreCount:
@@ -133,7 +156,11 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({ sheets, onSaveAd
 
     setSavingById((prev) => ({ ...prev, [sheetId]: true }));
     try {
-      await onSaveAdminMemo(sheetId, memo);
+      const savedSheet = await onSaveAdminMemo(sheetId, memo);
+      setDrafts((prev) => ({
+        ...prev,
+        [sheetId]: buildDraftFromSheet(savedSheet),
+      }));
     } finally {
       setSavingById((prev) => ({ ...prev, [sheetId]: false }));
     }
@@ -313,6 +340,17 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({ sheets, onSaveAd
           </tbody>
         </table>
       </div>
+      {hasMore && (
+        <div className="text-center pt-2">
+          <button
+            onClick={() => onLoadMore?.()}
+            disabled={isLoadingMore}
+            className="px-5 py-2.5 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          >
+            {isLoadingMore ? '読み込み中...' : 'さらに読み込む'}
+          </button>
+        </div>
+      )}
     </div>
   );
 };

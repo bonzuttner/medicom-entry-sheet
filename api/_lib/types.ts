@@ -21,6 +21,7 @@ export interface MasterData {
 }
 
 export interface EntrySheetAdminMemo {
+  version?: number;
   promoCode?: string;
   boardPickingJan?: string;
   deadlineTableUrl?: string;
@@ -64,6 +65,7 @@ export interface ProductEntry {
 
 export interface EntrySheet {
   id: string;
+  version: number;
   updatedAt: string;
   createdAt: string;
   creatorId: string;
