@@ -47,8 +47,10 @@
   - `api/auth/login.ts`
   - `api/current-user.ts`
   - `api/sheets.ts`, `api/sheets/[id].ts`
+  - `api/sheets/[id]/revisions.ts`
   - `api/users.ts`, `api/users/[id].ts`
   - `api/master.ts`
+  - `api/products/search.ts`
   - `api/upload.ts`
   - `api/admin/*`（移行系）
 
@@ -77,6 +79,9 @@
   - `product_ingredients`
   - `attachments`
   - `master_data`
+  - `manufacturer_shelf_names`
+  - `manufacturer_default_start_months`
+  - `entry_sheet_revisions`
 
 ## 4. データモデル（アプリ）
 
@@ -84,8 +89,11 @@
 
 - `User`: `ADMIN` / `STAFF` を持つ
 - `EntrySheet`: シートヘッダ情報 + `products`
+  - `deploymentStartMonth` を保持
+  - `status`: `draft` / `completed` / `completed_no_image`
+  - `adminMemo` を保持（編集は ADMIN のみ）
 - `ProductEntry`: 商品情報（JAN、画像、販促物情報など）
-- `MasterData`: メーカー名・棚割名・リスク分類・特定成分
+- `MasterData`: メーカー名・リスク分類・特定成分・メーカー別棚割名・メーカー別デフォルト展開スタート月
 
 補足:
 - APIでは `manufacturer_id`（UUID FK）で正規化しつつ、UIには `manufacturerName` を返す
@@ -113,6 +121,8 @@
 - シート一覧: `GET /api/sheets`
 - シート保存: `PUT /api/sheets/:id`
 - シート削除: `DELETE /api/sheets/:id`
+- シート変更履歴: `GET /api/sheets/:id/revisions`
+- 過去商品検索: `GET /api/products/search`
 - ユーザー一覧: `GET /api/users`
 - ユーザー保存: `PUT /api/users/:id`
 - ユーザー削除: `DELETE /api/users/:id`

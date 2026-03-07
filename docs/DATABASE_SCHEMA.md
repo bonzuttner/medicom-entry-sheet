@@ -30,12 +30,14 @@
 - 目的: エントリーシート（ヘッダ）
 - 主キー: `id (UUID)`
 - 外部キー:
-  - `creator_id -> users.id`
+  - `creator_id -> users.id`（`ON DELETE SET NULL`）
   - `manufacturer_id -> manufacturers.id`
 - 主項目:
   - `title`: シートタイトル
   - `notes`: 補足情報
-  - `status`: `draft` / `completed`
+  - `deployment_start_month`: 展開スタート月（1〜12）
+  - `admin_*`: 管理者メモ項目
+  - `status`: `draft` / `completed` / `completed_no_image`
   - `created_at`, `updated_at`
 
 ## 4. `product_entries`
@@ -81,7 +83,7 @@
 
 ## 7. `master_data`
 
-- 目的: マスタ値管理（メーカー名、棚割名、リスク分類、特定成分）
+- 目的: 共通マスタ値管理（メーカー名、リスク分類、特定成分など）
 - 主キー: `id (UUID)`
 - 主項目:
   - `category`
@@ -91,22 +93,59 @@
 - 制約:
   - `UNIQUE (category, value)`
 
-`category` の実運用値:
+`category` の実運用値（主要）:
 - `manufacturer_name` -> `manufacturerNames`
-- `shelf_name` -> `shelfNames`
 - `risk_classification` -> `riskClassifications`
 - `specific_ingredient` -> `specificIngredients`
 
-## 8. インデックス補足
+## 8. `manufacturer_shelf_names`
+
+- 目的: メーカー別棚割り名マスタ
+- 主キー: `id (UUID)`
+- 外部キー:
+  - `manufacturer_id -> manufacturers.id`
+- 主項目:
+  - `shelf_name`
+  - `display_order`
+  - `created_at`
+- 制約:
+  - `UNIQUE (manufacturer_id, shelf_name)`
+
+## 9. `manufacturer_default_start_months`
+
+- 目的: メーカー別デフォルト展開スタート月
+- 主キー: `id (UUID)`
+- 外部キー:
+  - `manufacturer_id -> manufacturers.id`
+- 主項目:
+  - `month`（1〜12）
+  - `display_order`
+  - `created_at`
+- 制約:
+  - `UNIQUE (manufacturer_id, month)`
+
+## 10. `entry_sheet_revisions`
+
+- 目的: エントリーシート変更履歴
+- 主キー: `id (UUID)`
+- 外部キー:
+  - `sheet_id -> entry_sheets.id`
+  - `changed_by_user_id -> users.id`（`ON DELETE SET NULL`）
+- 主項目:
+  - `changed_by_name_snapshot`
+  - `summary`
+  - `created_at`
+
+## 11. インデックス補足
 
 - 一覧・絞り込み高速化のために `manufacturer_id` / `status` / `created_at` 等へインデックスを付与
 - `entry_sheets` は `manufacturer_id, updated_at DESC` の複合インデックスを利用
 
-## 9. バリデーション一覧（DB制約 + API実装）
+## 12. バリデーション一覧（DB制約 + API実装）
 
 ここでは「DBが強制する制約」と「API/画面で追加実装している入力チェック」を分けて記載する。
 
-### 9.1 `users`
+### 12.1 `users`
 
 - DB制約:
   - `username`: `NOT NULL`, `UNIQUE`, `VARCHAR(100)`
@@ -121,19 +160,19 @@
   - 電話番号: ハイフンなし半角数字10〜11桁
   - 最後の `ADMIN` ユーザーは削除不可
 
-### 9.2 `entry_sheets`
+### 12.2 `entry_sheets`
 
 - DB制約:
-  - `creator_id`: `NOT NULL`, `FK`
+  - `creator_id`: `NULL許容`, `FK`（ユーザー削除時は `NULL`）
   - `manufacturer_id`: `NOT NULL`, `FK`
   - `title`: `NOT NULL`, `VARCHAR(500)`
-  - `status`: `CHECK (status IN ('draft', 'completed'))`
+  - `status`: `CHECK (status IN ('draft', 'completed', 'completed_no_image'))`
 - APIバリデーション:
   - テキスト系項目は最大4000文字
     - `title`, `notes`, `email`, `phoneNumber`
   - `products` は1件以上必須
 
-### 9.3 `product_entries`
+### 12.3 `product_entries`
 
 - DB制約:
   - `sheet_id`: `NOT NULL`, `FK`
@@ -149,17 +188,18 @@
   - テキスト系項目は最大4000文字
     - `shelf_name`, `product_name`, `jan_code`, `catch_copy`, `product_message`, `product_notes`, `promo_sample`, `special_fixture`
   - `completed` 保存時:
-    - `product_name` / `jan_code` / `product_image` は必須
+    - `product_name` / `jan_code` は必須
+    - `product_image` が不足している場合は `completed_no_image` で保存
     - 販促物ありの場合 `promo_width` と `promo_image` は必須
 
-### 9.4 `product_ingredients`
+### 12.4 `product_ingredients`
 
 - DB制約:
   - `product_id`: `NOT NULL`, `FK`
   - `ingredient_name`: `NOT NULL`, `VARCHAR(200)`
   - `UNIQUE (product_id, ingredient_name)`（同一商品で重複禁止）
 
-### 9.5 `attachments`
+### 12.5 `attachments`
 
 - DB制約:
   - `name`: `NOT NULL`, `VARCHAR(500)`
@@ -174,15 +214,15 @@
     - 短辺1500px未満はエラー
     - 許可MIMEのみ（JPEG/PNG/WebP/GIF/BMP）
 
-### 9.6 `master_data`
+### 12.6 `master_data`
 
 - DB制約:
   - `UNIQUE (category, value)`
 - APIバリデーション:
   - マスタ値は20文字以内
-  - 対象カテゴリ: メーカー名 / 棚割名 / リスク分類 / 特定成分
+  - 対象カテゴリ: メーカー名 / リスク分類 / 特定成分
 
-## 10. 参照先
+## 13. 参照先
 
 - スキーマ本体: `api/admin/schema.sql`
 - Repository実装:

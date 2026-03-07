@@ -50,7 +50,6 @@ const parseErrorMessage = (status: number, raw: string): string => {
       'dataUrl and fileName are required': 'アップロード情報が不足しています。もう一度やり直してください。',
       'Blob storage is not configured': '画像保存先の設定が未完了です。管理者に連絡してください。',
       'Bulk update is deprecated. Use /api/users/:id': '一括更新は利用できません。個別更新で実行してください。',
-      'Deprecated endpoint. Use /api/sheets.': '古いAPIは利用できません。画面を再読み込みして再試行してください。',
       'Only admin can migrate data': '移行処理を実行できるのは管理者のみです。',
       'Only admin can migrate data to PostgreSQL': 'PostgreSQL移行を実行できるのは管理者のみです。',
       'data with users/sheets/master is required': '移行データが不足しています。users/sheets/masterを確認してください。',
