@@ -129,7 +129,6 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
   const [deploymentFilterMode, setDeploymentFilterMode] = useState<'since' | 'until'>('since');
   const [drafts, setDrafts] = useState<Record<string, MemoDraft>>({});
   const [savingById, setSavingById] = useState<Record<string, boolean>>({});
-  const [expandedMobileRows, setExpandedMobileRows] = useState<Record<string, boolean>>({});
   const [selectedSheets, setSelectedSheets] = useState<Set<string>>(new Set());
   const [showExportModal, setShowExportModal] = useState(false);
 
@@ -430,17 +429,17 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
         <table className="min-w-[1380px] w-full divide-y divide-slate-200 table-fixed">
           <thead className="bg-slate-50 [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-slate-50">
             <tr>
-              <th className="w-[76px] px-2 py-3 text-left text-[10px] font-bold text-slate-400">ID</th>
-              <th className="w-[56px] px-2 py-3 text-center text-xs font-bold text-slate-500">編集</th>
-              <th className="w-[48px] px-2 py-3 text-center text-xs font-bold text-slate-500">
+              <th className="w-[42px] px-1 py-3 text-center text-xs font-bold text-slate-500">
                 <button onClick={toggleSelectAll} className="inline-flex items-center justify-center text-slate-500 hover:text-slate-700">
                   {filteredSheets.length > 0 && selectedCount === filteredSheets.length ? (
-                    <CheckSquare size={16} />
+                    <CheckSquare size={15} />
                   ) : (
-                    <Square size={16} />
+                    <Square size={15} />
                   )}
                 </button>
               </th>
+              <th className="w-[70px] px-1 py-3 text-left text-[10px] font-bold text-slate-400">ID</th>
+              <th className="w-[42px] px-1 py-3 text-center text-[10px] font-bold text-slate-400">✎</th>
               <th className="w-[90px] px-3 py-3 text-left text-xs font-bold text-slate-500">状態</th>
               <th className="w-[220px] px-3 py-3 text-left text-xs font-bold text-slate-500">タイトル</th>
               <th className="w-[120px] px-3 py-3 text-left text-xs font-bold text-slate-500">展開期間</th>
@@ -462,27 +461,27 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
               return (
                 <React.Fragment key={sheet.id}>
                   <tr className="hover:bg-slate-50">
-                    <td className="px-2 py-3 text-[10px] text-slate-400 font-mono whitespace-nowrap">
-                      {getShortSheetId(sheet.id)}
-                    </td>
-                    <td className="px-2 py-3 text-center">
-                      <button
-                        type="button"
-                        onClick={() => onEdit(sheet)}
-                        className="inline-flex items-center justify-center h-8 w-8 rounded-md border border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-100 transition-colors"
-                        title="編集"
-                      >
-                        <Edit3 size={14} />
-                      </button>
-                    </td>
-                    <td className="px-2 py-3 text-center">
+                    <td className="px-1 py-3 text-center">
                       <button
                         type="button"
                         onClick={() => toggleSelect(sheet.id)}
                         className="inline-flex items-center justify-center text-slate-500 hover:text-slate-700"
                         title="CSV出力対象として選択"
                       >
-                        {selectedSheets.has(sheet.id) ? <CheckSquare size={16} /> : <Square size={16} />}
+                        {selectedSheets.has(sheet.id) ? <CheckSquare size={15} /> : <Square size={15} />}
+                      </button>
+                    </td>
+                    <td className="px-1 py-3 text-[10px] text-slate-400 font-mono whitespace-nowrap">
+                      {getShortSheetId(sheet.id)}
+                    </td>
+                    <td className="px-1 py-3 text-center">
+                      <button
+                        type="button"
+                        onClick={() => onEdit(sheet)}
+                        className="inline-flex items-center justify-center h-6 w-6 text-slate-500 hover:text-slate-700 transition-colors"
+                        title="編集"
+                      >
+                        <Edit3 size={13} />
                       </button>
                     </td>
                     <td className="px-3 py-3 text-xs text-slate-700">
@@ -618,15 +617,6 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                     <td className="px-3 py-3 text-right">
                       <div className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 p-1 border border-slate-200 whitespace-nowrap">
                         <button
-                          type="button"
-                          onClick={() =>
-                            setExpandedMobileRows((prev) => ({ ...prev, [sheet.id]: !prev[sheet.id] }))
-                          }
-                          className="md:hidden inline-flex items-center h-8 px-2.5 rounded-md border border-slate-300 bg-white text-slate-700 text-xs font-semibold hover:bg-slate-50"
-                        >
-                          詳細編集
-                        </button>
-                        <button
                           onClick={() => {
                             void handleSave(sheet.id);
                           }}
@@ -643,61 +633,6 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                       </div>
                     </td>
                   </tr>
-                  {expandedMobileRows[sheet.id] && (
-                    <tr className="md:hidden bg-slate-50/70">
-                      <td colSpan={14} className="px-3 pb-3">
-                        <div className="rounded-lg border border-slate-200 bg-white p-3">
-                          <div className="text-[11px] font-semibold text-slate-500 mb-2">印刷依頼数量</div>
-                          <div className="grid grid-cols-1 gap-2">
-                            <label className="inline-flex items-center gap-1 text-xs text-slate-700">
-                              <span className="w-14 text-slate-500">ボード①</span>
-                              <input
-                                type="number"
-                                min={0}
-                                value={draft.printBoard1Count}
-                                onChange={(e) => setDraftValue(sheet.id, 'printBoard1Count', e.target.value)}
-                                className="w-16 border border-slate-300 rounded-md px-2 py-1 text-xs bg-white text-right"
-                              />
-                              <span className="text-slate-500">枚</span>
-                            </label>
-                            <label className="inline-flex items-center gap-1 text-xs text-slate-700">
-                              <span className="w-14 text-slate-500">ボード②</span>
-                              <input
-                                type="number"
-                                min={0}
-                                value={draft.printBoard2Count}
-                                onChange={(e) => setDraftValue(sheet.id, 'printBoard2Count', e.target.value)}
-                                className="w-16 border border-slate-300 rounded-md px-2 py-1 text-xs bg-white text-right"
-                              />
-                              <span className="text-slate-500">枚</span>
-                            </label>
-                            <label className="inline-flex items-center gap-1 text-xs text-slate-700">
-                              <span className="w-14 text-slate-500">帯①</span>
-                              <input
-                                type="number"
-                                min={0}
-                                value={draft.printBand1Count}
-                                onChange={(e) => setDraftValue(sheet.id, 'printBand1Count', e.target.value)}
-                                className="w-16 border border-slate-300 rounded-md px-2 py-1 text-xs bg-white text-right"
-                              />
-                              <span className="text-slate-500">枚</span>
-                            </label>
-                            <label className="inline-flex items-center gap-1 text-xs text-slate-700">
-                              <span className="w-14 text-slate-500">帯②</span>
-                              <input
-                                type="number"
-                                min={0}
-                                value={draft.printBand2Count}
-                                onChange={(e) => setDraftValue(sheet.id, 'printBand2Count', e.target.value)}
-                                className="w-16 border border-slate-300 rounded-md px-2 py-1 text-xs bg-white text-right"
-                              />
-                              <span className="text-slate-500">枚</span>
-                            </label>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
                 </React.Fragment>
               );
             })}

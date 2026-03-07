@@ -772,12 +772,12 @@ export const EntryList: React.FC<EntryListProps> = ({
               <table className="min-w-full divide-y divide-slate-200 table-fixed">
                 <thead className="bg-slate-50 [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-slate-50">
                   <tr>
-                    <th scope="col" className="px-2 py-3 w-20 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">ID</th>
                     <th scope="col" className="px-4 py-3 w-12 text-center">
                       <button onClick={toggleSelectAll} className="text-slate-400 hover:text-slate-600">
                         {selectedSheets.size === filteredSheets.length && filteredSheets.length > 0 ? <CheckSquare size={20} /> : <Square size={20} />}
                       </button>
                     </th>
+                    <th scope="col" className="px-2 py-3 w-20 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">ID</th>
                     <th scope="col" className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-20">状態</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-[440px]">タイトル</th>
                     <th scope="col" className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-28">展開期間</th>
@@ -821,13 +821,13 @@ export const EntryList: React.FC<EntryListProps> = ({
                           className={`hover:bg-slate-50 transition-colors cursor-pointer ${isExpanded ? 'bg-slate-50' : ''}`}
                           onClick={() => toggleExpand(sheet.id)}
                         >
-                          <td className="px-2 py-4 text-[10px] text-slate-400 font-mono whitespace-nowrap">
-                            {getShortSheetId(sheet.id)}
-                          </td>
                           <td className="px-4 py-4 text-center" onClick={(e) => toggleSelect(sheet.id, e)}>
                              <div className="text-primary cursor-pointer inline-block">
                                {isSelected ? <CheckSquare size={20} /> : <Square size={20} className="text-slate-300" />}
                              </div>
+                          </td>
+                          <td className="px-2 py-4 text-[10px] text-slate-400 font-mono whitespace-nowrap">
+                            {getShortSheetId(sheet.id)}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap">
                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusPillClass(sheet.status)}`}>
