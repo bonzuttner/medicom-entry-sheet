@@ -635,6 +635,21 @@ export const findByManufacturerId = async (
   return sheets;
 };
 
+export const countAll = async (): Promise<number> => {
+  await ensureSheetCreatorReference();
+  const result = await db.query<{ count: string }>(`SELECT COUNT(*)::text AS count FROM entry_sheets`);
+  return Number(result.rows[0]?.count || 0);
+};
+
+export const countByManufacturerId = async (manufacturerId: string): Promise<number> => {
+  await ensureSheetCreatorReference();
+  const result = await db.query<{ count: string }>(
+    `SELECT COUNT(*)::text AS count FROM entry_sheets WHERE manufacturer_id = $1`,
+    [manufacturerId]
+  );
+  return Number(result.rows[0]?.count || 0);
+};
+
 /**
  * Get single sheet by ID
  */
@@ -1492,7 +1507,9 @@ export const pruneByRetention = async (cutoffDate: Date): Promise<number> => {
 
 export default {
   findAll,
+  countAll,
   findByManufacturerId,
+  countByManufacturerId,
   findById,
   upsert,
   addRevision,

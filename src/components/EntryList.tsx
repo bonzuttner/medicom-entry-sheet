@@ -13,6 +13,7 @@ interface EntryListProps {
   hasMore?: boolean;
   onLoadMore?: () => void;
   isLoadingMore?: boolean;
+  totalCount?: number;
 }
 
 export const EntryList: React.FC<EntryListProps> = ({
@@ -25,6 +26,7 @@ export const EntryList: React.FC<EntryListProps> = ({
   hasMore = false,
   onLoadMore,
   isLoadingMore = false,
+  totalCount = 0,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'updatedAt' | 'manufacturer'>('updatedAt');
@@ -185,6 +187,10 @@ export const EntryList: React.FC<EntryListProps> = ({
       const bTs = new Date(b.updatedAt).getTime();
       return (aTs - bTs) * direction;
     });
+  const loadedCount = sheets.length;
+  const safeTotalCount = totalCount > 0 ? totalCount : loadedCount;
+  const remainingCount = Math.max(safeTotalCount - loadedCount, 0);
+  const remainingPages = Math.ceil(remainingCount / 30);
 
   // Toggle Expansion
   const toggleExpand = (id: string) => {
@@ -896,8 +902,12 @@ export const EntryList: React.FC<EntryListProps> = ({
         </>
       )}
 
-      {hasMore && !searchTerm.trim() && !dateSince && (
-        <div className="flex justify-center">
+      {hasMore && (
+        <div className="flex flex-col items-center gap-2">
+          <div className="text-xs text-slate-500">
+            表示: {loadedCount} / 全{safeTotalCount}件
+            {remainingCount > 0 ? `（残り ${remainingCount}件 / 約${remainingPages}ページ）` : ''}
+          </div>
           <button
             onClick={() => onLoadMore?.()}
             disabled={isLoadingMore}

@@ -123,6 +123,7 @@ const App: React.FC = () => {
   const [initialProductIndex, setInitialProductIndex] = useState<number>(0);
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [hasMoreSheets, setHasMoreSheets] = useState<boolean>(false);
+  const [totalSheetCount, setTotalSheetCount] = useState<number>(0);
   const [sheetOffset, setSheetOffset] = useState<number>(0);
   const [isLoadingMoreSheets, setIsLoadingMoreSheets] = useState<boolean>(false);
   const [editingSheetRevisions, setEditingSheetRevisions] = useState<EntrySheetRevision[]>([]);
@@ -167,6 +168,7 @@ const App: React.FC = () => {
     const firstPage = await dataService.getSheetsPage(0, SHEET_PAGE_SIZE);
     setSheets(firstPage.items);
     setHasMoreSheets(firstPage.hasMore);
+    setTotalSheetCount(firstPage.totalCount || firstPage.items.length);
     setSheetOffset(firstPage.items.length);
   };
 
@@ -176,6 +178,7 @@ const App: React.FC = () => {
       .then((page) => {
         setSheets(page.items);
         setHasMoreSheets(page.hasMore);
+        setTotalSheetCount(page.totalCount || page.items.length);
         setSheetOffset(page.items.length);
       })
       .catch((error) => console.error('Failed to refresh sheets:', error));
@@ -190,6 +193,7 @@ const App: React.FC = () => {
       setSheets((prev) => appendUniqueSheets(prev, nextPage.items));
       setSheetOffset((prev) => prev + nextPage.items.length);
       setHasMoreSheets(nextPage.hasMore);
+      setTotalSheetCount(nextPage.totalCount || 0);
     } catch (error) {
       console.error('Failed to load more sheets:', error);
     } finally {
@@ -535,6 +539,7 @@ const App: React.FC = () => {
           hasMore={hasMoreSheets}
           onLoadMore={loadMoreSheets}
           isLoadingMore={isLoadingMoreSheets}
+          totalCount={totalSheetCount}
         />
       )}
 
@@ -544,6 +549,7 @@ const App: React.FC = () => {
           hasMore={hasMoreSheets}
           onLoadMore={loadMoreSheets}
           isLoadingMore={isLoadingMoreSheets}
+          totalCount={totalSheetCount}
           onEdit={handleEditSheet}
           onSaveAdminMemo={handleSaveSheetAdminMemo}
         />

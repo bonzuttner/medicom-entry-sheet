@@ -7,6 +7,7 @@ interface AdminEntryListProps {
   hasMore?: boolean;
   onLoadMore?: () => void;
   isLoadingMore?: boolean;
+  totalCount?: number;
   onEdit: (sheet: EntrySheet) => void;
   onSaveAdminMemo: (sheetId: string, memo: EntrySheetAdminMemo) => Promise<EntrySheet>;
 }
@@ -111,6 +112,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
   hasMore = false,
   onLoadMore,
   isLoadingMore = false,
+  totalCount = 0,
   onEdit,
   onSaveAdminMemo,
 }) => {
@@ -155,6 +157,10 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
       })
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   }, [sheets, keyword, manufacturerFilter]);
+  const loadedCount = sheets.length;
+  const safeTotalCount = totalCount > 0 ? totalCount : loadedCount;
+  const remainingCount = Math.max(safeTotalCount - loadedCount, 0);
+  const remainingPages = Math.ceil(remainingCount / 30);
   const setDraftValue = (sheetId: string, field: keyof MemoDraft, value: string) => {
     setDrafts((prev) => ({
       ...prev,
@@ -586,7 +592,11 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
         </table>
       </div>
       {hasMore && (
-        <div className="text-center pt-2">
+        <div className="text-center pt-2 space-y-2">
+          <div className="text-xs text-slate-500">
+            表示: {loadedCount} / 全{safeTotalCount}件
+            {remainingCount > 0 ? `（残り ${remainingCount}件 / 約${remainingPages}ページ）` : ''}
+          </div>
           <button
             onClick={() => onLoadMore?.()}
             disabled={isLoadingMore}

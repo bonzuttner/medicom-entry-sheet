@@ -33,12 +33,15 @@ export default async function handler(req: any, res: any) {
 
   // Get sheets based on user role
   let sheets;
+  let totalCount = 0;
   if (isAdmin(currentUser)) {
+    totalCount = await SheetRepository.countAll();
     sheets = hasPagingQuery
       ? await SheetRepository.findAll(pageSize + 1, pageOffset)
       : await SheetRepository.findAll();
   } else {
     const manufacturerId = await UserRepository.getManufacturerIdByUserId(currentUser.id);
+    totalCount = manufacturerId ? await SheetRepository.countByManufacturerId(manufacturerId) : 0;
     sheets = manufacturerId
       ? hasPagingQuery
         ? await SheetRepository.findByManufacturerId(manufacturerId, pageSize + 1, pageOffset)
@@ -49,7 +52,7 @@ export default async function handler(req: any, res: any) {
   if (hasPagingQuery) {
     const hasMore = sheets.length > pageSize;
     const items = hasMore ? sheets.slice(0, pageSize) : sheets;
-    sendJson(res, 200, { items, hasMore });
+    sendJson(res, 200, { items, hasMore, totalCount });
     return;
   }
 

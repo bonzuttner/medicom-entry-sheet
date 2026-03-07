@@ -4,6 +4,7 @@ import { apiClient } from './apiClient';
 export interface PagedResult<T> {
   items: T[];
   hasMore: boolean;
+  totalCount: number;
 }
 
 export interface DataService {
