@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { EntrySheet, EntrySheetRevision, MasterData, ProductEntry, User, UserRole } from '../types';
-import { Save, ArrowLeft, Plus, Trash2, AlertTriangle, Image as ImageIcon } from 'lucide-react';
+import { Save, ArrowLeft, Plus, Trash2, AlertTriangle, Image as ImageIcon, Search } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 interface EntryFormProps {
@@ -843,11 +843,11 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                           展開期間 <span className="text-red-500">*自動入力</span>
                         </label>
                         <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 min-w-[110px] text-center font-semibold">
+                          <div className="px-4 py-2 bg-slate-100 rounded-lg text-slate-700 min-w-[110px] text-center font-semibold">
                             {autoPeriod.start || '-'}
                           </div>
                           <span className="text-slate-500">~</span>
-                          <div className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 min-w-[110px] text-center font-semibold">
+                          <div className="px-4 py-2 bg-slate-100 rounded-lg text-slate-700 min-w-[110px] text-center font-semibold">
                             {autoPeriod.end || '-'}
                           </div>
                         </div>
@@ -980,8 +980,62 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             </button>
         </div>
 
+        <section className="mb-6 sm:mb-8 mt-6 sm:mt-0">
+          <div className="rounded-xl border border-sky-100 bg-gradient-to-r from-sky-50 to-cyan-50 p-4 sm:p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white text-sky-600 border border-sky-200">
+                <Search size={14} />
+              </span>
+              <h4 className="text-sm sm:text-base font-bold text-slate-800">過去商品検索（自社メーカー）</h4>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                className="flex-1 border-slate-300 rounded-lg py-2.5 px-3 bg-white"
+                value={productSearchQuery}
+                onChange={(e) => setProductSearchQuery(e.target.value)}
+                placeholder="商品名またはJANで検索"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  void runProductSearch();
+                }}
+                disabled={isSearchingProducts}
+                className="px-4 py-2.5 rounded-lg bg-slate-800 text-white hover:bg-slate-900 disabled:opacity-60"
+              >
+                {isSearchingProducts ? '検索中...' : '検索'}
+              </button>
+            </div>
+            {productSearchResults.length > 0 && (
+              <ul className="mt-3 max-h-52 overflow-auto space-y-2">
+                {productSearchResults.map((item) => (
+                  <li
+                    key={item.id}
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2.5"
+                  >
+                    <div className="text-sm min-w-0">
+                      <div className="font-semibold text-slate-800 truncate">{item.productName}</div>
+                      <div className="text-xs text-slate-500 truncate">
+                        JAN: {item.janCode} / 棚割名: {item.shelfName}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => applySearchedProduct(activeTab, item)}
+                      className="px-3 py-1.5 rounded-md bg-primary text-white hover:bg-sky-600 text-sm shrink-0"
+                    >
+                      反映
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+
         {/* Product: Basic Info */}
-        <section className="mb-8 sm:mb-10 mt-6 sm:mt-0">
+        <section className="mb-8 sm:mb-10">
             <h4 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
                 <span className="w-1 h-6 bg-primary rounded-full"></span>
                 商品情報
@@ -1022,52 +1076,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                         onChange={(e) => handleProductNameChange(activeTab, e.target.value)}
                         onBlur={(e) => maybeSuggestReusableProduct(activeTab, e.target.value)}
                      />
-                </div>
-                <div className="md:col-span-2 bg-slate-50 border border-slate-200 rounded-lg p-3">
-                    <label className="block text-sm font-bold text-slate-700 mb-2">過去商品検索（自社メーカー）</label>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <input
-                        type="text"
-                        className="flex-1 border-slate-300 rounded-lg py-2 px-3"
-                        value={productSearchQuery}
-                        onChange={(e) => setProductSearchQuery(e.target.value)}
-                        placeholder="商品名またはJANで検索"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void runProductSearch();
-                        }}
-                        disabled={isSearchingProducts}
-                        className="px-4 py-2 rounded-lg bg-slate-700 text-white hover:bg-slate-800 disabled:opacity-60"
-                      >
-                        {isSearchingProducts ? '検索中...' : '検索'}
-                      </button>
-                    </div>
-                    {productSearchResults.length > 0 && (
-                      <ul className="mt-3 max-h-48 overflow-auto space-y-2">
-                        {productSearchResults.map((item) => (
-                          <li
-                            key={item.id}
-                            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-white border border-slate-200 rounded px-3 py-2"
-                          >
-                            <div className="text-sm">
-                              <div className="font-semibold text-slate-800">{item.productName}</div>
-                              <div className="text-slate-500">
-                                JAN: {item.janCode} / 棚割名: {item.shelfName}
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => applySearchedProduct(activeTab, item)}
-                              className="px-3 py-1 rounded bg-primary text-white hover:bg-sky-600 text-sm"
-                            >
-                              反映
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
                 </div>
                  {/* Product Image - Prominent */}
                  <div className="md:col-span-2 bg-slate-50 p-4 sm:p-6 rounded-xl border border-slate-200 mb-2">
@@ -1418,7 +1426,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 mt-4 sm:mt-6">
         <h4 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
           <span className="w-1 h-5 bg-violet-500 rounded-full"></span>
-          Adminメモ（全員閲覧 / 管理者のみ編集）
+          Adminメモ（管理者のみ編集）
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           <div>
@@ -1452,6 +1460,20 @@ export const EntryForm: React.FC<EntryFormProps> = ({
               />
             ) : (
               renderAutoValue(formData.adminMemo?.boardPickingJan)
+            )}
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-bold text-slate-700 mb-2">期限表URL</label>
+            {isAdminUser ? (
+              <input
+                type="url"
+                className="w-full border-slate-300 rounded-lg shadow-sm p-3"
+                value={formData.adminMemo?.deadlineTableUrl || ''}
+                onChange={(e) => handleAdminMemoChange('deadlineTableUrl', e.target.value)}
+                placeholder="https://drive.google.com/..."
+              />
+            ) : (
+              renderAutoValue(formData.adminMemo?.deadlineTableUrl)
             )}
           </div>
           <div>

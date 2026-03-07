@@ -22,6 +22,7 @@ interface SheetRow {
   deployment_start_month: number | null;
   admin_promo_code: string | null;
   admin_board_picking_jan: string | null;
+  admin_deadline_table_url: string | null;
   admin_band_pattern: string | null;
   admin_target_store_count: number | null;
   admin_print_board1_count: number | null;
@@ -131,6 +132,10 @@ const ensureAdminMemoColumns = async (): Promise<void> => {
       await db.query(
         `ALTER TABLE entry_sheets
          ADD COLUMN IF NOT EXISTS admin_board_picking_jan VARCHAR(13)`
+      );
+      await db.query(
+        `ALTER TABLE entry_sheets
+         ADD COLUMN IF NOT EXISTS admin_deadline_table_url TEXT`
       );
       await db.query(
         `ALTER TABLE entry_sheets
@@ -338,6 +343,7 @@ const rowsToSheet = (
     adminMemo: {
       promoCode: sheetRow.admin_promo_code || undefined,
       boardPickingJan: sheetRow.admin_board_picking_jan || undefined,
+      deadlineTableUrl: sheetRow.admin_deadline_table_url || undefined,
       bandPattern: sheetRow.admin_band_pattern || undefined,
       targetStoreCount: sheetRow.admin_target_store_count ?? undefined,
       printBoard1Count: sheetRow.admin_print_board1_count ?? undefined,
@@ -417,7 +423,7 @@ export const findAll = async (limit?: number, offset: number = 0): Promise<Entry
     SELECT
       s.id, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
       s.deployment_start_month,
-      s.admin_promo_code, s.admin_board_picking_jan, s.admin_band_pattern,
+      s.admin_promo_code, s.admin_board_picking_jan, s.admin_deadline_table_url, s.admin_band_pattern,
       s.admin_target_store_count, s.admin_print_board1_count, s.admin_print_board2_count,
       s.admin_print_band1_count, s.admin_print_band2_count, s.admin_print_other,
       s.admin_equipment_note, s.admin_note,
@@ -515,7 +521,7 @@ export const findByManufacturerId = async (
     SELECT
       s.id, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
       s.deployment_start_month,
-      s.admin_promo_code, s.admin_board_picking_jan, s.admin_band_pattern,
+      s.admin_promo_code, s.admin_board_picking_jan, s.admin_deadline_table_url, s.admin_band_pattern,
       s.admin_target_store_count, s.admin_print_board1_count, s.admin_print_board2_count,
       s.admin_print_band1_count, s.admin_print_band2_count, s.admin_print_other,
       s.admin_equipment_note, s.admin_note,
@@ -610,7 +616,7 @@ export const findById = async (sheetId: string): Promise<EntrySheet | null> => {
     SELECT
       s.id, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
       s.deployment_start_month,
-      s.admin_promo_code, s.admin_board_picking_jan, s.admin_band_pattern,
+      s.admin_promo_code, s.admin_board_picking_jan, s.admin_deadline_table_url, s.admin_band_pattern,
       s.admin_target_store_count, s.admin_print_board1_count, s.admin_print_board2_count,
       s.admin_print_band1_count, s.admin_print_band2_count, s.admin_print_other,
       s.admin_equipment_note, s.admin_note,
@@ -720,6 +726,7 @@ export const upsert = async (
       adminMemo: {
         promoCode: String(sheet.adminMemo?.promoCode || '').trim() || undefined,
         boardPickingJan: String(sheet.adminMemo?.boardPickingJan || '').trim() || undefined,
+        deadlineTableUrl: String(sheet.adminMemo?.deadlineTableUrl || '').trim() || undefined,
         bandPattern: String(sheet.adminMemo?.bandPattern || '').trim() || undefined,
         targetStoreCount: sheet.adminMemo?.targetStoreCount,
         printBoard1Count: sheet.adminMemo?.printBoard1Count,
@@ -754,11 +761,11 @@ export const upsert = async (
         id, creator_id, manufacturer_id,
         creator_name_snapshot, creator_email_snapshot, creator_phone_snapshot,
         title, notes, deployment_start_month,
-        admin_promo_code, admin_board_picking_jan, admin_band_pattern, admin_target_store_count,
+        admin_promo_code, admin_board_picking_jan, admin_deadline_table_url, admin_band_pattern, admin_target_store_count,
         admin_print_board1_count, admin_print_board2_count, admin_print_band1_count, admin_print_band2_count,
         admin_print_other, admin_equipment_note, admin_note,
         status, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
       ON CONFLICT (id) DO UPDATE SET
         creator_name_snapshot = EXCLUDED.creator_name_snapshot,
         creator_email_snapshot = EXCLUDED.creator_email_snapshot,
@@ -768,6 +775,7 @@ export const upsert = async (
         deployment_start_month = EXCLUDED.deployment_start_month,
         admin_promo_code = EXCLUDED.admin_promo_code,
         admin_board_picking_jan = EXCLUDED.admin_board_picking_jan,
+        admin_deadline_table_url = EXCLUDED.admin_deadline_table_url,
         admin_band_pattern = EXCLUDED.admin_band_pattern,
         admin_target_store_count = EXCLUDED.admin_target_store_count,
         admin_print_board1_count = EXCLUDED.admin_print_board1_count,
@@ -792,6 +800,7 @@ export const upsert = async (
         normalizedSheet.deploymentStartMonth ?? null,
         normalizedSheet.adminMemo?.promoCode || null,
         normalizedSheet.adminMemo?.boardPickingJan || null,
+        normalizedSheet.adminMemo?.deadlineTableUrl || null,
         normalizedSheet.adminMemo?.bandPattern || null,
         normalizedSheet.adminMemo?.targetStoreCount ?? null,
         normalizedSheet.adminMemo?.printBoard1Count ?? null,

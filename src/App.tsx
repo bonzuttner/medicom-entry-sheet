@@ -3,6 +3,7 @@ import { Layout } from './components/Layout';
 import { Login } from './components/Login';
 import { EntryList } from './components/EntryList';
 import { EntryForm } from './components/EntryForm';
+import { AdminEntryList } from './components/AdminEntryList';
 import { AccountManage } from './components/AccountManage';
 import { MasterManage } from './components/MasterManage';
 import { dataService } from './services/dataService';
@@ -125,6 +126,10 @@ const App: React.FC = () => {
   const handleNavigate = (page: Page) => {
     if (!currentUser) return;
     if (page === Page.MASTERS && currentUser.role !== UserRole.ADMIN) {
+      setCurrentPage(Page.LIST);
+      return;
+    }
+    if (page === Page.ADMIN_LIST && currentUser.role !== UserRole.ADMIN) {
       setCurrentPage(Page.LIST);
       return;
     }
@@ -368,6 +373,35 @@ const App: React.FC = () => {
     }
   };
 
+  const handleSaveSheetAdminMemo = async (
+    sheetId: string,
+    adminMemo: EntrySheet['adminMemo']
+  ) => {
+    const target = sheets.find((sheet) => sheet.id === sheetId);
+    if (!target) {
+      alert('対象シートが見つかりません。再読み込みして再試行してください。');
+      return;
+    }
+
+    const merged: EntrySheet = {
+      ...target,
+      adminMemo: {
+        ...(target.adminMemo || {}),
+        ...(adminMemo || {}),
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    try {
+      await dataService.saveSheet(merged);
+      setSheets((prev) => upsertSheetInList(prev, merged));
+      refreshFirstSheetsPage();
+    } catch (error) {
+      console.error('Failed to save admin memo:', error);
+      alert(`Adminメモの保存に失敗しました。\n${getSheetSaveErrorMessage(error)}`);
+    }
+  };
+
   const handleDeleteSheet = async (id: string) => {
     try {
       await dataService.deleteSheet(id);
@@ -467,6 +501,13 @@ const App: React.FC = () => {
           hasMore={hasMoreSheets}
           onLoadMore={loadMoreSheets}
           isLoadingMore={isLoadingMoreSheets}
+        />
+      )}
+
+      {currentPage === Page.ADMIN_LIST && currentUser.role === UserRole.ADMIN && (
+        <AdminEntryList
+          sheets={visibleSheets}
+          onSaveAdminMemo={handleSaveSheetAdminMemo}
         />
       )}
 

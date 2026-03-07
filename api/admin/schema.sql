@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS entry_sheets (
   deployment_start_month SMALLINT,
   admin_promo_code VARCHAR(50),
   admin_board_picking_jan VARCHAR(13),
+  admin_deadline_table_url TEXT,
   admin_band_pattern VARCHAR(100),
   admin_target_store_count INTEGER,
   admin_print_board1_count INTEGER,
@@ -70,6 +71,9 @@ ALTER TABLE entry_sheets
 
 ALTER TABLE entry_sheets
   ADD COLUMN IF NOT EXISTS admin_board_picking_jan VARCHAR(13);
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS admin_deadline_table_url TEXT;
 
 ALTER TABLE entry_sheets
   ADD COLUMN IF NOT EXISTS admin_band_pattern VARCHAR(100);

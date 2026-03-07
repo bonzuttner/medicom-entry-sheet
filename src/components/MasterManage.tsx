@@ -155,7 +155,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
               <div className="rounded-lg border border-slate-200 p-3">
-                <h4 className="font-semibold text-slate-800 mb-2">棚割名（メーカー別）</h4>
+                <h4 className="font-semibold text-slate-800 mb-2">棚割名</h4>
                 {selectedManufacturer === ALL_MANUFACTURERS ? (
                   <div className="space-y-2 max-h-64 overflow-auto">
                     {getAllShelfNames().length === 0 ? (
@@ -223,7 +223,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
               </div>
 
               <div className="rounded-lg border border-slate-200 p-3">
-                <h4 className="font-semibold text-slate-800 mb-2">デフォルト展開スタート月（メーカー別）</h4>
+                <h4 className="font-semibold text-slate-800 mb-2">デフォルト展開スタート月</h4>
                 {selectedManufacturer === ALL_MANUFACTURERS ? (
                   <p className="text-xs text-slate-500">「すべて」は閲覧専用です。編集するにはメーカーを選択してください。</p>
                 ) : (

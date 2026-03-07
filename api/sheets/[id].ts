@@ -11,6 +11,7 @@ interface PutSheetBody {
 const MAX_GENERAL_TEXT_LENGTH = 4000;
 const PROMO_CODE_PATTERN = /^X\d{6}$/;
 const JAN_13_PATTERN = /^\d{13}$/;
+const HTTP_URL_PATTERN = /^https?:\/\/.+/i;
 
 const getSheetId = (req: any): string | null => {
   const raw = req.query?.id;
@@ -50,6 +51,7 @@ const findTooLongField = (sheet: EntrySheet): string | null => {
   if (isTooLong(sheet.email)) return '担当者メール';
   if (isTooLong(sheet.phoneNumber)) return '担当者電話番号';
   if (isTooLong(sheet.adminMemo?.bandPattern)) return '帯パターン';
+  if (isTooLong(sheet.adminMemo?.deadlineTableUrl)) return '期限表URL';
   if (isTooLong(sheet.adminMemo?.printOther)) return '印刷依頼数量 その他';
   if (isTooLong(sheet.adminMemo?.equipmentNote)) return '備品';
   if (isTooLong(sheet.adminMemo?.adminNote)) return '備考';
@@ -93,6 +95,7 @@ const normalizeAdminMemo = (
   return {
     promoCode: String(incoming?.promoCode || '').trim() || undefined,
     boardPickingJan: String(incoming?.boardPickingJan || '').trim() || undefined,
+    deadlineTableUrl: String(incoming?.deadlineTableUrl || '').trim() || undefined,
     bandPattern: String(incoming?.bandPattern || '').trim() || undefined,
     targetStoreCount: toOptionalNumber(incoming?.targetStoreCount),
     printBoard1Count: toOptionalNumber(incoming?.printBoard1Count),
@@ -112,6 +115,9 @@ const validateAdminMemo = (memo: EntrySheetAdminMemo | undefined): string | null
   }
   if (memo.boardPickingJan && !JAN_13_PATTERN.test(memo.boardPickingJan)) {
     return 'ボードピッキングJANは13桁の数字で入力してください';
+  }
+  if (memo.deadlineTableUrl && !HTTP_URL_PATTERN.test(memo.deadlineTableUrl)) {
+    return '期限表URLは http:// または https:// から始まる形式で入力してください';
   }
   return null;
 };
@@ -144,6 +150,7 @@ const buildRevisionSummary = (before: EntrySheet | null, after: EntrySheet): str
     before.adminMemo?.boardPickingJan,
     after.adminMemo?.boardPickingJan
   );
+  pushChange('Adminメモ.期限表URL', before.adminMemo?.deadlineTableUrl, after.adminMemo?.deadlineTableUrl);
   pushChange('Adminメモ.帯パターン', before.adminMemo?.bandPattern, after.adminMemo?.bandPattern);
   pushChange(
     'Adminメモ.対象店舗数',

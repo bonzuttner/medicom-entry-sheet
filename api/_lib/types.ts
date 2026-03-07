@@ -23,6 +23,7 @@ export interface MasterData {
 export interface EntrySheetAdminMemo {
   promoCode?: string;
   boardPickingJan?: string;
+  deadlineTableUrl?: string;
   bandPattern?: string;
   targetStoreCount?: number;
   printBoard1Count?: number;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { User, Page, UserRole } from '../types';
-import { LogOut, LayoutGrid, Users, Settings, FileText } from 'lucide-react';
+import { LogOut, LayoutGrid, Users, Settings, FileText, ListChecks } from 'lucide-react';
 
 interface LayoutProps {
   currentUser: User;
@@ -47,11 +47,20 @@ export const Layout: React.FC<LayoutProps> = ({ currentUser, currentPage, onNavi
       <div className="bg-white border-b border-slate-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-8 overflow-x-auto">
           <NavButton 
-            active={currentPage === Page.LIST || currentPage === Page.EDIT} 
+            active={currentPage === Page.LIST || currentPage === Page.EDIT}
             onClick={() => onNavigate(Page.LIST)}
             icon={<LayoutGrid size={18} />}
             label="エントリーシート一覧"
           />
+
+          {currentUser.role === UserRole.ADMIN && (
+            <NavButton
+              active={currentPage === Page.ADMIN_LIST}
+              onClick={() => onNavigate(Page.ADMIN_LIST)}
+              icon={<ListChecks size={18} />}
+              label="エントリー履歴(Admin)"
+            />
+          )}
           
           {/* Account Management - All users can manage accounts in their own company */}
           <NavButton

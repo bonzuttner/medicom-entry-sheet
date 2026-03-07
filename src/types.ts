@@ -26,6 +26,7 @@ export interface MasterData {
 export interface EntrySheetAdminMemo {
   promoCode?: string;
   boardPickingJan?: string;
+  deadlineTableUrl?: string;
   bandPattern?: string;
   targetStoreCount?: number;
   printBoard1Count?: number;
@@ -111,6 +112,7 @@ export interface Attachment {
 export enum Page {
   LOGIN = 'LOGIN',
   LIST = 'LIST',
+  ADMIN_LIST = 'ADMIN_LIST',
   EDIT = 'EDIT',
   ACCOUNTS = 'ACCOUNTS',
   MASTERS = 'MASTERS',
