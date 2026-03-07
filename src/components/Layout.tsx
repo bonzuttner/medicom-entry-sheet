@@ -13,72 +13,74 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ currentUser, currentPage, onNavigate, onLogout, children }) => {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => onNavigate(Page.LIST)}>
-            <div className="bg-primary p-2 rounded-lg">
-              <FileText className="h-6 w-6 text-white" />
-            </div>
-            <h1 className="text-xl font-bold text-slate-800 tracking-tight">PharmaPOP Entry</h1>
-          </div>
-          
-          <div className="flex items-center gap-6">
-            <div className="hidden md:flex flex-col items-end text-sm">
-              <span className="font-semibold text-slate-700">{currentUser.displayName}</span>
-              <span className="text-slate-500">{currentUser.manufacturerName}</span>
-              <span className="text-xs text-slate-400">{currentUser.role === UserRole.ADMIN ? '管理者' : '一般'}</span>
+      <div className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
+        {/* Header */}
+        <header>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div className="flex items-center gap-2 cursor-pointer" onClick={() => onNavigate(Page.LIST)}>
+              <div className="bg-primary p-2 rounded-lg">
+                <FileText className="h-6 w-6 text-white" />
+              </div>
+              <h1 className="text-xl font-bold text-slate-800 tracking-tight">PharmaPOP Entry</h1>
             </div>
             
-            <button 
-              onClick={() => {
-                void onLogout();
-              }}
-              className="p-2 text-slate-500 hover:text-danger hover:bg-red-50 rounded-full transition-colors"
-              title="ログアウト"
-            >
-              <LogOut size={20} />
-            </button>
+            <div className="flex items-center gap-6">
+              <div className="hidden md:flex flex-col items-end text-sm">
+                <span className="font-semibold text-slate-700">{currentUser.displayName}</span>
+                <span className="text-slate-500">{currentUser.manufacturerName}</span>
+                <span className="text-xs text-slate-400">{currentUser.role === UserRole.ADMIN ? '管理者' : '一般'}</span>
+              </div>
+              
+              <button 
+                onClick={() => {
+                  void onLogout();
+                }}
+                className="p-2 text-slate-500 hover:text-danger hover:bg-red-50 rounded-full transition-colors"
+                title="ログアウト"
+              >
+                <LogOut size={20} />
+              </button>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Main Nav (Simple Toolbar) */}
-      <div className="bg-white border-b border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-8 overflow-x-auto">
-          <NavButton 
-            active={currentPage === Page.LIST || currentPage === Page.EDIT}
-            onClick={() => onNavigate(Page.LIST)}
-            icon={<LayoutGrid size={18} />}
-            label="エントリーシート一覧"
-          />
-
-          {currentUser.role === UserRole.ADMIN && (
-            <NavButton
-              active={currentPage === Page.ADMIN_LIST}
-              onClick={() => onNavigate(Page.ADMIN_LIST)}
-              icon={<ListChecks size={18} />}
-              label="エントリー履歴(Admin)"
-            />
-          )}
-          
-          {/* Account Management - All users can manage accounts in their own company */}
-          <NavButton
-             active={currentPage === Page.ACCOUNTS}
-             onClick={() => onNavigate(Page.ACCOUNTS)}
-             icon={<Users size={18} />}
-             label="アカウント管理"
-          />
-
-          {/* Master Management - Explicitly Admin Only */}
-          {currentUser.role === UserRole.ADMIN && (
+        {/* Main Nav (Simple Toolbar) */}
+        <div className="border-t border-slate-100">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-6 overflow-x-auto">
             <NavButton 
-               active={currentPage === Page.MASTERS} 
-               onClick={() => onNavigate(Page.MASTERS)}
-               icon={<Settings size={18} />}
-               label="マスタ管理"
+              active={currentPage === Page.LIST || currentPage === Page.EDIT}
+              onClick={() => onNavigate(Page.LIST)}
+              icon={<LayoutGrid size={17} />}
+              label="エントリーシート一覧"
             />
-          )}
+
+            {/* Account Management - All users can manage accounts in their own company */}
+            <NavButton
+              active={currentPage === Page.ACCOUNTS}
+              onClick={() => onNavigate(Page.ACCOUNTS)}
+              icon={<Users size={17} />}
+              label="アカウント管理"
+            />
+
+            {/* Master Management - Explicitly Admin Only */}
+            {currentUser.role === UserRole.ADMIN && (
+              <NavButton 
+                active={currentPage === Page.MASTERS} 
+                onClick={() => onNavigate(Page.MASTERS)}
+                icon={<Settings size={17} />}
+                label="マスタ管理"
+              />
+            )}
+
+            {currentUser.role === UserRole.ADMIN && (
+              <NavButton
+                active={currentPage === Page.ADMIN_LIST}
+                onClick={() => onNavigate(Page.ADMIN_LIST)}
+                icon={<ListChecks size={17} />}
+                label="エントリー履歴(Admin)"
+              />
+            )}
+          </div>
         </div>
       </div>
 
@@ -94,7 +96,7 @@ const NavButton = ({ active, onClick, icon, label }: { active: boolean, onClick:
   <button
     onClick={onClick}
     className={`
-      flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap
+      flex items-center gap-2 py-3 px-1 border-b-2 font-medium text-[13px] transition-colors whitespace-nowrap
       ${active 
         ? 'border-primary text-primary' 
         : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}

@@ -544,6 +544,7 @@ const App: React.FC = () => {
           hasMore={hasMoreSheets}
           onLoadMore={loadMoreSheets}
           isLoadingMore={isLoadingMoreSheets}
+          onEdit={handleEditSheet}
           onSaveAdminMemo={handleSaveSheetAdminMemo}
         />
       )}
