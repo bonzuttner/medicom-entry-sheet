@@ -342,19 +342,19 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
-        <table className="min-w-[1280px] w-full divide-y divide-slate-200 table-fixed">
-          <thead className="bg-slate-50">
+        <table className="min-w-[1160px] w-full divide-y divide-slate-200 table-fixed">
+          <thead className="bg-slate-50 [&_th]:sticky [&_th]:top-[112px] [&_th]:z-10 [&_th]:bg-slate-50">
             <tr>
               <th className="w-[90px] px-3 py-3 text-left text-xs font-bold text-slate-500">状態</th>
-              <th className="w-[300px] px-3 py-3 text-left text-xs font-bold text-slate-500">タイトル</th>
-              <th className="w-[120px] px-3 py-3 text-left text-xs font-bold text-slate-500">展開期間</th>
-              <th className="w-[150px] px-3 py-3 text-left text-xs font-bold text-slate-500">棚割り</th>
-              <th className="w-[140px] px-3 py-3 text-left text-xs font-bold text-slate-500">メーカー名</th>
+              <th className="w-[240px] px-3 py-3 text-left text-xs font-bold text-slate-500">タイトル</th>
+              <th className="w-[105px] px-3 py-3 text-left text-xs font-bold text-slate-500">展開期間</th>
+              <th className="w-[120px] px-3 py-3 text-left text-xs font-bold text-slate-500">棚割り</th>
+              <th className="w-[110px] px-3 py-3 text-left text-xs font-bold text-slate-500">メーカー名</th>
               <th className="w-[72px] px-3 py-3 text-center text-xs font-bold text-slate-500">期限表</th>
               <th className="w-[120px] px-3 py-3 text-left text-xs font-bold text-slate-500">販促CD</th>
               <th className="w-[120px] px-3 py-3 text-left text-xs font-bold text-slate-500">帯パターン</th>
               <th className="w-[110px] px-3 py-3 text-left text-xs font-bold text-slate-500">対象店舗数</th>
-              <th className="hidden md:table-cell w-[260px] px-3 py-3 text-left text-xs font-bold text-slate-500">印刷依頼数量</th>
+              <th className="hidden md:table-cell w-[230px] px-3 py-3 text-left text-xs font-bold text-slate-500">印刷依頼数量</th>
               <th className="w-[145px] px-3 py-3 text-right text-xs font-bold text-slate-500">操作</th>
             </tr>
           </thead>
@@ -446,68 +446,68 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                       </label>
                     </td>
                     <td className="px-3 py-3 hidden md:table-cell">
-                      <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-                        <label className="inline-flex items-center gap-1 text-xs text-slate-700">
-                          <span className="text-slate-500 whitespace-nowrap">ボード①</span>
+                      <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-2.5 grid grid-cols-2 gap-2">
+                        <label className="inline-flex items-center gap-1.5 text-[11px] text-slate-700">
+                          <span className="inline-flex items-center rounded bg-white border border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-500 whitespace-nowrap">ボード①</span>
                           <input
                             type="number"
                             min={0}
                             value={draft.printBoard1Count}
                             onChange={(e) => setDraftValue(sheet.id, 'printBoard1Count', e.target.value)}
-                            className="w-16 border border-slate-300 rounded-md px-2 py-1 text-xs bg-white text-right"
+                            className="w-14 border border-slate-300 rounded-md px-1.5 py-1 text-xs bg-white text-right"
                           />
-                          <span className="text-slate-500">枚</span>
+                          <span className="text-slate-400">枚</span>
                         </label>
-                        <label className="inline-flex items-center gap-1 text-xs text-slate-700">
-                          <span className="text-slate-500 whitespace-nowrap">ボード②</span>
+                        <label className="inline-flex items-center gap-1.5 text-[11px] text-slate-700">
+                          <span className="inline-flex items-center rounded bg-white border border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-500 whitespace-nowrap">ボード②</span>
                           <input
                             type="number"
                             min={0}
                             value={draft.printBoard2Count}
                             onChange={(e) => setDraftValue(sheet.id, 'printBoard2Count', e.target.value)}
-                            className="w-16 border border-slate-300 rounded-md px-2 py-1 text-xs bg-white text-right"
+                            className="w-14 border border-slate-300 rounded-md px-1.5 py-1 text-xs bg-white text-right"
                           />
-                          <span className="text-slate-500">枚</span>
+                          <span className="text-slate-400">枚</span>
                         </label>
-                        <label className="inline-flex items-center gap-1 text-xs text-slate-700">
-                          <span className="text-slate-500 whitespace-nowrap">帯①</span>
+                        <label className="inline-flex items-center gap-1.5 text-[11px] text-slate-700">
+                          <span className="inline-flex items-center rounded bg-white border border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-500 whitespace-nowrap">帯①</span>
                           <input
                             type="number"
                             min={0}
                             value={draft.printBand1Count}
                             onChange={(e) => setDraftValue(sheet.id, 'printBand1Count', e.target.value)}
-                            className="w-16 border border-slate-300 rounded-md px-2 py-1 text-xs bg-white text-right"
+                            className="w-14 border border-slate-300 rounded-md px-1.5 py-1 text-xs bg-white text-right"
                           />
-                          <span className="text-slate-500">枚</span>
+                          <span className="text-slate-400">枚</span>
                         </label>
-                        <label className="inline-flex items-center gap-1 text-xs text-slate-700">
-                          <span className="text-slate-500 whitespace-nowrap">帯②</span>
+                        <label className="inline-flex items-center gap-1.5 text-[11px] text-slate-700">
+                          <span className="inline-flex items-center rounded bg-white border border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-500 whitespace-nowrap">帯②</span>
                           <input
                             type="number"
                             min={0}
                             value={draft.printBand2Count}
                             onChange={(e) => setDraftValue(sheet.id, 'printBand2Count', e.target.value)}
-                            className="w-16 border border-slate-300 rounded-md px-2 py-1 text-xs bg-white text-right"
+                            className="w-14 border border-slate-300 rounded-md px-1.5 py-1 text-xs bg-white text-right"
                           />
-                          <span className="text-slate-500">枚</span>
+                          <span className="text-slate-400">枚</span>
                         </label>
                       </div>
                     </td>
                     <td className="px-3 py-3 text-right">
-                      <div className="inline-flex items-center gap-2">
+                      <div className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 p-1 border border-slate-200">
                         <button
                           type="button"
                           onClick={() =>
                             setExpandedMobileRows((prev) => ({ ...prev, [sheet.id]: !prev[sheet.id] }))
                           }
-                          className="md:hidden inline-flex items-center px-2 py-1.5 rounded-md border border-slate-300 text-slate-700 text-xs font-semibold"
+                          className="md:hidden inline-flex items-center h-8 px-2.5 rounded-md border border-slate-300 bg-white text-slate-700 text-xs font-semibold hover:bg-slate-50"
                         >
                           詳細編集
                         </button>
                         <button
                           type="button"
                           onClick={() => onEdit(sheet)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-50"
+                          className="inline-flex items-center gap-1 h-8 px-3 rounded-md border border-slate-300 bg-white text-slate-700 text-xs font-semibold hover:border-slate-400 hover:bg-slate-100 transition-colors"
                           title="編集"
                         >
                           <Edit3 size={13} />
@@ -518,10 +518,10 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                             void handleSave(sheet.id);
                           }}
                           disabled={Boolean(savingById[sheet.id]) || !dirty}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold disabled:opacity-60 ${
+                          className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-semibold disabled:opacity-60 transition-colors ${
                             dirty
-                              ? 'bg-sky-600 text-white hover:bg-sky-700 shadow-sm'
-                              : 'bg-slate-200 text-slate-500'
+                              ? 'bg-primary text-white hover:bg-sky-700 shadow-sm'
+                              : 'bg-slate-200 text-slate-500 border border-slate-200'
                           }`}
                         >
                           <Save size={14} />

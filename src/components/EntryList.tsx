@@ -759,7 +759,7 @@ export const EntryList: React.FC<EntryListProps> = ({
           <div className="hidden md:block bg-white rounded-xl border border-slate-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-200 table-fixed">
-                <thead className="bg-slate-50">
+                <thead className="bg-slate-50 [&_th]:sticky [&_th]:top-[112px] [&_th]:z-10 [&_th]:bg-slate-50">
                   <tr>
                     <th scope="col" className="px-4 py-3 w-12 text-center">
                       <button onClick={toggleSelectAll} className="text-slate-400 hover:text-slate-600">
