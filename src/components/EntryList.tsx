@@ -29,7 +29,7 @@ export const EntryList: React.FC<EntryListProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'updatedAt' | 'manufacturer'>('updatedAt');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
-  const [dateFilterBy, setDateFilterBy] = useState<'createdAt' | 'updatedAt' | 'arrivalDate'>('updatedAt');
+  const [dateFilterBy, setDateFilterBy] = useState<'createdAt' | 'updatedAt' | 'deploymentPeriod'>('updatedAt');
   const [dateSince, setDateSince] = useState('');
   const [dateFilterMode, setDateFilterMode] = useState<'since' | 'until'>('since');
   const [expandedSheets, setExpandedSheets] = useState<Set<string>>(new Set());
@@ -70,13 +70,6 @@ export const EntryList: React.FC<EntryListProps> = ({
     );
   };
 
-  const getSheetArrivalTimestamp = (sheet: EntrySheet): number | null => {
-    const timestamps = sheet.products
-      .map((product) => (product.arrivalDate ? new Date(product.arrivalDate).getTime() : NaN))
-      .filter((ts) => Number.isFinite(ts));
-    if (timestamps.length === 0) return null;
-    return Math.max(...timestamps);
-  };
   const formatYearMonth = (year: number, month: number): string => `${year}/${month}`;
   const getDeploymentPeriod = (sheet: EntrySheet): { start: string; end: string } => {
     if (!sheet.deploymentStartMonth) return { start: '', end: '' };
@@ -92,6 +85,29 @@ export const EntryList: React.FC<EntryListProps> = ({
       start: formatYearMonth(startDate.getFullYear(), startDate.getMonth() + 1),
       end: formatYearMonth(endDate.getFullYear(), endDate.getMonth() + 1),
     };
+  };
+  const getSheetDeploymentPeriodTimestamp = (sheet: EntrySheet): number | null => {
+    if (!sheet.deploymentStartMonth) return null;
+    const createdAt = new Date(sheet.createdAt);
+    if (Number.isNaN(createdAt.getTime())) return null;
+    const createdMonth = createdAt.getMonth() + 1;
+    const monthOffset = (sheet.deploymentStartMonth - createdMonth + 12) % 12;
+    const startDate = new Date(createdAt.getFullYear(), createdAt.getMonth(), 1);
+    startDate.setMonth(startDate.getMonth() + monthOffset);
+    return startDate.getTime();
+  };
+  const getSheetDeploymentPeriodRange = (
+    sheet: EntrySheet
+  ): { startTs: number; endTs: number } | null => {
+    if (!sheet.deploymentStartMonth) return null;
+    const createdAt = new Date(sheet.createdAt);
+    if (Number.isNaN(createdAt.getTime())) return null;
+    const createdMonth = createdAt.getMonth() + 1;
+    const monthOffset = (sheet.deploymentStartMonth - createdMonth + 12) % 12;
+    const startDate = new Date(createdAt.getFullYear(), createdAt.getMonth(), 1);
+    startDate.setMonth(startDate.getMonth() + monthOffset);
+    const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 3, 0, 23, 59, 59, 999);
+    return { startTs: startDate.getTime(), endTs: endDate.getTime() };
   };
   const getDeploymentPeriodLabel = (sheet: EntrySheet): string => {
     const period = getDeploymentPeriod(sheet);
@@ -109,7 +125,7 @@ export const EntryList: React.FC<EntryListProps> = ({
 
   const getSheetTimestampBy = (
     sheet: EntrySheet,
-    field: 'createdAt' | 'updatedAt' | 'arrivalDate'
+    field: 'createdAt' | 'updatedAt' | 'deploymentPeriod'
   ): number | null => {
     if (field === 'createdAt') {
       return new Date(sheet.createdAt).getTime();
@@ -117,7 +133,7 @@ export const EntryList: React.FC<EntryListProps> = ({
     if (field === 'updatedAt') {
       return new Date(sheet.updatedAt).getTime();
     }
-    return getSheetArrivalTimestamp(sheet);
+    return getSheetDeploymentPeriodTimestamp(sheet);
   };
 
   const toggleSort = (nextSortBy: 'updatedAt' | 'manufacturer') => {
@@ -145,6 +161,11 @@ export const EntryList: React.FC<EntryListProps> = ({
       if (!dateSince) return true;
       const filterStart = new Date(`${dateSince}T00:00:00`).getTime();
       const filterEnd = new Date(`${dateSince}T23:59:59.999`).getTime();
+      if (dateFilterBy === 'deploymentPeriod') {
+        const range = getSheetDeploymentPeriodRange(sheet);
+        if (!range) return false;
+        return filterStart <= range.endTs && filterEnd >= range.startTs;
+      }
       const targetTs = getSheetTimestampBy(sheet, dateFilterBy);
       if (targetTs === null) return false;
       if (dateFilterMode === 'since') {
@@ -579,12 +600,12 @@ export const EntryList: React.FC<EntryListProps> = ({
           <span className="text-[11px] font-bold text-slate-600">絞り込み</span>
           <select
             value={dateFilterBy}
-            onChange={(e) => setDateFilterBy(e.target.value as 'createdAt' | 'updatedAt' | 'arrivalDate')}
+            onChange={(e) => setDateFilterBy(e.target.value as 'createdAt' | 'updatedAt' | 'deploymentPeriod')}
             className="border border-slate-300 rounded-md px-2 py-1.5 text-xs bg-white"
           >
             <option value="createdAt">作成日</option>
             <option value="updatedAt">更新日</option>
-            <option value="arrivalDate">送込み店舗着日要望</option>
+            <option value="deploymentPeriod">展開期間</option>
           </select>
           <input
             type="date"
@@ -739,11 +760,11 @@ export const EntryList: React.FC<EntryListProps> = ({
                         {selectedSheets.size === filteredSheets.length && filteredSheets.length > 0 ? <CheckSquare size={20} /> : <Square size={20} />}
                       </button>
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-24">状態</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">タイトル</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-44">展開期間</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-44">棚割り</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-48">
+                    <th scope="col" className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-20">状態</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-[440px]">タイトル</th>
+                    <th scope="col" className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-28">展開期間</th>
+                    <th scope="col" className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-32">棚割り</th>
+                    <th scope="col" className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-36">
                       <button
                         onClick={() => toggleSort('manufacturer')}
                         className={`inline-flex items-center gap-1 hover:text-slate-700 ${
@@ -755,7 +776,7 @@ export const EntryList: React.FC<EntryListProps> = ({
                         <ArrowUpDown size={14} />
                       </button>
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-32">
+                    <th scope="col" className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-24">
                       <button
                         onClick={() => toggleSort('updatedAt')}
                         className={`inline-flex items-center gap-1 hover:text-slate-700 ${
@@ -767,7 +788,7 @@ export const EntryList: React.FC<EntryListProps> = ({
                         <ArrowUpDown size={14} />
                       </button>
                     </th>
-                    <th scope="col" className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider w-40">操作</th>
+                    <th scope="col" className="px-4 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider w-32">操作</th>
                     <th scope="col" className="w-10"></th>
                   </tr>
                 </thead>
@@ -787,31 +808,31 @@ export const EntryList: React.FC<EntryListProps> = ({
                                {isSelected ? <CheckSquare size={20} /> : <Square size={20} className="text-slate-300" />}
                              </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-4 py-4 whitespace-nowrap">
                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusPillClass(sheet.status)}`}>
                               {getStatusLabel(sheet.status)}
                             </span>
                           </td>
                           <td className="px-6 py-4">
-                            <div className="text-sm font-bold text-slate-900 line-clamp-1">{sheet.title}</div>
+                            <div className="text-sm font-bold text-slate-900 line-clamp-2 break-words leading-tight">{sheet.title}</div>
                             <div className="text-xs text-slate-500">{sheet.products.length} 商品登録済</div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
+                          <td className="px-4 py-4 whitespace-nowrap text-xs text-slate-700">
                             {getDeploymentPeriodLabel(sheet)}
                           </td>
-                          <td className="px-6 py-4 text-sm text-slate-700">
+                          <td className="px-4 py-4 text-xs text-slate-700">
                             <div className="line-clamp-2 break-words" title={getSheetShelfNames(sheet)}>
                               {getSheetShelfNames(sheet)}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-slate-900 line-clamp-1">{sheet.manufacturerName}</div>
-                            <div className="text-xs text-slate-500 line-clamp-1">{sheet.creatorName}</div>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="text-xs text-slate-900 line-clamp-1">{sheet.manufacturerName}</div>
+                            <div className="text-[11px] text-slate-500 line-clamp-1">{sheet.creatorName}</div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                          <td className="px-4 py-4 whitespace-nowrap text-xs text-slate-500">
                             {new Date(sheet.updatedAt).toLocaleDateString()}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onClick={e => e.stopPropagation()}>
+                          <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium" onClick={e => e.stopPropagation()}>
                             <div className="flex justify-end gap-2">
                               <button
                                   onClick={() => onEdit(sheet)}

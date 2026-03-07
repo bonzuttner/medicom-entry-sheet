@@ -116,6 +116,17 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       <p className="text-xs text-slate-500 mt-1">※ 自動入力（編集不可）</p>
     </div>
   );
+  const renderAutoValueWithUnit = (
+    value: string | number | undefined,
+    unit: string
+  ) => (
+    <div>
+      <div className="w-full border border-slate-200 rounded-lg p-3 bg-slate-100 text-slate-700">
+        {value === undefined || value === '' ? '（未入力）' : `${String(value)} ${unit}`}
+      </div>
+      <p className="text-xs text-slate-500 mt-1">※ 自動入力（編集不可）</p>
+    </div>
+  );
 
   // Sync update time
   useEffect(() => {
@@ -801,42 +812,48 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                         placeholder="例：2024年秋の新商品プロモーション"
                     />
                 </div>
-                <div className="col-span-1 md:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-2">展開スタート月</label>
-                    <div className="flex flex-wrap gap-2">
-                      {selectableStartMonths.map((item) => {
-                        const checked = formData.deploymentStartMonth === item.month;
-                        return (
-                          <button
-                            key={`${item.year}-${item.month}`}
-                            type="button"
-                            onClick={() =>
-                              setFormData((prev) => ({ ...prev, deploymentStartMonth: item.month }))
-                            }
-                            className={`px-4 py-2 rounded-lg border text-sm font-semibold ${
-                              checked
-                                ? 'bg-primary text-white border-primary'
-                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-                            }`}
-                          >
-                            {item.label}
-                          </button>
-                        );
-                      })}
+                <div className="col-span-1 md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6 items-start">
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">展開スタート月</label>
+                        <div className="flex flex-wrap gap-2">
+                          {selectableStartMonths.map((item) => {
+                            const checked = formData.deploymentStartMonth === item.month;
+                            return (
+                              <button
+                                key={`${item.year}-${item.month}`}
+                                type="button"
+                                onClick={() =>
+                                  setFormData((prev) => ({ ...prev, deploymentStartMonth: item.month }))
+                                }
+                                className={`px-4 py-2 rounded-lg border text-sm font-semibold ${
+                                  checked
+                                    ? 'bg-primary text-white border-primary'
+                                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                                }`}
+                              >
+                                {item.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">
+                          展開期間 <span className="text-red-500">*自動入力</span>
+                        </label>
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 min-w-[110px] text-center font-semibold">
+                            {autoPeriod.start || '-'}
+                          </div>
+                          <span className="text-slate-500">~</span>
+                          <div className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 min-w-[110px] text-center font-semibold">
+                            {autoPeriod.end || '-'}
+                          </div>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-2">※終了期間が変更になる場合はご連絡ください</p>
+                      </div>
                     </div>
-                </div>
-                <div className="col-span-1 md:col-span-2">
-                  <label className="block text-sm font-bold text-slate-700 mb-2">展開期間 <span className="text-red-500">*自動入力</span></label>
-                  <div className="flex items-center gap-3 text-lg">
-                    <div className="px-4 py-2 bg-slate-100 rounded text-slate-800 min-w-[100px]">
-                      {autoPeriod.start || '-'}
-                    </div>
-                    <span>~</span>
-                    <div className="px-4 py-2 bg-slate-100 rounded text-slate-800 min-w-[100px]">
-                      {autoPeriod.end || '-'}
-                    </div>
-                    <span className="text-sm text-slate-500">※終了期間が変更になる場合はご連絡ください</span>
-                  </div>
                 </div>
                 <div className="col-span-1 md:col-span-2">
                     <label className="block text-sm font-bold text-slate-700 mb-2">エントリシート補足情報</label>
@@ -898,166 +915,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     <p className={`text-xs mt-1 ${isShelfWidthOver ? 'text-red-600' : 'text-slate-500'}`}>
                     商品情報ごとの「個装サイズ(幅) × フェイシング数」の合計値。840mm以下を推奨。
                     </p>
-                </div>
-            </div>
-        </div>
-
-        <div className="mt-8">
-            <h4 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
-                <span className="w-1 h-5 bg-violet-500 rounded-full"></span>
-                Adminメモ（全員閲覧 / 管理者のみ編集）
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">販促CD</label>
-                    {isAdminUser ? (
-                      <input
-                        type="text"
-                        className="w-full border-slate-300 rounded-lg shadow-sm p-3 font-mono"
-                        value={formData.adminMemo?.promoCode || ''}
-                        onChange={(e) => handleAdminMemoChange('promoCode', e.target.value)}
-                        placeholder="X000000"
-                      />
-                    ) : (
-                      renderAutoValue(formData.adminMemo?.promoCode)
-                    )}
-                </div>
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">ボードピッキングJAN</label>
-                    {isAdminUser ? (
-                      <input
-                        type="text"
-                        className="w-full border-slate-300 rounded-lg shadow-sm p-3 font-mono"
-                        value={formData.adminMemo?.boardPickingJan || ''}
-                        onChange={(e) => handleAdminMemoChange('boardPickingJan', normalizeJanCodeInput(e.target.value).slice(0, 13))}
-                        placeholder="9999999999999"
-                      />
-                    ) : (
-                      renderAutoValue(formData.adminMemo?.boardPickingJan)
-                    )}
-                </div>
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">帯パターン</label>
-                    {isAdminUser ? (
-                      <input
-                        type="text"
-                        className="w-full border-slate-300 rounded-lg shadow-sm p-3"
-                        value={formData.adminMemo?.bandPattern || ''}
-                        onChange={(e) => handleAdminMemoChange('bandPattern', e.target.value)}
-                        placeholder="〇種"
-                      />
-                    ) : (
-                      renderAutoValue(formData.adminMemo?.bandPattern)
-                    )}
-                </div>
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">対象店舗数</label>
-                    {isAdminUser ? (
-                      <input
-                        type="number"
-                        className="w-full border-slate-300 rounded-lg shadow-sm p-3"
-                        value={formData.adminMemo?.targetStoreCount ?? ''}
-                        onChange={(e) => handleAdminMemoChange('targetStoreCount', parseOptionalNumber(e.target.value))}
-                        placeholder="〇店舗"
-                      />
-                    ) : (
-                      renderAutoValue(formData.adminMemo?.targetStoreCount)
-                    )}
-                </div>
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">印刷依頼数量 ボード①</label>
-                    {isAdminUser ? (
-                      <input
-                        type="number"
-                        className="w-full border-slate-300 rounded-lg shadow-sm p-3"
-                        value={formData.adminMemo?.printBoard1Count ?? ''}
-                        onChange={(e) => handleAdminMemoChange('printBoard1Count', parseOptionalNumber(e.target.value))}
-                        placeholder="〇枚"
-                      />
-                    ) : (
-                      renderAutoValue(formData.adminMemo?.printBoard1Count)
-                    )}
-                </div>
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">印刷依頼数量 ボード②</label>
-                    {isAdminUser ? (
-                      <input
-                        type="number"
-                        className="w-full border-slate-300 rounded-lg shadow-sm p-3"
-                        value={formData.adminMemo?.printBoard2Count ?? ''}
-                        onChange={(e) => handleAdminMemoChange('printBoard2Count', parseOptionalNumber(e.target.value))}
-                        placeholder="〇枚"
-                      />
-                    ) : (
-                      renderAutoValue(formData.adminMemo?.printBoard2Count)
-                    )}
-                </div>
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">印刷依頼数量 帯①</label>
-                    {isAdminUser ? (
-                      <input
-                        type="number"
-                        className="w-full border-slate-300 rounded-lg shadow-sm p-3"
-                        value={formData.adminMemo?.printBand1Count ?? ''}
-                        onChange={(e) => handleAdminMemoChange('printBand1Count', parseOptionalNumber(e.target.value))}
-                        placeholder="〇枚"
-                      />
-                    ) : (
-                      renderAutoValue(formData.adminMemo?.printBand1Count)
-                    )}
-                </div>
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">印刷依頼数量 帯②</label>
-                    {isAdminUser ? (
-                      <input
-                        type="number"
-                        className="w-full border-slate-300 rounded-lg shadow-sm p-3"
-                        value={formData.adminMemo?.printBand2Count ?? ''}
-                        onChange={(e) => handleAdminMemoChange('printBand2Count', parseOptionalNumber(e.target.value))}
-                        placeholder="〇枚"
-                      />
-                    ) : (
-                      renderAutoValue(formData.adminMemo?.printBand2Count)
-                    )}
-                </div>
-                <div className="md:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-2">印刷依頼数量 その他</label>
-                    {isAdminUser ? (
-                      <textarea
-                        rows={2}
-                        className="w-full border-slate-300 rounded-lg shadow-sm p-3"
-                        value={formData.adminMemo?.printOther || ''}
-                        onChange={(e) => handleAdminMemoChange('printOther', e.target.value)}
-                      />
-                    ) : (
-                      renderAutoValue(formData.adminMemo?.printOther)
-                    )}
-                </div>
-                <div className="md:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-2">備品</label>
-                    {isAdminUser ? (
-                      <textarea
-                        rows={2}
-                        className="w-full border-slate-300 rounded-lg shadow-sm p-3"
-                        value={formData.adminMemo?.equipmentNote || ''}
-                        onChange={(e) => handleAdminMemoChange('equipmentNote', e.target.value)}
-                      />
-                    ) : (
-                      renderAutoValue(formData.adminMemo?.equipmentNote)
-                    )}
-                </div>
-                <div className="md:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-2">備考</label>
-                    {isAdminUser ? (
-                      <textarea
-                        rows={3}
-                        className="w-full border-slate-300 rounded-lg shadow-sm p-3"
-                        value={formData.adminMemo?.adminNote || ''}
-                        onChange={(e) => handleAdminMemoChange('adminNote', e.target.value)}
-                      />
-                    ) : (
-                      renderAutoValue(formData.adminMemo?.adminNote)
-                    )}
                 </div>
             </div>
         </div>
@@ -1556,6 +1413,210 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             </div>
         </section>
 
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 mt-4 sm:mt-6">
+        <h4 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+          <span className="w-1 h-5 bg-violet-500 rounded-full"></span>
+          Adminメモ（全員閲覧 / 管理者のみ編集）
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">販促CD</label>
+            {isAdminUser ? (
+              <input
+                type="text"
+                className="w-full border-slate-300 rounded-lg shadow-sm p-3 font-mono"
+                value={formData.adminMemo?.promoCode || ''}
+                onChange={(e) => handleAdminMemoChange('promoCode', e.target.value)}
+                placeholder="X000000"
+              />
+            ) : (
+              renderAutoValue(formData.adminMemo?.promoCode)
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">ボードピッキングJAN</label>
+            {isAdminUser ? (
+              <input
+                type="text"
+                className="w-full border-slate-300 rounded-lg shadow-sm p-3 font-mono"
+                value={formData.adminMemo?.boardPickingJan || ''}
+                onChange={(e) =>
+                  handleAdminMemoChange(
+                    'boardPickingJan',
+                    normalizeJanCodeInput(e.target.value).slice(0, 13)
+                  )
+                }
+                placeholder="9999999999999"
+              />
+            ) : (
+              renderAutoValue(formData.adminMemo?.boardPickingJan)
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">帯パターン</label>
+            {isAdminUser ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  className="w-24 border-slate-300 rounded-lg shadow-sm p-2.5"
+                  value={formData.adminMemo?.bandPattern || ''}
+                  onChange={(e) =>
+                    handleAdminMemoChange(
+                      'bandPattern',
+                      e.target.value === '' ? undefined : e.target.value
+                    )
+                  }
+                  placeholder="1"
+                />
+                <span className="text-sm text-slate-600">種</span>
+              </div>
+            ) : (
+              renderAutoValueWithUnit(formData.adminMemo?.bandPattern, '種')
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">対象店舗数</label>
+            {isAdminUser ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  className="w-24 border-slate-300 rounded-lg shadow-sm p-2.5"
+                  value={formData.adminMemo?.targetStoreCount ?? ''}
+                  onChange={(e) =>
+                    handleAdminMemoChange('targetStoreCount', parseOptionalNumber(e.target.value))
+                  }
+                  placeholder="1"
+                />
+                <span className="text-sm text-slate-600">店舗</span>
+              </div>
+            ) : (
+              renderAutoValueWithUnit(formData.adminMemo?.targetStoreCount, '店舗')
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">印刷依頼数量 ボード①</label>
+            {isAdminUser ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  className="w-24 border-slate-300 rounded-lg shadow-sm p-2.5"
+                  value={formData.adminMemo?.printBoard1Count ?? ''}
+                  onChange={(e) =>
+                    handleAdminMemoChange('printBoard1Count', parseOptionalNumber(e.target.value))
+                  }
+                  placeholder="1"
+                />
+                <span className="text-sm text-slate-600">枚</span>
+              </div>
+            ) : (
+              renderAutoValueWithUnit(formData.adminMemo?.printBoard1Count, '枚')
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">印刷依頼数量 ボード②</label>
+            {isAdminUser ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  className="w-24 border-slate-300 rounded-lg shadow-sm p-2.5"
+                  value={formData.adminMemo?.printBoard2Count ?? ''}
+                  onChange={(e) =>
+                    handleAdminMemoChange('printBoard2Count', parseOptionalNumber(e.target.value))
+                  }
+                  placeholder="1"
+                />
+                <span className="text-sm text-slate-600">枚</span>
+              </div>
+            ) : (
+              renderAutoValueWithUnit(formData.adminMemo?.printBoard2Count, '枚')
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">印刷依頼数量 帯①</label>
+            {isAdminUser ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  className="w-24 border-slate-300 rounded-lg shadow-sm p-2.5"
+                  value={formData.adminMemo?.printBand1Count ?? ''}
+                  onChange={(e) =>
+                    handleAdminMemoChange('printBand1Count', parseOptionalNumber(e.target.value))
+                  }
+                  placeholder="1"
+                />
+                <span className="text-sm text-slate-600">枚</span>
+              </div>
+            ) : (
+              renderAutoValueWithUnit(formData.adminMemo?.printBand1Count, '枚')
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">印刷依頼数量 帯②</label>
+            {isAdminUser ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  className="w-24 border-slate-300 rounded-lg shadow-sm p-2.5"
+                  value={formData.adminMemo?.printBand2Count ?? ''}
+                  onChange={(e) =>
+                    handleAdminMemoChange('printBand2Count', parseOptionalNumber(e.target.value))
+                  }
+                  placeholder="1"
+                />
+                <span className="text-sm text-slate-600">枚</span>
+              </div>
+            ) : (
+              renderAutoValueWithUnit(formData.adminMemo?.printBand2Count, '枚')
+            )}
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-bold text-slate-700 mb-2">印刷依頼数量 その他</label>
+            {isAdminUser ? (
+              <textarea
+                rows={2}
+                className="w-full border-slate-300 rounded-lg shadow-sm p-3"
+                value={formData.adminMemo?.printOther || ''}
+                onChange={(e) => handleAdminMemoChange('printOther', e.target.value)}
+              />
+            ) : (
+              renderAutoValue(formData.adminMemo?.printOther)
+            )}
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-bold text-slate-700 mb-2">備品</label>
+            {isAdminUser ? (
+              <textarea
+                rows={2}
+                className="w-full border-slate-300 rounded-lg shadow-sm p-3"
+                value={formData.adminMemo?.equipmentNote || ''}
+                onChange={(e) => handleAdminMemoChange('equipmentNote', e.target.value)}
+              />
+            ) : (
+              renderAutoValue(formData.adminMemo?.equipmentNote)
+            )}
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-bold text-slate-700 mb-2">備考</label>
+            {isAdminUser ? (
+              <textarea
+                rows={3}
+                className="w-full border-slate-300 rounded-lg shadow-sm p-3"
+                value={formData.adminMemo?.adminNote || ''}
+                onChange={(e) => handleAdminMemoChange('adminNote', e.target.value)}
+              />
+            ) : (
+              renderAutoValue(formData.adminMemo?.adminNote)
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

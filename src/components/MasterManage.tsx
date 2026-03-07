@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { MasterData } from '../types';
 import { Plus, X } from 'lucide-react';
 
+const ALL_MANUFACTURERS = '__all__';
+
 interface MasterManageProps {
   data: MasterData;
   onSave: (data: MasterData) => Promise<void> | void;
@@ -11,6 +13,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
   const [localData, setLocalData] = useState<MasterData>(data);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedManufacturer, setSelectedManufacturer] = useState('');
+  const [shelfInput, setShelfInput] = useState('');
 
   useEffect(() => {
     setLocalData(data);
@@ -53,13 +56,22 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
   };
 
   const getShelfNamesForSelectedManufacturer = (): string[] => {
-    if (!selectedManufacturer) return [];
+    if (!selectedManufacturer || selectedManufacturer === ALL_MANUFACTURERS) return [];
     return localData.manufacturerShelfNames?.[selectedManufacturer] || [];
+  };
+
+  const getAllShelfNames = (): Array<{ manufacturer: string; shelfName: string }> => {
+    return localData.manufacturerNames.flatMap((manufacturer) =>
+      (localData.manufacturerShelfNames?.[manufacturer] || []).map((shelfName) => ({
+        manufacturer,
+        shelfName,
+      }))
+    );
   };
 
   const addShelfName = async (rawValue: string) => {
     const value = normalizeItem(rawValue);
-    if (!value || !selectedManufacturer) return;
+    if (!value || !selectedManufacturer || selectedManufacturer === ALL_MANUFACTURERS) return;
     const current = getShelfNamesForSelectedManufacturer();
     if (current.some((existing) => existing.trim() === value)) {
       return;
@@ -72,12 +84,22 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
   };
 
   const removeShelfName = async (value: string) => {
-    if (!selectedManufacturer) return;
+    if (!selectedManufacturer || selectedManufacturer === ALL_MANUFACTURERS) return;
     if (!window.confirm(`「${value}」を削除しますか？`)) return;
     const current = getShelfNamesForSelectedManufacturer();
     const manufacturerShelfNames = {
       ...(localData.manufacturerShelfNames || {}),
       [selectedManufacturer]: current.filter((v) => v !== value),
+    };
+    await persist({ ...localData, manufacturerShelfNames });
+  };
+
+  const removeShelfNameByManufacturer = async (manufacturer: string, value: string) => {
+    if (!window.confirm(`「${manufacturer} / ${value}」を削除しますか？`)) return;
+    const current = localData.manufacturerShelfNames?.[manufacturer] || [];
+    const manufacturerShelfNames = {
+      ...(localData.manufacturerShelfNames || {}),
+      [manufacturer]: current.filter((v) => v !== value),
     };
     await persist({ ...localData, manufacturerShelfNames });
   };
@@ -114,65 +136,122 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
             isSaving={isSaving}
         />
 
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-            <h3 className="font-bold text-lg">棚割名（メーカー別）</h3>
-            <p className="text-sm text-slate-500">メーカーを選択して棚割名を管理します。</p>
-            <select
-              className="w-full max-w-md border border-slate-300 rounded-lg px-3 py-2"
-              value={selectedManufacturer}
-              onChange={(e) => setSelectedManufacturer(e.target.value)}
-            >
-              {localData.manufacturerNames.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-            <MasterSection
-              title={selectedManufacturer ? `棚割名: ${selectedManufacturer}` : '棚割名'}
-              items={getShelfNamesForSelectedManufacturer()}
-              onAdd={addShelfName}
-              onRemove={removeShelfName}
-              isSaving={isSaving}
-            />
-        </div>
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <h3 className="font-bold text-base text-slate-800">メーカー別設定</h3>
+              <select
+                className="w-full sm:w-72 border border-slate-300 rounded-md px-3 py-1.5 text-sm"
+                value={selectedManufacturer}
+                onChange={(e) => setSelectedManufacturer(e.target.value)}
+              >
+                <option value={ALL_MANUFACTURERS}>すべて</option>
+                {localData.manufacturerNames.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-            <h3 className="font-bold text-lg">デフォルト展開スタート月（メーカー別）</h3>
-            <p className="text-sm text-slate-500">メーカーごとに複数指定できます。エントリーシート新規作成時に候補として使用されます。</p>
-            <select
-              className="w-full max-w-md border border-slate-300 rounded-lg px-3 py-2"
-              value={selectedManufacturer}
-              onChange={(e) => setSelectedManufacturer(e.target.value)}
-            >
-              {localData.manufacturerNames.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-            <div className="flex flex-wrap gap-2">
-              {monthLabels.map((label, index) => {
-                const month = index + 1;
-                const checked = getDefaultStartMonthsForSelectedManufacturer().includes(month);
-                return (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => {
-                      void toggleDefaultStartMonth(month);
-                    }}
-                    disabled={isSaving}
-                    className={`px-3 py-2 rounded-lg border text-sm ${
-                      checked
-                        ? 'bg-primary text-white border-primary'
-                        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <div className="rounded-lg border border-slate-200 p-3">
+                <h4 className="font-semibold text-slate-800 mb-2">棚割名（メーカー別）</h4>
+                {selectedManufacturer === ALL_MANUFACTURERS ? (
+                  <div className="space-y-2 max-h-64 overflow-auto">
+                    {getAllShelfNames().length === 0 ? (
+                      <p className="text-xs text-slate-500">棚割名はまだありません。</p>
+                    ) : (
+                      getAllShelfNames().map((item, index) => (
+                        <div
+                          key={`${item.manufacturer}-${item.shelfName}-${index}`}
+                          className="px-2.5 py-1.5 rounded-md bg-slate-50 border border-slate-200 text-xs flex items-center justify-between gap-2"
+                        >
+                          <div className="min-w-0">
+                            <span className="font-semibold text-slate-700">{item.manufacturer}</span>
+                            <span className="text-slate-400 mx-1.5">/</span>
+                            <span className="text-slate-700">{item.shelfName}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void removeShelfNameByManufacturer(item.manufacturer, item.shelfName);
+                            }}
+                            className="text-slate-400 hover:text-danger shrink-0"
+                            title="削除"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {getShelfNamesForSelectedManufacturer().map((item) => (
+                        <span
+                          key={item}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-full text-slate-700 text-xs"
+                        >
+                          {item}
+                          <button onClick={() => void removeShelfName(item)} className="hover:text-danger">
+                            <X size={12} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        className="flex-1 border border-slate-300 rounded-md px-3 py-1.5 text-sm"
+                        placeholder="棚割名を追加"
+                        value={shelfInput}
+                        onChange={(e) => setShelfInput(e.target.value)}
+                      />
+                      <button
+                        onClick={async () => {
+                          await addShelfName(shelfInput);
+                          setShelfInput('');
+                        }}
+                        disabled={isSaving}
+                        className="bg-secondary text-white px-3 py-1.5 rounded-md hover:bg-slate-600 text-sm flex items-center gap-1"
+                      >
+                        <Plus size={14} /> 追加
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="rounded-lg border border-slate-200 p-3">
+                <h4 className="font-semibold text-slate-800 mb-2">デフォルト展開スタート月（メーカー別）</h4>
+                {selectedManufacturer === ALL_MANUFACTURERS ? (
+                  <p className="text-xs text-slate-500">「すべて」は閲覧専用です。編集するにはメーカーを選択してください。</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {monthLabels.map((label, index) => {
+                      const month = index + 1;
+                      const checked = getDefaultStartMonthsForSelectedManufacturer().includes(month);
+                      return (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={() => {
+                            void toggleDefaultStartMonth(month);
+                          }}
+                          disabled={isSaving}
+                          className={`px-2.5 py-1.5 rounded-md border text-xs ${
+                            checked
+                              ? 'bg-primary text-white border-primary'
+                              : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
         </div>
         
