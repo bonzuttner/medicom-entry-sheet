@@ -6,7 +6,15 @@ import { EntryForm } from './components/EntryForm';
 import { AccountManage } from './components/AccountManage';
 import { MasterManage } from './components/MasterManage';
 import { dataService } from './services/dataService';
-import { User, Page, EntrySheet, MasterData, ProductEntry, UserRole } from './types';
+import {
+  User,
+  Page,
+  EntrySheet,
+  MasterData,
+  ProductEntry,
+  UserRole,
+  EntrySheetRevision,
+} from './types';
 import { v4 as uuidv4 } from 'uuid';
 
 const EMPTY_MASTER_DATA: MasterData = {
@@ -14,6 +22,8 @@ const EMPTY_MASTER_DATA: MasterData = {
   shelfNames: [],
   riskClassifications: [],
   specificIngredients: [],
+  manufacturerShelfNames: {},
+  manufacturerDefaultStartMonths: {},
 };
 
 const SHEET_PAGE_SIZE = 30;
@@ -109,6 +119,7 @@ const App: React.FC = () => {
   const [hasMoreSheets, setHasMoreSheets] = useState<boolean>(false);
   const [sheetOffset, setSheetOffset] = useState<number>(0);
   const [isLoadingMoreSheets, setIsLoadingMoreSheets] = useState<boolean>(false);
+  const [editingSheetRevisions, setEditingSheetRevisions] = useState<EntrySheetRevision[]>([]);
   const masterSaveSeqRef = useRef(0);
 
   const handleNavigate = (page: Page) => {
@@ -118,6 +129,9 @@ const App: React.FC = () => {
       return;
     }
     setCurrentPage(page);
+    if (page !== Page.EDIT) {
+      setEditingSheetRevisions([]);
+    }
   };
 
   const loadAuxiliaryData = async (): Promise<{ users: User[]; masterData: MasterData }> => {
@@ -258,6 +272,8 @@ const App: React.FC = () => {
 
   const handleCreateSheet = () => {
     if (!currentUser) return;
+    const shelfOptions =
+      masterData.manufacturerShelfNames?.[currentUser.manufacturerName] || masterData.shelfNames;
     const newSheet: EntrySheet = {
       id: uuidv4(),
       updatedAt: new Date().toISOString(),
@@ -274,7 +290,7 @@ const App: React.FC = () => {
       products: [
         {
           id: uuidv4(),
-          shelfName: masterData.shelfNames[0] || '',
+          shelfName: shelfOptions[0] || '',
           manufacturerName: currentUser.manufacturerName,
           janCode: '',
           productName: '',
@@ -299,6 +315,18 @@ const App: React.FC = () => {
     setEditingSheet(sheet);
     setInitialProductIndex(productIndex);
     setCurrentPage(Page.EDIT);
+    const persisted = sheets.some((row) => row.id === sheet.id);
+    if (!persisted) {
+      setEditingSheetRevisions([]);
+      return;
+    }
+    void dataService
+      .getSheetRevisions(sheet.id)
+      .then((rows) => setEditingSheetRevisions(rows))
+      .catch((error) => {
+        console.error('Failed to load sheet revisions:', error);
+        setEditingSheetRevisions([]);
+      });
   };
 
   const handleDuplicateSheet = async (sheet: EntrySheet) => {
@@ -330,6 +358,7 @@ const App: React.FC = () => {
     try {
       await dataService.saveSheet(sheet);
       setEditingSheet(null);
+      setEditingSheetRevisions([]);
       setCurrentPage(Page.LIST);
       setSheets((prev) => upsertSheetInList(prev, sheet));
       refreshFirstSheetsPage();
@@ -374,9 +403,9 @@ const App: React.FC = () => {
   const handleSaveMaster = async (data: MasterData) => {
     const seq = ++masterSaveSeqRef.current;
     try {
-      await dataService.saveMasterData(data);
+      const saved = await dataService.saveMasterData(data);
       if (seq === masterSaveSeqRef.current) {
-        setMasterData(data);
+        setMasterData(saved);
       }
     } catch (error) {
       console.error('Failed to save master data:', error);
@@ -447,9 +476,15 @@ const App: React.FC = () => {
           initialActiveTab={initialProductIndex}
           masterData={masterData}
           reusableProductTemplates={reusableProductTemplates}
+          revisions={editingSheetRevisions}
+          currentUser={currentUser}
+          onSearchProducts={(query, manufacturerName) =>
+            dataService.searchProducts({ query, manufacturerName, limit: 30 })
+          }
           onSave={handleSaveSheet}
           onCancel={() => {
             setEditingSheet(null);
+            setEditingSheetRevisions([]);
             setCurrentPage(Page.LIST);
           }}
         />

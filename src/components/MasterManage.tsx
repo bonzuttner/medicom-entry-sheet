@@ -10,9 +10,16 @@ interface MasterManageProps {
 export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
   const [localData, setLocalData] = useState<MasterData>(data);
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedManufacturer, setSelectedManufacturer] = useState('');
 
   useEffect(() => {
     setLocalData(data);
+    if (
+      data.manufacturerNames.length > 0 &&
+      (!selectedManufacturer || !data.manufacturerNames.includes(selectedManufacturer))
+    ) {
+      setSelectedManufacturer(data.manufacturerNames[0]);
+    }
   }, [data]);
 
   const normalizeItem = (value: string): string => value.trim();
@@ -45,6 +52,55 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
     await persist(newData);
   };
 
+  const getShelfNamesForSelectedManufacturer = (): string[] => {
+    if (!selectedManufacturer) return [];
+    return localData.manufacturerShelfNames?.[selectedManufacturer] || [];
+  };
+
+  const addShelfName = async (rawValue: string) => {
+    const value = normalizeItem(rawValue);
+    if (!value || !selectedManufacturer) return;
+    const current = getShelfNamesForSelectedManufacturer();
+    if (current.some((existing) => existing.trim() === value)) {
+      return;
+    }
+    const manufacturerShelfNames = {
+      ...(localData.manufacturerShelfNames || {}),
+      [selectedManufacturer]: [...current, value],
+    };
+    await persist({ ...localData, manufacturerShelfNames });
+  };
+
+  const removeShelfName = async (value: string) => {
+    if (!selectedManufacturer) return;
+    if (!window.confirm(`「${value}」を削除しますか？`)) return;
+    const current = getShelfNamesForSelectedManufacturer();
+    const manufacturerShelfNames = {
+      ...(localData.manufacturerShelfNames || {}),
+      [selectedManufacturer]: current.filter((v) => v !== value),
+    };
+    await persist({ ...localData, manufacturerShelfNames });
+  };
+
+  const monthLabels = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+  const getDefaultStartMonthsForSelectedManufacturer = (): number[] => {
+    if (!selectedManufacturer) return [];
+    return localData.manufacturerDefaultStartMonths?.[selectedManufacturer] || [];
+  };
+
+  const toggleDefaultStartMonth = async (month: number) => {
+    if (!selectedManufacturer) return;
+    const current = getDefaultStartMonthsForSelectedManufacturer();
+    const next = current.includes(month)
+      ? current.filter((m) => m !== month)
+      : [...current, month].sort((a, b) => a - b);
+    const manufacturerDefaultStartMonths = {
+      ...(localData.manufacturerDefaultStartMonths || {}),
+      [selectedManufacturer]: next,
+    };
+    await persist({ ...localData, manufacturerDefaultStartMonths });
+  };
+
   return (
     <div className="space-y-8">
         <h2 className="text-2xl font-bold text-slate-800">マスタ管理</h2>
@@ -58,13 +114,67 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
             isSaving={isSaving}
         />
 
-        <MasterSection 
-            title="棚割名" 
-            items={localData.shelfNames} 
-            onAdd={(v) => addItem('shelfNames', v)} 
-            onRemove={(v) => removeItem('shelfNames', v)} 
-            isSaving={isSaving}
-        />
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+            <h3 className="font-bold text-lg">棚割名（メーカー別）</h3>
+            <p className="text-sm text-slate-500">メーカーを選択して棚割名を管理します。</p>
+            <select
+              className="w-full max-w-md border border-slate-300 rounded-lg px-3 py-2"
+              value={selectedManufacturer}
+              onChange={(e) => setSelectedManufacturer(e.target.value)}
+            >
+              {localData.manufacturerNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <MasterSection
+              title={selectedManufacturer ? `棚割名: ${selectedManufacturer}` : '棚割名'}
+              items={getShelfNamesForSelectedManufacturer()}
+              onAdd={addShelfName}
+              onRemove={removeShelfName}
+              isSaving={isSaving}
+            />
+        </div>
+
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+            <h3 className="font-bold text-lg">デフォルト展開スタート月（メーカー別）</h3>
+            <p className="text-sm text-slate-500">メーカーごとに複数指定できます。エントリーシート新規作成時に候補として使用されます。</p>
+            <select
+              className="w-full max-w-md border border-slate-300 rounded-lg px-3 py-2"
+              value={selectedManufacturer}
+              onChange={(e) => setSelectedManufacturer(e.target.value)}
+            >
+              {localData.manufacturerNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <div className="flex flex-wrap gap-2">
+              {monthLabels.map((label, index) => {
+                const month = index + 1;
+                const checked = getDefaultStartMonthsForSelectedManufacturer().includes(month);
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => {
+                      void toggleDefaultStartMonth(month);
+                    }}
+                    disabled={isSaving}
+                    className={`px-3 py-2 rounded-lg border text-sm ${
+                      checked
+                        ? 'bg-primary text-white border-primary'
+                        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+        </div>
         
         <MasterSection 
             title="リスク分類" 

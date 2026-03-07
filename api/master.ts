@@ -25,6 +25,30 @@ const findTooLongMasterValue = (data: MasterData): string | null => {
     }
   }
 
+  const shelfMap = data.manufacturerShelfNames || {};
+  for (const [manufacturerName, shelfNames] of Object.entries(shelfMap)) {
+    if (manufacturerName.length > MAX_MASTER_VALUE_LENGTH) {
+      return 'メーカー名';
+    }
+    for (const value of shelfNames) {
+      if (typeof value === 'string' && value.length > MAX_MASTER_VALUE_LENGTH) {
+        return '棚割名';
+      }
+    }
+  }
+
+  const defaultStartMonthsMap = data.manufacturerDefaultStartMonths || {};
+  for (const [manufacturerName, months] of Object.entries(defaultStartMonthsMap)) {
+    if (manufacturerName.length > MAX_MASTER_VALUE_LENGTH) {
+      return 'メーカー名';
+    }
+    for (const month of months) {
+      if (!Number.isInteger(month) || month < 1 || month > 12) {
+        return 'デフォルト展開スタート月';
+      }
+    }
+  }
+
   return null;
 };
 
@@ -36,7 +60,21 @@ export default async function handler(req: any, res: any) {
   if (method === 'GET') {
     // Read-only master values are required for entry form dropdowns for all authenticated users.
     const masterData = await MasterRepository.getAll();
-    sendJson(res, 200, masterData);
+    const shelfNamesForCurrentUser = await MasterRepository.getShelfNamesByManufacturerName(
+      currentUser.manufacturerName
+    );
+    const manufacturerShelfNames = isAdmin(currentUser)
+      ? await MasterRepository.getManufacturerShelfNamesMap()
+      : undefined;
+    const manufacturerDefaultStartMonths = isAdmin(currentUser)
+      ? await MasterRepository.getManufacturerDefaultStartMonthsMap()
+      : undefined;
+    sendJson(res, 200, {
+      ...masterData,
+      shelfNames: shelfNamesForCurrentUser,
+      manufacturerShelfNames,
+      manufacturerDefaultStartMonths,
+    });
     return;
   }
 
@@ -58,7 +96,38 @@ export default async function handler(req: any, res: any) {
     }
 
     const updated = await MasterRepository.updateAll(body.data);
-    sendJson(res, 200, updated);
+    if (Object.prototype.hasOwnProperty.call(body.data, 'manufacturerShelfNames')) {
+      const shelfMap = body.data.manufacturerShelfNames || {};
+      const normalizedShelfMap = Object.fromEntries(
+        (body.data.manufacturerNames || []).map((name) => [
+          name,
+          shelfMap[name] || [],
+        ])
+      );
+      await MasterRepository.updateManufacturerShelfNamesMap(normalizedShelfMap);
+    }
+    if (Object.prototype.hasOwnProperty.call(body.data, 'manufacturerDefaultStartMonths')) {
+      const monthMap = body.data.manufacturerDefaultStartMonths || {};
+      const normalizedMonthMap = Object.fromEntries(
+        (body.data.manufacturerNames || []).map((name) => [
+          name,
+          monthMap[name] || [],
+        ])
+      );
+      await MasterRepository.updateManufacturerDefaultStartMonthsMap(normalizedMonthMap);
+    }
+    const shelfNamesForCurrentUser = await MasterRepository.getShelfNamesByManufacturerName(
+      currentUser.manufacturerName
+    );
+    const manufacturerShelfNames = await MasterRepository.getManufacturerShelfNamesMap();
+    const manufacturerDefaultStartMonths =
+      await MasterRepository.getManufacturerDefaultStartMonthsMap();
+    sendJson(res, 200, {
+      ...updated,
+      shelfNames: shelfNamesForCurrentUser,
+      manufacturerShelfNames,
+      manufacturerDefaultStartMonths,
+    });
     return;
   }
 

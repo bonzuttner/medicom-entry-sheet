@@ -37,8 +37,25 @@ export const EntryList: React.FC<EntryListProps> = ({
   const [showExportModal, setShowExportModal] = useState(false);
   const [isDownloadingImages, setIsDownloadingImages] = useState(false);
 
-  const normalizeSheetStatus = (status: EntrySheet['status'] | string): 'completed' | 'draft' =>
-    status === 'completed' ? 'completed' : 'draft';
+  const normalizeSheetStatus = (
+    status: EntrySheet['status'] | string
+  ): 'completed' | 'completed_no_image' | 'draft' => {
+    if (status === 'completed') return 'completed';
+    if (status === 'completed_no_image') return 'completed_no_image';
+    return 'draft';
+  };
+  const getStatusLabel = (status: EntrySheet['status'] | string): string => {
+    const normalized = normalizeSheetStatus(status);
+    if (normalized === 'completed') return '完了';
+    if (normalized === 'completed_no_image') return '完了 -商品画像なし';
+    return '下書き';
+  };
+  const getStatusPillClass = (status: EntrySheet['status'] | string): string => {
+    const normalized = normalizeSheetStatus(status);
+    if (normalized === 'completed') return 'bg-green-100 text-green-800';
+    if (normalized === 'completed_no_image') return 'bg-amber-100 text-amber-800';
+    return 'bg-slate-100 text-slate-700';
+  };
   const normalizeManufacturerKey = (value: string): string => value.trim();
 
   const hasText = (value: unknown): boolean =>
@@ -60,6 +77,35 @@ export const EntryList: React.FC<EntryListProps> = ({
     if (timestamps.length === 0) return null;
     return Math.max(...timestamps);
   };
+  const formatYearMonth = (year: number, month: number): string => `${year}/${month}`;
+  const getDeploymentPeriod = (sheet: EntrySheet): { start: string; end: string } => {
+    if (!sheet.deploymentStartMonth) return { start: '', end: '' };
+    const createdAt = new Date(sheet.createdAt);
+    if (Number.isNaN(createdAt.getTime())) return { start: '', end: '' };
+    const createdMonth = createdAt.getMonth() + 1;
+    const monthOffset = (sheet.deploymentStartMonth - createdMonth + 12) % 12;
+    const startDate = new Date(createdAt.getFullYear(), createdAt.getMonth(), 1);
+    startDate.setMonth(startDate.getMonth() + monthOffset);
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + 2);
+    return {
+      start: formatYearMonth(startDate.getFullYear(), startDate.getMonth() + 1),
+      end: formatYearMonth(endDate.getFullYear(), endDate.getMonth() + 1),
+    };
+  };
+  const getDeploymentPeriodLabel = (sheet: EntrySheet): string => {
+    const period = getDeploymentPeriod(sheet);
+    if (!period.start || !period.end) return '未設定';
+    return `${period.start}~${period.end}`;
+  };
+  const getSheetShelfNames = (sheet: EntrySheet): string =>
+    Array.from(
+      new Set(
+        sheet.products
+          .map((product) => (product.shelfName || '').trim())
+          .filter((name) => name.length > 0)
+      )
+    ).join(' / ') || '未設定';
 
   const getSheetTimestampBy = (
     sheet: EntrySheet,
@@ -157,7 +203,6 @@ export const EntryList: React.FC<EntryListProps> = ({
       const formulaGuarded = /^[=+\-@]/.test(normalized) ? `'${normalized}` : normalized;
       return `"${formulaGuarded.replace(/"/g, '""')}"`;
     };
-
     // Flatten data: 1 row per product. Covers all sheet/product fields.
     const csvRows: string[][] = [
       [
@@ -170,9 +215,10 @@ export const EntryList: React.FC<EntryListProps> = ({
         '作成者',
         '作成日',
         '更新日',
+        '展開期間開始',
+        '展開期間終了',
         '担当者メール',
         '担当者電話',
-        'シート添付ファイル有無',
         'シート添付ファイル数',
         'シート添付ファイル名一覧',
         'シート添付ファイル種別一覧',
@@ -182,13 +228,12 @@ export const EntryList: React.FC<EntryListProps> = ({
         '商品メーカー名',
         'JANコード',
         '商品名',
-        '商品画像有無',
+        '商品画像URL',
         'リスク分類',
         '特定成分',
         'キャッチコピー',
         '商品メッセージ',
         '補足事項',
-        '商品添付ファイル有無',
         '商品添付ファイル数',
         '商品添付ファイル名一覧',
         '商品添付ファイル種別一覧',
@@ -197,18 +242,19 @@ export const EntryList: React.FC<EntryListProps> = ({
         '高さ(mm)',
         '奥行(mm)',
         'フェイシング数',
-        '店舗到着日',
+        '送込み店舗着日要望',
         '販促物有無',
         '香り・色見本',
         '特殊な陳列什器',
         '販促物サイズ(幅)',
         '販促物サイズ(高さ)',
         '販促物サイズ(奥行)',
-        '販促物画像有無',
+        '販促物画像URL',
       ]
     ];
 
     targetSheets.forEach(sheet => {
+      const deploymentPeriod = getDeploymentPeriod(sheet);
       const sheetAttachmentCount = sheet.attachments?.length ?? 0;
       const sheetAttachmentNames = (sheet.attachments || []).map((file) => file.name).join(' / ');
       const sheetAttachmentTypes = (sheet.attachments || []).map((file) => file.type).join(' / ');
@@ -220,7 +266,7 @@ export const EntryList: React.FC<EntryListProps> = ({
         const productAttachmentUrls = (prod.productAttachments || []).map((file) => file.url).join(' / ');
         csvRows.push([
           toSafeCsvCell(sheet.id),
-          toSafeCsvCell(normalizeSheetStatus(sheet.status) === 'completed' ? '完了' : '下書き'),
+          toSafeCsvCell(getStatusLabel(sheet.status)),
           toSafeCsvCell(sheet.title),
           toSafeCsvCell(sheet.notes || ''),
           toSafeCsvCell(sheet.manufacturerName),
@@ -228,9 +274,10 @@ export const EntryList: React.FC<EntryListProps> = ({
           toSafeCsvCell(sheet.creatorName),
           toSafeCsvCell(new Date(sheet.createdAt).toLocaleDateString()),
           toSafeCsvCell(new Date(sheet.updatedAt).toLocaleDateString()),
+          toSafeCsvCell(deploymentPeriod.start),
+          toSafeCsvCell(deploymentPeriod.end),
           toSafeCsvCell(sheet.email),
           toSafeCsvCell(sheet.phoneNumber),
-          toSafeCsvCell(sheetAttachmentCount > 0 ? '有り' : '無し'),
           toSafeCsvCell(sheetAttachmentCount),
           toSafeCsvCell(sheetAttachmentNames),
           toSafeCsvCell(sheetAttachmentTypes),
@@ -240,13 +287,12 @@ export const EntryList: React.FC<EntryListProps> = ({
           toSafeCsvCell(prod.manufacturerName),
           toSafeCsvCell(prod.janCode),
           toSafeCsvCell(prod.productName),
-          toSafeCsvCell(prod.productImage ? '有り' : '無し'),
+          toSafeCsvCell(prod.productImage || ''),
           toSafeCsvCell(prod.riskClassification),
           toSafeCsvCell((prod.specificIngredients || []).join(' / ')),
           toSafeCsvCell(prod.catchCopy || ''),
           toSafeCsvCell(prod.productMessage || ''),
           toSafeCsvCell(prod.productNotes || ''),
-          toSafeCsvCell(productAttachmentCount > 0 ? '有り' : '無し'),
           toSafeCsvCell(productAttachmentCount),
           toSafeCsvCell(productAttachmentNames),
           toSafeCsvCell(productAttachmentTypes),
@@ -262,7 +308,7 @@ export const EntryList: React.FC<EntryListProps> = ({
           toSafeCsvCell(prod.promoWidth ?? ''),
           toSafeCsvCell(prod.promoHeight ?? ''),
           toSafeCsvCell(prod.promoDepth ?? ''),
-          toSafeCsvCell(prod.promoImage ? '有り' : '無し'),
+          toSafeCsvCell(prod.promoImage || ''),
         ]);
       });
     });
@@ -466,7 +512,7 @@ export const EntryList: React.FC<EntryListProps> = ({
                         </div>
                         <div className="text-sm font-bold text-slate-800 truncate" title={prod.productName}>{prod.productName || '(名称未設定)'}</div>
                         <div className="text-xs text-slate-500 font-mono mt-1">
-                            店舗着日: {prod.arrivalDate ? new Date(prod.arrivalDate).toLocaleDateString() : '未設定'}
+                            送込み店舗着日要望: {prod.arrivalDate ? new Date(prod.arrivalDate).toLocaleDateString() : '未設定'}
                         </div>
                     </div>
                 </div>
@@ -538,7 +584,7 @@ export const EntryList: React.FC<EntryListProps> = ({
           >
             <option value="createdAt">作成日</option>
             <option value="updatedAt">更新日</option>
-            <option value="arrivalDate">店舗到着日</option>
+            <option value="arrivalDate">送込み店舗着日要望</option>
           </select>
           <input
             type="date"
@@ -605,14 +651,20 @@ export const EntryList: React.FC<EntryListProps> = ({
                             </div>
                             <div className="flex-1 min-w-0" onClick={() => toggleExpand(sheet.id)}>
                                 <div className="flex justify-between items-start mb-1">
-                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${normalizeSheetStatus(sheet.status) === 'completed' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-700'}`}>
-                                        {normalizeSheetStatus(sheet.status) === 'completed' ? '完了' : '下書き'}
+                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${getStatusPillClass(sheet.status)}`}>
+                                        {getStatusLabel(sheet.status)}
                                     </span>
                                     <span className="text-xs text-slate-400">{new Date(sheet.updatedAt).toLocaleDateString()}</span>
                                 </div>
                                 <h3 className="text-base font-bold text-slate-900 leading-tight mb-1">{sheet.title}</h3>
                                 <div className="text-xs text-slate-500 truncate">
                                     {sheet.manufacturerName} / {sheet.creatorName}
+                                </div>
+                                <div className="text-xs text-slate-600 mt-1">
+                                    展開期間: {getDeploymentPeriodLabel(sheet)}
+                                </div>
+                                <div className="text-xs text-slate-600 mt-0.5 break-words">
+                                    棚割り: {getSheetShelfNames(sheet)}
                                 </div>
                             </div>
                         </div>
@@ -689,6 +741,8 @@ export const EntryList: React.FC<EntryListProps> = ({
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-24">状態</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">タイトル</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-44">展開期間</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-44">棚割り</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-48">
                       <button
                         onClick={() => toggleSort('manufacturer')}
@@ -734,19 +788,21 @@ export const EntryList: React.FC<EntryListProps> = ({
                              </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            {normalizeSheetStatus(sheet.status) === 'completed' ? (
-                              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                完了
-                              </span>
-                            ) : (
-                              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-slate-100 text-slate-800">
-                                下書き
-                              </span>
-                            )}
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusPillClass(sheet.status)}`}>
+                              {getStatusLabel(sheet.status)}
+                            </span>
                           </td>
                           <td className="px-6 py-4">
                             <div className="text-sm font-bold text-slate-900 line-clamp-1">{sheet.title}</div>
                             <div className="text-xs text-slate-500">{sheet.products.length} 商品登録済</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
+                            {getDeploymentPeriodLabel(sheet)}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-slate-700">
+                            <div className="line-clamp-2 break-words" title={getSheetShelfNames(sheet)}>
+                              {getSheetShelfNames(sheet)}
+                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-slate-900 line-clamp-1">{sheet.manufacturerName}</div>
@@ -795,7 +851,7 @@ export const EntryList: React.FC<EntryListProps> = ({
                         {/* Expanded Content Desktop */}
                         {isExpanded && (
                           <tr className="bg-slate-50 shadow-inner">
-                              <td colSpan={7} className="px-4 sm:px-6 py-4">
+                              <td colSpan={9} className="px-4 sm:px-6 py-4">
                                   <ProductGrid sheet={sheet} />
                                   <div className="mt-4 text-right">
                                        <button

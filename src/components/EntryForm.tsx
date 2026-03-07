@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { EntrySheet, MasterData, ProductEntry } from '../types';
+import { EntrySheet, EntrySheetRevision, MasterData, ProductEntry, User, UserRole } from '../types';
 import { Save, ArrowLeft, Plus, Trash2, AlertTriangle, Image as ImageIcon } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -8,6 +8,9 @@ interface EntryFormProps {
   initialActiveTab?: number;
   masterData: MasterData;
   reusableProductTemplates: Record<string, ProductEntry>;
+  revisions: EntrySheetRevision[];
+  currentUser: User;
+  onSearchProducts: (query: string, manufacturerName: string) => Promise<ProductEntry[]>;
   onSave: (sheet: EntrySheet) => Promise<void> | void;
   onCancel: () => void;
 }
@@ -21,6 +24,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   initialActiveTab = 0,
   masterData,
   reusableProductTemplates,
+  revisions,
+  currentUser,
+  onSearchProducts,
   onSave,
   onCancel,
 }) => {
@@ -28,7 +34,41 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   const [activeTab, setActiveTab] = useState<number>(initialActiveTab); // Index of the product being edited
   const [isSaving, setIsSaving] = useState(false);
   const [pendingUploads, setPendingUploads] = useState(0);
+  const [productSearchQuery, setProductSearchQuery] = useState('');
+  const [productSearchResults, setProductSearchResults] = useState<ProductEntry[]>([]);
+  const [isSearchingProducts, setIsSearchingProducts] = useState(false);
   const askedPrefillByProductRef = useRef<Map<number, string>>(new Map());
+  const isAdminUser = currentUser.role === UserRole.ADMIN;
+
+  const selectableStartMonths = (() => {
+    const base = new Date(formData.createdAt || new Date().toISOString());
+    const items: Array<{ year: number; month: number; label: string }> = [];
+    for (let i = 0; i < 4; i += 1) {
+      const d = new Date(base);
+      d.setMonth(d.getMonth() + i);
+      const year = d.getFullYear();
+      const month = d.getMonth() + 1;
+      items.push({
+        year,
+        month,
+        label: `${month}月`,
+      });
+    }
+    return items;
+  })();
+
+  const selectedStartMonth = selectableStartMonths.find(
+    (item) => item.month === formData.deploymentStartMonth
+  );
+  const formatYearMonth = (year: number, month: number): string => `${year}/${month}`;
+  const autoPeriod = (() => {
+    if (!selectedStartMonth) return { start: '', end: '' };
+    const start = formatYearMonth(selectedStartMonth.year, selectedStartMonth.month);
+    const endDate = new Date(selectedStartMonth.year, selectedStartMonth.month - 1, 1);
+    endDate.setMonth(endDate.getMonth() + 2);
+    const end = formatYearMonth(endDate.getFullYear(), endDate.getMonth() + 1);
+    return { start, end };
+  })();
 
   const parseRequiredNumber = (value: string): number => {
     const parsed = Number(value);
@@ -46,6 +86,37 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
       .replace(/[^0-9]/g, '');
 
+  const getShelfOptions = (): string[] => {
+    return (
+      masterData.manufacturerShelfNames?.[formData.manufacturerName] ||
+      masterData.shelfNames ||
+      []
+    );
+  };
+
+  const runProductSearch = async () => {
+    setIsSearchingProducts(true);
+    try {
+      const rows = await onSearchProducts(productSearchQuery, formData.manufacturerName);
+      const sorted = [...rows].sort((a, b) => a.productName.localeCompare(b.productName, 'ja'));
+      setProductSearchResults(sorted);
+    } catch (error) {
+      console.error('Failed to search products:', error);
+      alert('過去商品検索に失敗しました。時間をおいて再試行してください。');
+    } finally {
+      setIsSearchingProducts(false);
+    }
+  };
+
+  const renderAutoValue = (value: string | number | undefined) => (
+    <div>
+      <div className="w-full border border-slate-200 rounded-lg p-3 bg-slate-100 text-slate-700">
+        {value === undefined || value === '' ? '（未入力）' : String(value)}
+      </div>
+      <p className="text-xs text-slate-500 mt-1">※ 自動入力（編集不可）</p>
+    </div>
+  );
+
   // Sync update time
   useEffect(() => {
     setFormData(prev => ({
@@ -54,8 +125,35 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     }));
   }, [formData.products, formData.title, formData.email, formData.phoneNumber]);
 
+  useEffect(() => {
+    if (formData.deploymentStartMonth) return;
+    const defaults =
+      masterData.manufacturerDefaultStartMonths?.[formData.manufacturerName] || [];
+    if (defaults.length === 0) return;
+    const matched = selectableStartMonths.find((item) => defaults.includes(item.month));
+    if (!matched) return;
+    setFormData((prev) =>
+      prev.deploymentStartMonth ? prev : { ...prev, deploymentStartMonth: matched.month }
+    );
+  }, [
+    formData.deploymentStartMonth,
+    formData.manufacturerName,
+    masterData.manufacturerDefaultStartMonths,
+    selectableStartMonths,
+  ]);
+
   const handleHeaderChange = (field: keyof EntrySheet, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleAdminMemoChange = (field: string, value: string | number | undefined) => {
+    setFormData((prev) => ({
+      ...prev,
+      adminMemo: {
+        ...(prev.adminMemo || {}),
+        [field]: value,
+      },
+    }));
   };
 
   const readFileAsDataUrl = (file: File): Promise<string> => new Promise((resolve, reject) => {
@@ -350,6 +448,20 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     });
   };
 
+  const applySearchedProduct = (index: number, candidate: ProductEntry) => {
+    setFormData((prev) => {
+      const nextProducts = [...prev.products];
+      const current = nextProducts[index];
+      nextProducts[index] = {
+        ...current,
+        ...candidate,
+        id: current.id,
+        manufacturerName: current.manufacturerName,
+      };
+      return { ...prev, products: nextProducts };
+    });
+  };
+
   const maybeSuggestReusableProduct = (index: number, productName: string) => {
     const normalized = normalizeProductName(productName);
     if (!normalized) return;
@@ -399,9 +511,10 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   };
 
   const addProduct = () => {
+    const shelfOptions = getShelfOptions();
     const newProduct: ProductEntry = {
       id: uuidv4(),
-      shelfName: masterData.shelfNames[0] || '',
+      shelfName: shelfOptions[0] || '',
       manufacturerName: formData.manufacturerName,
       janCode: '',
       productName: '',
@@ -460,17 +573,21 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         return;
     }
     
+    let finalStatus: EntrySheet['status'] = status;
     if (status === 'completed') {
         if (shelfWidthTotal >= 840) {
             alert("棚割り幅合計が840mm以上のため完了できません。");
             return;
+        }
+        const hasMissingProductImage = formData.products.some((product) => !product.productImage);
+        if (hasMissingProductImage) {
+          finalStatus = 'completed_no_image';
         }
         // Strict validation
         for (const [index, p] of formData.products.entries()) {
             const missing: string[] = [];
             if (!p.productName) missing.push('商品名');
             if (!p.janCode) missing.push('JANコード');
-            if (!p.productImage) missing.push('商品画像');
             if (missing.length > 0) {
                 alert(`商品${index + 1}の必須項目が不足しています: ${missing.join('、')}`);
                 return;
@@ -497,7 +614,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
     setIsSaving(true);
     try {
-      await onSave({ ...formData, status });
+      await onSave({ ...formData, status: finalStatus });
     } finally {
       setIsSaving(false);
     }
@@ -685,6 +802,43 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     />
                 </div>
                 <div className="col-span-1 md:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">展開スタート月</label>
+                    <div className="flex flex-wrap gap-2">
+                      {selectableStartMonths.map((item) => {
+                        const checked = formData.deploymentStartMonth === item.month;
+                        return (
+                          <button
+                            key={`${item.year}-${item.month}`}
+                            type="button"
+                            onClick={() =>
+                              setFormData((prev) => ({ ...prev, deploymentStartMonth: item.month }))
+                            }
+                            className={`px-4 py-2 rounded-lg border text-sm font-semibold ${
+                              checked
+                                ? 'bg-primary text-white border-primary'
+                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                </div>
+                <div className="col-span-1 md:col-span-2">
+                  <label className="block text-sm font-bold text-slate-700 mb-2">展開期間 <span className="text-red-500">*自動入力</span></label>
+                  <div className="flex items-center gap-3 text-lg">
+                    <div className="px-4 py-2 bg-slate-100 rounded text-slate-800 min-w-[100px]">
+                      {autoPeriod.start || '-'}
+                    </div>
+                    <span>~</span>
+                    <div className="px-4 py-2 bg-slate-100 rounded text-slate-800 min-w-[100px]">
+                      {autoPeriod.end || '-'}
+                    </div>
+                    <span className="text-sm text-slate-500">※終了期間が変更になる場合はご連絡ください</span>
+                  </div>
+                </div>
+                <div className="col-span-1 md:col-span-2">
                     <label className="block text-sm font-bold text-slate-700 mb-2">エントリシート補足情報</label>
                     <textarea
                         rows={3}
@@ -747,6 +901,189 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                 </div>
             </div>
         </div>
+
+        <div className="mt-8">
+            <h4 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <span className="w-1 h-5 bg-violet-500 rounded-full"></span>
+                Adminメモ（全員閲覧 / 管理者のみ編集）
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">販促CD</label>
+                    {isAdminUser ? (
+                      <input
+                        type="text"
+                        className="w-full border-slate-300 rounded-lg shadow-sm p-3 font-mono"
+                        value={formData.adminMemo?.promoCode || ''}
+                        onChange={(e) => handleAdminMemoChange('promoCode', e.target.value)}
+                        placeholder="X000000"
+                      />
+                    ) : (
+                      renderAutoValue(formData.adminMemo?.promoCode)
+                    )}
+                </div>
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">ボードピッキングJAN</label>
+                    {isAdminUser ? (
+                      <input
+                        type="text"
+                        className="w-full border-slate-300 rounded-lg shadow-sm p-3 font-mono"
+                        value={formData.adminMemo?.boardPickingJan || ''}
+                        onChange={(e) => handleAdminMemoChange('boardPickingJan', normalizeJanCodeInput(e.target.value).slice(0, 13))}
+                        placeholder="9999999999999"
+                      />
+                    ) : (
+                      renderAutoValue(formData.adminMemo?.boardPickingJan)
+                    )}
+                </div>
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">帯パターン</label>
+                    {isAdminUser ? (
+                      <input
+                        type="text"
+                        className="w-full border-slate-300 rounded-lg shadow-sm p-3"
+                        value={formData.adminMemo?.bandPattern || ''}
+                        onChange={(e) => handleAdminMemoChange('bandPattern', e.target.value)}
+                        placeholder="〇種"
+                      />
+                    ) : (
+                      renderAutoValue(formData.adminMemo?.bandPattern)
+                    )}
+                </div>
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">対象店舗数</label>
+                    {isAdminUser ? (
+                      <input
+                        type="number"
+                        className="w-full border-slate-300 rounded-lg shadow-sm p-3"
+                        value={formData.adminMemo?.targetStoreCount ?? ''}
+                        onChange={(e) => handleAdminMemoChange('targetStoreCount', parseOptionalNumber(e.target.value))}
+                        placeholder="〇店舗"
+                      />
+                    ) : (
+                      renderAutoValue(formData.adminMemo?.targetStoreCount)
+                    )}
+                </div>
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">印刷依頼数量 ボード①</label>
+                    {isAdminUser ? (
+                      <input
+                        type="number"
+                        className="w-full border-slate-300 rounded-lg shadow-sm p-3"
+                        value={formData.adminMemo?.printBoard1Count ?? ''}
+                        onChange={(e) => handleAdminMemoChange('printBoard1Count', parseOptionalNumber(e.target.value))}
+                        placeholder="〇枚"
+                      />
+                    ) : (
+                      renderAutoValue(formData.adminMemo?.printBoard1Count)
+                    )}
+                </div>
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">印刷依頼数量 ボード②</label>
+                    {isAdminUser ? (
+                      <input
+                        type="number"
+                        className="w-full border-slate-300 rounded-lg shadow-sm p-3"
+                        value={formData.adminMemo?.printBoard2Count ?? ''}
+                        onChange={(e) => handleAdminMemoChange('printBoard2Count', parseOptionalNumber(e.target.value))}
+                        placeholder="〇枚"
+                      />
+                    ) : (
+                      renderAutoValue(formData.adminMemo?.printBoard2Count)
+                    )}
+                </div>
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">印刷依頼数量 帯①</label>
+                    {isAdminUser ? (
+                      <input
+                        type="number"
+                        className="w-full border-slate-300 rounded-lg shadow-sm p-3"
+                        value={formData.adminMemo?.printBand1Count ?? ''}
+                        onChange={(e) => handleAdminMemoChange('printBand1Count', parseOptionalNumber(e.target.value))}
+                        placeholder="〇枚"
+                      />
+                    ) : (
+                      renderAutoValue(formData.adminMemo?.printBand1Count)
+                    )}
+                </div>
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">印刷依頼数量 帯②</label>
+                    {isAdminUser ? (
+                      <input
+                        type="number"
+                        className="w-full border-slate-300 rounded-lg shadow-sm p-3"
+                        value={formData.adminMemo?.printBand2Count ?? ''}
+                        onChange={(e) => handleAdminMemoChange('printBand2Count', parseOptionalNumber(e.target.value))}
+                        placeholder="〇枚"
+                      />
+                    ) : (
+                      renderAutoValue(formData.adminMemo?.printBand2Count)
+                    )}
+                </div>
+                <div className="md:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">印刷依頼数量 その他</label>
+                    {isAdminUser ? (
+                      <textarea
+                        rows={2}
+                        className="w-full border-slate-300 rounded-lg shadow-sm p-3"
+                        value={formData.adminMemo?.printOther || ''}
+                        onChange={(e) => handleAdminMemoChange('printOther', e.target.value)}
+                      />
+                    ) : (
+                      renderAutoValue(formData.adminMemo?.printOther)
+                    )}
+                </div>
+                <div className="md:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">備品</label>
+                    {isAdminUser ? (
+                      <textarea
+                        rows={2}
+                        className="w-full border-slate-300 rounded-lg shadow-sm p-3"
+                        value={formData.adminMemo?.equipmentNote || ''}
+                        onChange={(e) => handleAdminMemoChange('equipmentNote', e.target.value)}
+                      />
+                    ) : (
+                      renderAutoValue(formData.adminMemo?.equipmentNote)
+                    )}
+                </div>
+                <div className="md:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">備考</label>
+                    {isAdminUser ? (
+                      <textarea
+                        rows={3}
+                        className="w-full border-slate-300 rounded-lg shadow-sm p-3"
+                        value={formData.adminMemo?.adminNote || ''}
+                        onChange={(e) => handleAdminMemoChange('adminNote', e.target.value)}
+                      />
+                    ) : (
+                      renderAutoValue(formData.adminMemo?.adminNote)
+                    )}
+                </div>
+            </div>
+        </div>
+
+        <div className="mt-8">
+          <h4 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+            <span className="w-1 h-5 bg-rose-500 rounded-full"></span>
+            変更履歴（直近）
+          </h4>
+          {revisions.length === 0 ? (
+            <p className="text-sm text-slate-500">履歴はまだありません。</p>
+          ) : (
+            <ul className="space-y-3">
+              {revisions.map((revision) => (
+                <li key={revision.id} className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                  <div className="text-xs text-slate-500 mb-1">
+                    {new Date(revision.changedAt).toLocaleString('ja-JP')} / {revision.changedByName || '不明ユーザー'}
+                  </div>
+                  <pre className="whitespace-pre-wrap text-sm text-slate-700 font-sans">
+                    {revision.summary}
+                  </pre>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
 
       {/* Products Tabs */}
@@ -800,17 +1137,12 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                         value={activeProduct.shelfName}
                         onChange={(e) => handleProductChange(activeTab, 'shelfName', e.target.value)}
                     >
-                        {masterData.shelfNames.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        {getShelfOptions().map(opt => <option key={opt} value={opt}>{opt}</option>)}
                     </select>
                 </div>
                 <div>
                      <label className="block text-sm font-bold text-slate-700 mb-2">メーカー名 <span className="text-danger">*</span></label>
-                     <input 
-                        type="text" 
-                        className="w-full border-slate-300 rounded-lg py-3 px-3 focus:ring-primary focus:border-primary"
-                        value={activeProduct.manufacturerName}
-                        onChange={(e) => handleProductChange(activeTab, 'manufacturerName', e.target.value)}
-                     />
+                     {renderAutoValue(activeProduct.manufacturerName)}
                 </div>
                  <div>
                      <label className="block text-sm font-bold text-slate-700 mb-2">JANコード <span className="text-danger">*</span> <span className="text-xs font-normal text-slate-500">(8, 13, 16桁)</span></label>
@@ -833,6 +1165,52 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                         onChange={(e) => handleProductNameChange(activeTab, e.target.value)}
                         onBlur={(e) => maybeSuggestReusableProduct(activeTab, e.target.value)}
                      />
+                </div>
+                <div className="md:col-span-2 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">過去商品検索（自社メーカー）</label>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="text"
+                        className="flex-1 border-slate-300 rounded-lg py-2 px-3"
+                        value={productSearchQuery}
+                        onChange={(e) => setProductSearchQuery(e.target.value)}
+                        placeholder="商品名またはJANで検索"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void runProductSearch();
+                        }}
+                        disabled={isSearchingProducts}
+                        className="px-4 py-2 rounded-lg bg-slate-700 text-white hover:bg-slate-800 disabled:opacity-60"
+                      >
+                        {isSearchingProducts ? '検索中...' : '検索'}
+                      </button>
+                    </div>
+                    {productSearchResults.length > 0 && (
+                      <ul className="mt-3 max-h-48 overflow-auto space-y-2">
+                        {productSearchResults.map((item) => (
+                          <li
+                            key={item.id}
+                            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-white border border-slate-200 rounded px-3 py-2"
+                          >
+                            <div className="text-sm">
+                              <div className="font-semibold text-slate-800">{item.productName}</div>
+                              <div className="text-slate-500">
+                                JAN: {item.janCode} / 棚割名: {item.shelfName}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => applySearchedProduct(activeTab, item)}
+                              className="px-3 py-1 rounded bg-primary text-white hover:bg-sky-600 text-sm"
+                            >
+                              反映
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                 </div>
                  {/* Product Image - Prominent */}
                  <div className="md:col-span-2 bg-slate-50 p-4 sm:p-6 rounded-xl border border-slate-200 mb-2">
@@ -859,6 +1237,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                         <div className="flex-1 text-sm text-slate-600">
                             <p className="mb-2"><strong>推奨:</strong> 300dpi相当 (2500px以上)。</p>
                             <p className="mb-3 text-slate-500">※A4で印刷可能な高解像度画像をアップロードしてください。保存できない場合は担当者へメール送付してください。</p>
+                            <p className="mb-3 text-slate-500">※登録可能な形式: ai / PNG / jpeg / eps</p>
                             <button 
                                 onClick={() => handleImageUpload(activeTab, 'productImage')}
                                 className="w-full sm:w-auto px-4 py-2 bg-white border border-slate-300 rounded shadow-sm hover:bg-slate-50 text-slate-700 font-medium"
@@ -963,17 +1342,18 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         <section className="mb-10">
             <h4 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
                 <span className="w-1 h-6 bg-cyan-500 rounded-full"></span>
-                送込み店舗着日
+                送込み店舗着日要望
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                     <label className="block text-sm font-bold text-slate-700 mb-2">送込み店舗着日</label>
+                     <label className="block text-sm font-bold text-slate-700 mb-2">送込み店舗着日要望</label>
                      <input 
                         type="date" 
                         className="w-full border-slate-300 rounded-lg py-3 px-3"
                         value={activeProduct.arrivalDate || ''}
                         onChange={(e) => handleProductChange(activeTab, 'arrivalDate', e.target.value)}
                      />
+                     <p className="text-xs text-slate-500 mt-2">＊日程の確定は担当者とご相談ください</p>
                 </div>
             </div>
         </section>
@@ -1016,7 +1396,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         <section className="mb-6">
             <h4 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
                 <span className="w-1 h-6 bg-orange-500 rounded-full"></span>
-                販促情報
+                販促物情報
             </h4>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">

@@ -1,7 +1,7 @@
 import { canAccessManufacturer, isAdmin, requireUser } from '../_lib/auth.js';
 import { getMethod, methodNotAllowed, readJsonBody, sendError, sendJson } from '../_lib/http.js';
 import { deleteUnusedManagedBlobUrls, normalizeSheetMedia } from '../_lib/media.js';
-import { EntrySheet } from '../_lib/types.js';
+import { EntrySheet, EntrySheetAdminMemo } from '../_lib/types.js';
 import * as SheetRepository from '../_lib/repositories/sheets.js';
 
 interface PutSheetBody {
@@ -9,6 +9,8 @@ interface PutSheetBody {
 }
 
 const MAX_GENERAL_TEXT_LENGTH = 4000;
+const PROMO_CODE_PATTERN = /^X\d{6}$/;
+const JAN_13_PATTERN = /^\d{13}$/;
 
 const getSheetId = (req: any): string | null => {
   const raw = req.query?.id;
@@ -16,8 +18,13 @@ const getSheetId = (req: any): string | null => {
   return raw || null;
 };
 
-const normalizeStatus = (value: string | undefined): 'draft' | 'completed' =>
-  value === 'completed' ? 'completed' : 'draft';
+const normalizeStatus = (
+  value: string | undefined
+): 'draft' | 'completed' | 'completed_no_image' => {
+  if (value === 'completed') return 'completed';
+  if (value === 'completed_no_image') return 'completed_no_image';
+  return 'draft';
+};
 
 const normalizeProducts = (
   incoming: EntrySheet['products'] | undefined,
@@ -42,6 +49,10 @@ const findTooLongField = (sheet: EntrySheet): string | null => {
   if (isTooLong(sheet.notes)) return 'エントリシート補足情報';
   if (isTooLong(sheet.email)) return '担当者メール';
   if (isTooLong(sheet.phoneNumber)) return '担当者電話番号';
+  if (isTooLong(sheet.adminMemo?.bandPattern)) return '帯パターン';
+  if (isTooLong(sheet.adminMemo?.printOther)) return '印刷依頼数量 その他';
+  if (isTooLong(sheet.adminMemo?.equipmentNote)) return '備品';
+  if (isTooLong(sheet.adminMemo?.adminNote)) return '備考';
 
   for (let i = 0; i < sheet.products.length; i += 1) {
     const product = sheet.products[i];
@@ -57,6 +68,108 @@ const findTooLongField = (sheet: EntrySheet): string | null => {
   }
 
   return null;
+};
+
+const toOptionalNumber = (value: unknown): number | undefined => {
+  if (value === '' || value === null || value === undefined) return undefined;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return undefined;
+  return Math.floor(parsed);
+};
+
+const toOptionalMonthNumber = (value: unknown): number | undefined => {
+  if (value === '' || value === null || value === undefined) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 12) return undefined;
+  return parsed;
+};
+
+const normalizeAdminMemo = (
+  incoming: EntrySheetAdminMemo | undefined,
+  existing: EntrySheetAdminMemo | undefined,
+  editable: boolean
+): EntrySheetAdminMemo | undefined => {
+  if (!editable) return existing;
+  return {
+    promoCode: String(incoming?.promoCode || '').trim() || undefined,
+    boardPickingJan: String(incoming?.boardPickingJan || '').trim() || undefined,
+    bandPattern: String(incoming?.bandPattern || '').trim() || undefined,
+    targetStoreCount: toOptionalNumber(incoming?.targetStoreCount),
+    printBoard1Count: toOptionalNumber(incoming?.printBoard1Count),
+    printBoard2Count: toOptionalNumber(incoming?.printBoard2Count),
+    printBand1Count: toOptionalNumber(incoming?.printBand1Count),
+    printBand2Count: toOptionalNumber(incoming?.printBand2Count),
+    printOther: String(incoming?.printOther || '').trim() || undefined,
+    equipmentNote: String(incoming?.equipmentNote || '').trim() || undefined,
+    adminNote: String(incoming?.adminNote || '').trim() || undefined,
+  };
+};
+
+const validateAdminMemo = (memo: EntrySheetAdminMemo | undefined): string | null => {
+  if (!memo) return null;
+  if (memo.promoCode && !PROMO_CODE_PATTERN.test(memo.promoCode)) {
+    return '販促CDは X000000 形式で入力してください';
+  }
+  if (memo.boardPickingJan && !JAN_13_PATTERN.test(memo.boardPickingJan)) {
+    return 'ボードピッキングJANは13桁の数字で入力してください';
+  }
+  return null;
+};
+
+const buildRevisionSummary = (before: EntrySheet | null, after: EntrySheet): string => {
+  if (!before) {
+    return `新規作成: タイトル="${after.title}" / 商品件数=${after.products.length}`;
+  }
+
+  const changes: string[] = [];
+  const pushChange = (label: string, prev: unknown, next: unknown) => {
+    const left = prev == null || prev === '' ? '(空)' : String(prev);
+    const right = next == null || next === '' ? '(空)' : String(next);
+    if (left !== right) {
+      changes.push(`${label}: ${left} -> ${right}`);
+    }
+  };
+
+  pushChange('タイトル', before.title, after.title);
+  pushChange('補足', before.notes || '', after.notes || '');
+  pushChange('担当者名', before.creatorName, after.creatorName);
+  pushChange('担当者メール', before.email, after.email);
+  pushChange('担当者電話', before.phoneNumber, after.phoneNumber);
+  pushChange('状態', before.status, after.status);
+  pushChange('展開スタート月', before.deploymentStartMonth, after.deploymentStartMonth);
+
+  pushChange('Adminメモ.販促CD', before.adminMemo?.promoCode, after.adminMemo?.promoCode);
+  pushChange(
+    'Adminメモ.ボードピッキングJAN',
+    before.adminMemo?.boardPickingJan,
+    after.adminMemo?.boardPickingJan
+  );
+  pushChange('Adminメモ.帯パターン', before.adminMemo?.bandPattern, after.adminMemo?.bandPattern);
+  pushChange(
+    'Adminメモ.対象店舗数',
+    before.adminMemo?.targetStoreCount,
+    after.adminMemo?.targetStoreCount
+  );
+  pushChange('Adminメモ.備品', before.adminMemo?.equipmentNote, after.adminMemo?.equipmentNote);
+  pushChange('Adminメモ.備考', before.adminMemo?.adminNote, after.adminMemo?.adminNote);
+
+  if (before.products.length !== after.products.length) {
+    changes.push(`商品件数: ${before.products.length} -> ${after.products.length}`);
+  }
+
+  const minLen = Math.min(before.products.length, after.products.length);
+  for (let i = 0; i < minLen; i += 1) {
+    const prev = before.products[i];
+    const next = after.products[i];
+    const prefix = `商品${i + 1}`;
+    pushChange(`${prefix}.商品名`, prev.productName, next.productName);
+    pushChange(`${prefix}.JAN`, prev.janCode, next.janCode);
+    pushChange(`${prefix}.棚割名`, prev.shelfName, next.shelfName);
+    pushChange(`${prefix}.リスク分類`, prev.riskClassification, next.riskClassification);
+  }
+
+  if (changes.length === 0) return '変更なしで保存';
+  return changes.slice(0, 80).join('\n');
 };
 
 export default async function handler(req: any, res: any) {
@@ -91,6 +204,7 @@ export default async function handler(req: any, res: any) {
     // - Header fields (creatorName/email/phoneNumber) are editable and stored as snapshots
     const ownerManufacturer = existingSheet?.manufacturerName || currentUser.manufacturerName;
     const ownerCreatorId = existingSheet?.creatorId || currentUser.id;
+    const canEditAdminMemo = isAdmin(currentUser);
 
     const safeSheet: EntrySheet = {
       ...sheet,
@@ -102,6 +216,8 @@ export default async function handler(req: any, res: any) {
       phoneNumber: String(sheet.phoneNumber || existingSheet?.phoneNumber || currentUser.phoneNumber || '').trim(),
       title: String(sheet.title || '').trim(),
       notes: sheet.notes ? String(sheet.notes).trim() : '',
+      deploymentStartMonth: toOptionalMonthNumber(sheet.deploymentStartMonth),
+      adminMemo: normalizeAdminMemo(sheet.adminMemo, existingSheet?.adminMemo, canEditAdminMemo),
       status: normalizeStatus(sheet.status),
       createdAt: existingSheet?.createdAt || sheet.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -116,6 +232,11 @@ export default async function handler(req: any, res: any) {
     const tooLongField = findTooLongField(safeSheet);
     if (tooLongField) {
       sendError(res, 400, `${tooLongField}は${MAX_GENERAL_TEXT_LENGTH}文字以内で入力してください`);
+      return;
+    }
+    const adminMemoValidationError = validateAdminMemo(safeSheet.adminMemo);
+    if (adminMemoValidationError) {
+      sendError(res, 400, adminMemoValidationError);
       return;
     }
 
@@ -154,7 +275,15 @@ export default async function handler(req: any, res: any) {
 
     // Save to database
     try {
-      await SheetRepository.upsert({ ...normalizedSheet, id: sheetId });
+      await SheetRepository.upsert(
+        { ...normalizedSheet, id: sheetId },
+        {
+          changedByUserId: currentUser.id,
+          changedByName: currentUser.displayName || currentUser.username,
+          summary: buildRevisionSummary(existingSheet, safeSheet),
+          keepLatestCount: 30,
+        }
+      );
     } catch (error) {
       // DB save failed after media normalization/upload.
       // Delete newly uploaded blobs that are not part of the previous persisted sheet.

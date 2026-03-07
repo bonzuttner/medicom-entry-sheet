@@ -44,6 +44,7 @@ const parseErrorMessage = (status: number, raw: string): string => {
       'At least one product is required': '商品を1件以上入力してください。',
       'You can only save sheets in your manufacturer': '自社メーカーのシートのみ保存できます。',
       'You cannot modify this sheet': 'このシートを編集する権限がありません。',
+      'You cannot access this sheet': 'このシートを参照する権限がありません。',
       'Sheet not found': '対象のシートが見つかりません。',
       'You cannot delete this sheet': 'このシートを削除する権限がありません。',
       'dataUrl and fileName are required': 'アップロード情報が不足しています。もう一度やり直してください。',
@@ -53,6 +54,9 @@ const parseErrorMessage = (status: number, raw: string): string => {
       'Only admin can migrate data': '移行処理を実行できるのは管理者のみです。',
       'Only admin can migrate data to PostgreSQL': 'PostgreSQL移行を実行できるのは管理者のみです。',
       'data with users/sheets/master is required': '移行データが不足しています。users/sheets/masterを確認してください。',
+      '販促CDは X000000 形式で入力してください': '販促CDは X000000 形式で入力してください。',
+      'ボードピッキングJANは13桁の数字で入力してください': 'ボードピッキングJANは13桁の数字で入力してください。',
+      'Manufacturer is required': 'メーカー情報が不足しています。',
     };
 
     if (exactMap[normalized]) {

@@ -36,7 +36,19 @@ CREATE TABLE IF NOT EXISTS entry_sheets (
   creator_phone_snapshot VARCHAR(50),
   title VARCHAR(500) NOT NULL,
   notes TEXT,
-  status VARCHAR(20) NOT NULL CHECK (status IN ('draft', 'completed')),
+  deployment_start_month SMALLINT,
+  admin_promo_code VARCHAR(50),
+  admin_board_picking_jan VARCHAR(13),
+  admin_band_pattern VARCHAR(100),
+  admin_target_store_count INTEGER,
+  admin_print_board1_count INTEGER,
+  admin_print_board2_count INTEGER,
+  admin_print_band1_count INTEGER,
+  admin_print_band2_count INTEGER,
+  admin_print_other TEXT,
+  admin_equipment_note TEXT,
+  admin_note TEXT,
+  status VARCHAR(30) NOT NULL CHECK (status IN ('draft', 'completed', 'completed_no_image')),
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
@@ -49,6 +61,42 @@ ALTER TABLE entry_sheets
 
 ALTER TABLE entry_sheets
   ADD COLUMN IF NOT EXISTS creator_phone_snapshot VARCHAR(50);
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS deployment_start_month SMALLINT;
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS admin_promo_code VARCHAR(50);
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS admin_board_picking_jan VARCHAR(13);
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS admin_band_pattern VARCHAR(100);
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS admin_target_store_count INTEGER;
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS admin_print_board1_count INTEGER;
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS admin_print_board2_count INTEGER;
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS admin_print_band1_count INTEGER;
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS admin_print_band2_count INTEGER;
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS admin_print_other TEXT;
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS admin_equipment_note TEXT;
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS admin_note TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_sheets_manufacturer ON entry_sheets(manufacturer_id);
 CREATE INDEX IF NOT EXISTS idx_sheets_creator ON entry_sheets(creator_id);
@@ -128,3 +176,42 @@ CREATE TABLE IF NOT EXISTS master_data (
 );
 
 CREATE INDEX IF NOT EXISTS idx_master_category ON master_data(category, display_order);
+
+-- メーカー別棚割り名マスタ
+CREATE TABLE IF NOT EXISTS manufacturer_shelf_names (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  manufacturer_id UUID NOT NULL REFERENCES manufacturers(id) ON DELETE CASCADE,
+  shelf_name VARCHAR(200) NOT NULL,
+  display_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE (manufacturer_id, shelf_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_manufacturer_shelf_names_manufacturer
+  ON manufacturer_shelf_names(manufacturer_id, display_order);
+
+-- メーカー別デフォルト展開スタート月
+CREATE TABLE IF NOT EXISTS manufacturer_default_start_months (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  manufacturer_id UUID NOT NULL REFERENCES manufacturers(id) ON DELETE CASCADE,
+  month SMALLINT NOT NULL CHECK (month BETWEEN 1 AND 12),
+  display_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE (manufacturer_id, month)
+);
+
+CREATE INDEX IF NOT EXISTS idx_manufacturer_default_start_months_manufacturer
+  ON manufacturer_default_start_months(manufacturer_id, display_order);
+
+-- エントリーシート変更履歴
+CREATE TABLE IF NOT EXISTS entry_sheet_revisions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sheet_id UUID NOT NULL REFERENCES entry_sheets(id) ON DELETE CASCADE,
+  changed_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  changed_by_name_snapshot VARCHAR(200),
+  summary TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_sheet_revisions_sheet_created_at
+  ON entry_sheet_revisions(sheet_id, created_at DESC);

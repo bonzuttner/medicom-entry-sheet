@@ -16,6 +16,22 @@ export interface MasterData {
   shelfNames: string[];
   riskClassifications: string[];
   specificIngredients: string[];
+  manufacturerShelfNames?: Record<string, string[]>;
+  manufacturerDefaultStartMonths?: Record<string, number[]>;
+}
+
+export interface EntrySheetAdminMemo {
+  promoCode?: string;
+  boardPickingJan?: string;
+  bandPattern?: string;
+  targetStoreCount?: number;
+  printBoard1Count?: number;
+  printBoard2Count?: number;
+  printBand1Count?: number;
+  printBand2Count?: number;
+  printOther?: string;
+  equipmentNote?: string;
+  adminNote?: string;
 }
 
 export interface ProductEntry {
@@ -56,9 +72,20 @@ export interface EntrySheet {
   phoneNumber: string;
   title: string;
   notes?: string;
+  deploymentStartMonth?: number;
   attachments?: Attachment[];
-  status: 'draft' | 'completed';
+  status: 'draft' | 'completed' | 'completed_no_image';
+  adminMemo?: EntrySheetAdminMemo;
   products: ProductEntry[];
+}
+
+export interface EntrySheetRevision {
+  id: string;
+  sheetId: string;
+  changedAt: string;
+  changedByUserId?: string;
+  changedByName: string;
+  summary: string;
 }
 
 export interface StoreData {

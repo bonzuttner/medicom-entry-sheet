@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { MasterData, User, UserRole } from '../types';
-import { Plus, Edit, Trash2, AlertCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 interface AccountManageProps {
@@ -53,6 +53,7 @@ export const AccountManage: React.FC<AccountManageProps> = ({
   const [editingUser, setEditingUser] = useState<Partial<User> | null>(null);
   const [validationError, setValidationError] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const passwordRule = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
   const emailRule = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
   const phoneRule = /^[0-9]{10,11}$/;
@@ -165,6 +166,7 @@ export const AccountManage: React.FC<AccountManageProps> = ({
       setIsSaving(true);
       await onSaveUser(newUser);
       setEditingUser(null);
+      setIsPasswordVisible(false);
       setValidationError('');
     } catch (error) {
       setValidationError(getUserSaveErrorMessage(error));
@@ -182,6 +184,7 @@ export const AccountManage: React.FC<AccountManageProps> = ({
       role: UserRole.STAFF,
       manufacturerName: defaultManufacturer
     });
+    setIsPasswordVisible(false);
     setValidationError('');
   };
 
@@ -219,39 +222,47 @@ export const AccountManage: React.FC<AccountManageProps> = ({
                     </div>
                      <div>
                         <label className="block text-sm font-medium text-slate-700">メーカー名 <span className="text-red-500">*</span></label>
-                        <select
-                            className="w-full border p-2 rounded bg-white"
-                            value={editingUser.manufacturerName || ''}
-                            onChange={e => setEditingUser({...editingUser, manufacturerName: e.target.value})}
-                            disabled={currentUser.role === UserRole.STAFF}
-                            title={currentUser.role === UserRole.STAFF ? '自社メーカー名のみ設定可能です' : ''}
-                        >
-                            {manufacturerOptions.length === 0 ? (
-                                <option value="">メーカー名をマスタ管理で登録してください</option>
-                            ) : (
-                                manufacturerOptions.map((name) => (
-                                    <option key={name} value={name}>{name}</option>
-                                ))
-                            )}
-                        </select>
-                        {currentUser.role === UserRole.STAFF && (
-                            <p className="text-xs text-slate-500 mt-1">※ 自社アカウントのみ作成できます</p>
+                        {currentUser.role === UserRole.STAFF ? (
+                          <div>
+                            <div className="w-full border border-slate-200 p-2 rounded bg-slate-100 text-slate-700">
+                              {editingUser.manufacturerName || currentUser.manufacturerName}
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">※ 自動入力（自社メーカー固定）</p>
+                          </div>
+                        ) : (
+                          <select
+                              className="w-full border p-2 rounded bg-white"
+                              value={editingUser.manufacturerName || ''}
+                              onChange={e => setEditingUser({...editingUser, manufacturerName: e.target.value})}
+                          >
+                              {manufacturerOptions.length === 0 ? (
+                                  <option value="">メーカー名をマスタ管理で登録してください</option>
+                              ) : (
+                                  manufacturerOptions.map((name) => (
+                                      <option key={name} value={name}>{name}</option>
+                                  ))
+                              )}
+                          </select>
                         )}
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700">権限 <span className="text-red-500">*</span></label>
-                        <select
-                            className="w-full border p-2 rounded bg-white"
-                            value={editingUser.role || UserRole.STAFF}
-                            onChange={e => setEditingUser({ ...editingUser, role: e.target.value as UserRole })}
-                            disabled={currentUser.role !== UserRole.ADMIN}
-                            title={currentUser.role !== UserRole.ADMIN ? '権限変更は管理者ユーザーのみ可能です' : ''}
-                        >
-                            <option value={UserRole.STAFF}>一般</option>
-                            <option value={UserRole.ADMIN}>管理者</option>
-                        </select>
-                        {currentUser.role !== UserRole.ADMIN && (
-                            <p className="text-xs text-slate-500 mt-1">※ 権限変更は管理者ユーザーのみ可能です</p>
+                        {currentUser.role !== UserRole.ADMIN ? (
+                          <div>
+                            <div className="w-full border border-slate-200 p-2 rounded bg-slate-100 text-slate-700">
+                              {editingUser.role === UserRole.ADMIN ? '管理者' : '一般'}
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">※ 自動入力（一般固定）</p>
+                          </div>
+                        ) : (
+                          <select
+                              className="w-full border p-2 rounded bg-white"
+                              value={editingUser.role || UserRole.STAFF}
+                              onChange={e => setEditingUser({ ...editingUser, role: e.target.value as UserRole })}
+                          >
+                              <option value={UserRole.STAFF}>一般</option>
+                              <option value={UserRole.ADMIN}>管理者</option>
+                          </select>
                         )}
                     </div>
                      <div>
@@ -278,14 +289,25 @@ export const AccountManage: React.FC<AccountManageProps> = ({
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700">パスワード <span className="text-red-500">*</span></label>
-                        <input
-                            type="password"
-                            className="w-full border p-2 rounded"
-                            value={editingUser.password || ''}
-                            onChange={e => setEditingUser({ ...editingUser, password: e.target.value })}
-                            placeholder={editingUser.id ? '変更する場合のみ入力（8文字以上）' : '大文字・小文字・数字・記号を含む8文字以上'}
-                            autoComplete="new-password"
-                        />
+                        <div className="relative">
+                            <input
+                                type={isPasswordVisible ? 'text' : 'password'}
+                                className="w-full border p-2 rounded pr-10"
+                                value={editingUser.password || ''}
+                                onChange={e => setEditingUser({ ...editingUser, password: e.target.value })}
+                                placeholder={editingUser.id ? '変更する場合のみ入力（8文字以上）' : '大文字・小文字・数字・記号を含む8文字以上'}
+                                autoComplete="new-password"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setIsPasswordVisible((prev) => !prev)}
+                                className="absolute inset-y-0 right-0 px-3 text-slate-500 hover:text-slate-700"
+                                aria-label={isPasswordVisible ? 'パスワードを非表示' : 'パスワードを表示'}
+                                title={isPasswordVisible ? '非表示' : '表示'}
+                            >
+                                {isPasswordVisible ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                        </div>
                         <p className="text-xs text-slate-500 mt-1">
                             {editingUser.id
                               ? '※ 未入力なら現在のパスワードを維持します'
@@ -295,7 +317,11 @@ export const AccountManage: React.FC<AccountManageProps> = ({
                 </div>
                 <div className="mt-4 flex gap-2 justify-end">
                     <button
-                      onClick={() => { setEditingUser(null); setValidationError(''); }}
+                      onClick={() => {
+                        setEditingUser(null);
+                        setIsPasswordVisible(false);
+                        setValidationError('');
+                      }}
                       disabled={isSaving}
                       className="px-4 py-2 text-slate-600 disabled:text-slate-400 disabled:cursor-not-allowed"
                     >
@@ -342,6 +368,7 @@ export const AccountManage: React.FC<AccountManageProps> = ({
                                           if (!canEdit) return;
                                           const { password: _password, ...safeUser } = u;
                                           setEditingUser(safeUser);
+                                          setIsPasswordVisible(false);
                                         }}
                                         disabled={!canEdit}
                                         className={`p-2 rounded ${canEdit ? 'text-primary hover:bg-blue-50' : 'text-slate-300 cursor-not-allowed'}`}

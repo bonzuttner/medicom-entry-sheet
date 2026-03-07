@@ -1,4 +1,4 @@
-import { EntrySheet, MasterData, User } from '../types';
+import { EntrySheet, EntrySheetRevision, MasterData, ProductEntry, User } from '../types';
 import { apiClient } from './apiClient';
 
 export interface PagedResult<T> {
@@ -17,8 +17,14 @@ export interface DataService {
   getSheetsPage: (offset: number, limit: number) => Promise<PagedResult<EntrySheet>>;
   saveSheet: (sheet: EntrySheet) => Promise<void>;
   deleteSheet: (id: string) => Promise<void>;
+  getSheetRevisions: (sheetId: string) => Promise<EntrySheetRevision[]>;
+  searchProducts: (params: {
+    query: string;
+    manufacturerName?: string;
+    limit?: number;
+  }) => Promise<ProductEntry[]>;
   getMasterData: () => Promise<MasterData>;
-  saveMasterData: (data: MasterData) => Promise<void>;
+  saveMasterData: (data: MasterData) => Promise<MasterData>;
 }
 
 const apiDataService: DataService = {
@@ -46,10 +52,16 @@ const apiDataService: DataService = {
   deleteSheet: async (id) => {
     await apiClient.delete<void>(`/api/sheets/${id}`);
   },
+  getSheetRevisions: async (sheetId) =>
+    apiClient.get<EntrySheetRevision[]>(`/api/sheets/${sheetId}/revisions`),
+  searchProducts: async ({ query, manufacturerName, limit = 30 }) =>
+    apiClient.get<ProductEntry[]>(
+      `/api/products/search?q=${encodeURIComponent(query)}&manufacturerName=${encodeURIComponent(
+        manufacturerName || ''
+      )}&limit=${limit}`
+    ),
   getMasterData: async () => apiClient.get<MasterData>('/api/master'),
-  saveMasterData: async (data) => {
-    await apiClient.put<void>('/api/master', { data });
-  },
+  saveMasterData: async (data) => apiClient.put<MasterData>('/api/master', { data }),
 };
 
 export const isApiDataSource = true;
