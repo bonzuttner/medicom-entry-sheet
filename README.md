@@ -1,4 +1,4 @@
-# PharmaPOP Entry System
+# PharmaPOP Entry System　
 
 薬局向けPOP入力シート管理システム。従来のExcelベースの管理から脱却し、Webインターフェースで直感的に操作できるアプリケーションです　
 
