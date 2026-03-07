@@ -118,6 +118,8 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
 }) => {
   const [keyword, setKeyword] = useState('');
   const [manufacturerFilter, setManufacturerFilter] = useState('');
+  const [deploymentDate, setDeploymentDate] = useState('');
+  const [deploymentFilterMode, setDeploymentFilterMode] = useState<'since' | 'until'>('since');
   const [drafts, setDrafts] = useState<Record<string, MemoDraft>>({});
   const [savingById, setSavingById] = useState<Record<string, boolean>>({});
   const [expandedMobileRows, setExpandedMobileRows] = useState<Record<string, boolean>>({});
@@ -149,14 +151,32 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
         if (manufacturerFilter && sheet.manufacturerName !== manufacturerFilter) return false;
         if (!q) return true;
         const shelfText = getShelfNames(sheet).toLowerCase();
-        return (
+        const matchedKeyword = (
           sheet.title.toLowerCase().includes(q) ||
           sheet.manufacturerName.toLowerCase().includes(q) ||
           shelfText.includes(q)
         );
+        return matchedKeyword;
+      })
+      .filter((sheet) => {
+        if (!deploymentDate) return true;
+        const period = getDeploymentPeriod(sheet);
+        if (!period.start || !period.end) return false;
+        const [startYear, startMonth] = period.start.split('/').map((v) => Number(v));
+        const [endYear, endMonth] = period.end.split('/').map((v) => Number(v));
+        if (!startYear || !startMonth || !endYear || !endMonth) return false;
+
+        const startTs = new Date(startYear, startMonth - 1, 1).getTime();
+        const endTs = new Date(endYear, endMonth, 0, 23, 59, 59, 999).getTime();
+        const targetStart = new Date(`${deploymentDate}T00:00:00`).getTime();
+        const targetEnd = new Date(`${deploymentDate}T23:59:59.999`).getTime();
+        if (deploymentFilterMode === 'since') {
+          return endTs >= targetStart;
+        }
+        return startTs <= targetEnd;
       })
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-  }, [sheets, keyword, manufacturerFilter]);
+  }, [sheets, keyword, manufacturerFilter, deploymentDate, deploymentFilterMode]);
   const loadedCount = sheets.length;
   const safeTotalCount = totalCount > 0 ? totalCount : loadedCount;
   const remainingCount = Math.max(safeTotalCount - loadedCount, 0);
@@ -339,6 +359,31 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
             </option>
           ))}
         </select>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-bold text-slate-600">展開期間</span>
+          <input
+            type="date"
+            value={deploymentDate}
+            onChange={(e) => setDeploymentDate(e.target.value)}
+            className="border border-slate-300 rounded-md px-2 py-2 text-xs bg-white"
+          />
+          <select
+            value={deploymentFilterMode}
+            onChange={(e) => setDeploymentFilterMode(e.target.value as 'since' | 'until')}
+            className="border border-slate-300 rounded-md px-2 py-2 text-xs bg-white"
+          >
+            <option value="since">以降</option>
+            <option value="until">以前</option>
+          </select>
+          {deploymentDate && (
+            <button
+              onClick={() => setDeploymentDate('')}
+              className="px-2 py-2 rounded-md border border-slate-300 text-xs text-slate-600 hover:bg-slate-50"
+            >
+              解除
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
