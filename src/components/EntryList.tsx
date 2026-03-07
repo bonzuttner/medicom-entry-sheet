@@ -28,6 +28,7 @@ export const EntryList: React.FC<EntryListProps> = ({
   isLoadingMore = false,
   totalCount = 0,
 }) => {
+  const getShortSheetId = (id: string): string => id.slice(0, 8);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'updatedAt' | 'manufacturer'>('updatedAt');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
@@ -73,6 +74,10 @@ export const EntryList: React.FC<EntryListProps> = ({
   };
 
   const formatYearMonth = (year: number, month: number): string => `${year}/${month}`;
+  const computeAutoEndMonth = (startMonth: number | undefined): number | undefined => {
+    if (!startMonth) return undefined;
+    return ((startMonth + 1) % 12) + 1;
+  };
   const getDeploymentPeriod = (sheet: EntrySheet): { start: string; end: string } => {
     if (!sheet.deploymentStartMonth) return { start: '', end: '' };
     const createdAt = new Date(sheet.createdAt);
@@ -81,8 +86,10 @@ export const EntryList: React.FC<EntryListProps> = ({
     const monthOffset = (sheet.deploymentStartMonth - createdMonth + 12) % 12;
     const startDate = new Date(createdAt.getFullYear(), createdAt.getMonth(), 1);
     startDate.setMonth(startDate.getMonth() + monthOffset);
-    const endDate = new Date(startDate);
-    endDate.setMonth(endDate.getMonth() + 2);
+    const resolvedEndMonth = sheet.deploymentEndMonth ?? computeAutoEndMonth(sheet.deploymentStartMonth);
+    if (!resolvedEndMonth) return { start: '', end: '' };
+    const endYear = resolvedEndMonth < sheet.deploymentStartMonth ? startDate.getFullYear() + 1 : startDate.getFullYear();
+    const endDate = new Date(endYear, resolvedEndMonth - 1, 1);
     return {
       start: formatYearMonth(startDate.getFullYear(), startDate.getMonth() + 1),
       end: formatYearMonth(endDate.getFullYear(), endDate.getMonth() + 1),
@@ -108,7 +115,10 @@ export const EntryList: React.FC<EntryListProps> = ({
     const monthOffset = (sheet.deploymentStartMonth - createdMonth + 12) % 12;
     const startDate = new Date(createdAt.getFullYear(), createdAt.getMonth(), 1);
     startDate.setMonth(startDate.getMonth() + monthOffset);
-    const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 3, 0, 23, 59, 59, 999);
+    const resolvedEndMonth = sheet.deploymentEndMonth ?? computeAutoEndMonth(sheet.deploymentStartMonth);
+    if (!resolvedEndMonth) return null;
+    const endYear = resolvedEndMonth < sheet.deploymentStartMonth ? startDate.getFullYear() + 1 : startDate.getFullYear();
+    const endDate = new Date(endYear, resolvedEndMonth, 0, 23, 59, 59, 999);
     return { startTs: startDate.getTime(), endTs: endDate.getTime() };
   };
   const getDeploymentPeriodLabel = (sheet: EntrySheet): string => {
@@ -683,6 +693,7 @@ export const EntryList: React.FC<EntryListProps> = ({
                                     </span>
                                     <span className="text-xs text-slate-400">{new Date(sheet.updatedAt).toLocaleDateString()}</span>
                                 </div>
+                                <div className="text-[10px] text-slate-400 font-mono mb-1">ID: {getShortSheetId(sheet.id)}</div>
                                 <h3 className="text-base font-bold text-slate-900 leading-tight mb-1">{sheet.title}</h3>
                                 <div className="text-xs text-slate-500 truncate">
                                     {sheet.manufacturerName} / {sheet.creatorName}
@@ -757,10 +768,11 @@ export const EntryList: React.FC<EntryListProps> = ({
 
           {/* DESKTOP VIEW: Table (Hidden on mobile) */}
           <div className="hidden md:block bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-auto max-h-[calc(100vh-260px)]">
               <table className="min-w-full divide-y divide-slate-200 table-fixed">
-                <thead className="bg-slate-50 [&_th]:sticky [&_th]:top-[112px] [&_th]:z-10 [&_th]:bg-slate-50">
+                <thead className="bg-slate-50 [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-slate-50">
                   <tr>
+                    <th scope="col" className="px-2 py-3 w-20 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">ID</th>
                     <th scope="col" className="px-4 py-3 w-12 text-center">
                       <button onClick={toggleSelectAll} className="text-slate-400 hover:text-slate-600">
                         {selectedSheets.size === filteredSheets.length && filteredSheets.length > 0 ? <CheckSquare size={20} /> : <Square size={20} />}
@@ -809,6 +821,9 @@ export const EntryList: React.FC<EntryListProps> = ({
                           className={`hover:bg-slate-50 transition-colors cursor-pointer ${isExpanded ? 'bg-slate-50' : ''}`}
                           onClick={() => toggleExpand(sheet.id)}
                         >
+                          <td className="px-2 py-4 text-[10px] text-slate-400 font-mono whitespace-nowrap">
+                            {getShortSheetId(sheet.id)}
+                          </td>
                           <td className="px-4 py-4 text-center" onClick={(e) => toggleSelect(sheet.id, e)}>
                              <div className="text-primary cursor-pointer inline-block">
                                {isSelected ? <CheckSquare size={20} /> : <Square size={20} className="text-slate-300" />}
@@ -878,7 +893,7 @@ export const EntryList: React.FC<EntryListProps> = ({
                         {/* Expanded Content Desktop */}
                         {isExpanded && (
                           <tr className="bg-slate-50 shadow-inner">
-                              <td colSpan={9} className="px-4 sm:px-6 py-4">
+                              <td colSpan={10} className="px-4 sm:px-6 py-4">
                                   <ProductGrid sheet={sheet} />
                                   <div className="mt-4 text-right">
                                        <button

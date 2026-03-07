@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS entry_sheets (
   title VARCHAR(500) NOT NULL,
   notes TEXT,
   deployment_start_month SMALLINT,
+  deployment_end_month SMALLINT,
   status VARCHAR(30) NOT NULL CHECK (status IN ('draft', 'completed', 'completed_no_image')),
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -57,6 +58,9 @@ ALTER TABLE entry_sheets
 
 ALTER TABLE entry_sheets
   ADD COLUMN IF NOT EXISTS deployment_start_month SMALLINT;
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS deployment_end_month SMALLINT;
 
 ALTER TABLE entry_sheets
   DROP COLUMN IF EXISTS admin_promo_code,

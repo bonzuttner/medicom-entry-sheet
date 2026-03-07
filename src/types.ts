@@ -87,6 +87,7 @@ export interface EntrySheet {
   title: string;
   notes?: string;
   deploymentStartMonth?: number;
+  deploymentEndMonth?: number;
   attachments?: Attachment[];
   status: 'draft' | 'completed' | 'completed_no_image';
   adminMemo?: EntrySheetAdminMemo;

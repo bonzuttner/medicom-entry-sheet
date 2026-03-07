@@ -26,6 +26,7 @@
 - `src/App.tsx`: 画面遷移・状態管理の中心
 - `src/components/`
   - `EntryList.tsx`: エントリー履歴一覧
+  - `AdminEntryList.tsx`: Admin向け一覧（Adminメモの行内編集）
   - `EntryForm.tsx`: 登録・編集フォーム
   - `AccountManage.tsx`: アカウント管理
   - `MasterManage.tsx`: マスタ管理
@@ -75,6 +76,7 @@
   - `manufacturers`
   - `users`
   - `entry_sheets`
+  - `entry_sheet_admin_memos`
   - `product_entries`
   - `product_ingredients`
   - `attachments`
@@ -90,8 +92,9 @@
 - `User`: `ADMIN` / `STAFF` を持つ
 - `EntrySheet`: シートヘッダ情報 + `products`
   - `deploymentStartMonth` を保持
+  - `version` を保持（競合制御）
   - `status`: `draft` / `completed` / `completed_no_image`
-  - `adminMemo` を保持（編集は ADMIN のみ）
+  - `adminMemo` を保持（編集は ADMIN のみ、`entry_sheet_admin_memos` に分離保存）
 - `ProductEntry`: 商品情報（JAN、画像、販促物情報など）
 - `MasterData`: メーカー名・リスク分類・特定成分・メーカー別棚割名・メーカー別デフォルト展開スタート月
 
@@ -113,13 +116,17 @@
 - `STAFF`: 自社メーカーのみアクセス可
 - マスタAPI（`/api/master`）:
   - `GET`: 認証済みユーザー全員可（入力用マスタ参照）
+    - STAFF には `manufacturerNames: []` を返却（他社メタ情報の露出防止）
   - `PUT`: `ADMIN` のみ可（マスタ更新）
 - 権限制御は API 側で実施（UIは補助）
 
 ### 5.3 主要API
 
 - シート一覧: `GET /api/sheets`
+  - `offset/limit` 指定時は `{ items, hasMore, totalCount }` を返却
 - シート保存: `PUT /api/sheets/:id`
+  - 通常保存（シート全体）と `mode=admin_memo`（Adminメモのみ）に対応
+  - `version` 不一致時は `409 VERSION_CONFLICT`
 - シート削除: `DELETE /api/sheets/:id`
 - シート変更履歴: `GET /api/sheets/:id/revisions`
 - 過去商品検索: `GET /api/products/search`
@@ -138,7 +145,19 @@
 4. DBへ `entry_sheets` / `product_entries` / `product_ingredients` / `attachments` を保存
 5. 一覧を再取得し画面反映
 
-### 6.2 画像/添付
+### 6.2 Adminメモ保存
+
+1. Admin一覧または編集画面で Adminメモを更新
+2. `dataService.saveSheetAdminMemo` 実行（`PUT /api/sheets/:id` + `mode=admin_memo`）
+3. API側で ADMIN権限・入力検証・`adminMemo.version` 競合検知
+4. `entry_sheet_admin_memos` のみ更新
+5. 成功時に更新済みシートを再取得し画面へ反映
+
+補足:
+- Adminメモのみ更新では `entry_sheets.updated_at` は更新しない
+- 一覧の並び替え（`updated_at`）は通常シート更新のみ反映
+
+### 6.3 画像/添付
 
 - クライアントでもサイズ・解像度を先に検証
 - APIでも同条件を再検証
@@ -160,6 +179,8 @@
 - `@vercel/postgres` は将来的なSDK移行候補（Neon SDK）
 - ログイン試行制限のカウンタは現状 `/tmp` ファイル利用
   - 無料サーバーレス環境では永続性が弱いため、将来 Redis 等への移行が望ましい
+- 一覧ページングは初期30件 + 追加読み込み方式
+  - 一般一覧/Admin一覧ともに、表示件数・全件数・残件数/残ページ（概算）を表示
 
 ## 9. 移行影響の早見表
 

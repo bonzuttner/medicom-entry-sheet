@@ -89,6 +89,11 @@ const toOptionalMonthNumber = (value: unknown): number | undefined => {
   return parsed;
 };
 
+const computeAutoDeploymentEndMonth = (startMonth: number | undefined): number | undefined => {
+  if (!startMonth) return undefined;
+  return ((startMonth + 1) % 12) + 1;
+};
+
 const normalizeAdminMemo = (
   incoming: EntrySheetAdminMemo | undefined,
   existing: EntrySheetAdminMemo | undefined,
@@ -201,6 +206,7 @@ const toComparableSheetCore = (sheet: EntrySheet) => ({
   title: normalizeOptionalString(sheet.title),
   notes: normalizeOptionalString(sheet.notes),
   deploymentStartMonth: normalizeOptionalNumberForCompare(sheet.deploymentStartMonth),
+  deploymentEndMonth: normalizeOptionalNumberForCompare(sheet.deploymentEndMonth),
   status: normalizeStatus(sheet.status),
   products: toComparableProducts(sheet.products),
   attachments: toComparableAttachments(sheet.attachments),
@@ -241,6 +247,7 @@ const buildRevisionSummary = (before: EntrySheet | null, after: EntrySheet): str
   pushChange('担当者電話', before.phoneNumber, after.phoneNumber);
   pushChange('状態', before.status, after.status);
   pushChange('展開スタート月', before.deploymentStartMonth, after.deploymentStartMonth);
+  pushChange('展開終了月', before.deploymentEndMonth, after.deploymentEndMonth);
 
   pushChange('Adminメモ.販促CD', before.adminMemo?.promoCode, after.adminMemo?.promoCode);
   pushChange(
@@ -397,6 +404,13 @@ export default async function handler(req: any, res: any) {
     const ownerManufacturer = existingSheet?.manufacturerName || currentUser.manufacturerName;
     const ownerCreatorId = existingSheet?.creatorId || currentUser.id;
     const canEditAdminMemo = isAdmin(currentUser);
+    const incomingStartMonth = toOptionalMonthNumber(sheet.deploymentStartMonth);
+    const resolvedStartMonth = incomingStartMonth ?? existingSheet?.deploymentStartMonth;
+    const autoEndMonth = computeAutoDeploymentEndMonth(resolvedStartMonth);
+    const incomingEndMonth = toOptionalMonthNumber(sheet.deploymentEndMonth);
+    const resolvedEndMonth = isAdmin(currentUser)
+      ? incomingEndMonth ?? existingSheet?.deploymentEndMonth ?? autoEndMonth
+      : existingSheet?.deploymentEndMonth ?? autoEndMonth;
 
     const safeSheet: EntrySheet = {
       ...sheet,
@@ -414,7 +428,8 @@ export default async function handler(req: any, res: any) {
       phoneNumber: String(sheet.phoneNumber || existingSheet?.phoneNumber || currentUser.phoneNumber || '').trim(),
       title: String(sheet.title || '').trim(),
       notes: sheet.notes ? String(sheet.notes).trim() : '',
-      deploymentStartMonth: toOptionalMonthNumber(sheet.deploymentStartMonth),
+      deploymentStartMonth: resolvedStartMonth,
+      deploymentEndMonth: resolvedEndMonth,
       adminMemo: normalizeAdminMemo(sheet.adminMemo, existingSheet?.adminMemo, canEditAdminMemo),
       status: normalizeStatus(sheet.status),
       createdAt: existingSheet?.createdAt || sheet.createdAt || new Date().toISOString(),
