@@ -659,7 +659,7 @@ export const EntryList: React.FC<EntryListProps> = ({
       ) : (
         <>
           {/* MOBILE VIEW: Cards (Visible only on small screens) */}
-          <div className="md:hidden space-y-4">
+          <div className="md:hidden space-y-4 max-h-[calc(100vh-260px)] overflow-y-auto pr-1">
             {/* Mobile Select All Bar */}
             <div className="bg-white p-3 rounded-lg border border-slate-200 flex items-center justify-between shadow-sm">
                 <button 

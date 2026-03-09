@@ -478,8 +478,8 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                       <button
                         type="button"
                         onClick={() => onEdit(sheet)}
-                        className="inline-flex items-center justify-center h-6 w-6 text-slate-500 hover:text-slate-700 transition-colors"
-                        title="編集"
+                        className="inline-flex items-center justify-center h-6 w-6 p-0 border-0 bg-transparent shadow-none rounded-none text-slate-500 hover:text-slate-700 transition-colors"
+                        title="詳細編集"
                       >
                         <Edit3 size={13} />
                       </button>
@@ -528,7 +528,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                         type="text"
                         value={draft.promoCode}
                         onChange={(e) => setDraftValue(sheet.id, 'promoCode', e.target.value)}
-                        className="w-full border border-transparent rounded-md px-2 py-1.5 text-xs bg-transparent text-slate-700 hover:bg-white hover:border-slate-200 focus:bg-white focus:border-slate-300 focus:ring-1 focus:ring-slate-200 transition-colors"
+                        className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs bg-white text-slate-700 focus:border-slate-400 focus:ring-1 focus:ring-slate-200 transition-colors"
                         placeholder="X000000"
                       />
                     </td>
@@ -539,7 +539,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                           min={0}
                           value={draft.bandPattern}
                           onChange={(e) => setDraftValue(sheet.id, 'bandPattern', e.target.value)}
-                          className="w-14 border border-transparent rounded-md px-1.5 py-1 text-xs bg-transparent text-right text-slate-700 hover:bg-white hover:border-slate-200 focus:bg-white focus:border-slate-300 focus:ring-1 focus:ring-slate-200 transition-colors"
+                          className="w-14 border border-slate-300 rounded-md px-1.5 py-1 text-xs bg-white text-right text-slate-700 focus:border-slate-400 focus:ring-1 focus:ring-slate-200 transition-colors"
                         />
                         <span className="text-slate-500">種</span>
                       </label>
@@ -551,15 +551,15 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                           min={0}
                           value={draft.targetStoreCount}
                           onChange={(e) => setDraftValue(sheet.id, 'targetStoreCount', e.target.value)}
-                          className="w-14 border border-transparent rounded-md px-1.5 py-1 text-xs bg-transparent text-right text-slate-700 hover:bg-white hover:border-slate-200 focus:bg-white focus:border-slate-300 focus:ring-1 focus:ring-slate-200 transition-colors"
+                          className="w-14 border border-slate-300 rounded-md px-1.5 py-1 text-xs bg-white text-right text-slate-700 focus:border-slate-400 focus:ring-1 focus:ring-slate-200 transition-colors"
                         />
                         <span className="text-slate-500">店舗</span>
                       </label>
                     </td>
                     <td className="px-3 py-3 hidden md:table-cell">
-                      <div className="rounded-lg border border-slate-200 bg-white p-2 shadow-[inset_0_1px_0_0_rgba(148,163,184,0.06)]">
+                      <div className="rounded-lg bg-white p-2 shadow-[inset_0_1px_0_0_rgba(148,163,184,0.06)]">
                         <div className="grid grid-cols-2 gap-1.5">
-                          <label className="flex items-center justify-between gap-1 rounded-md border border-slate-200 bg-white px-1.5 py-1">
+                          <label className="flex items-center justify-between gap-1 rounded-md bg-white px-1.5 py-1">
                             <span className="text-[10px] text-slate-500">ボード①</span>
                             <span className="flex items-center gap-1">
                               <input
@@ -572,7 +572,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                               <span className="text-[10px] text-slate-400">枚</span>
                             </span>
                           </label>
-                          <label className="flex items-center justify-between gap-1 rounded-md border border-slate-200 bg-white px-1.5 py-1">
+                          <label className="flex items-center justify-between gap-1 rounded-md bg-white px-1.5 py-1">
                             <span className="text-[10px] text-slate-500">ボード②</span>
                             <span className="flex items-center gap-1">
                               <input
@@ -585,7 +585,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                               <span className="text-[10px] text-slate-400">枚</span>
                             </span>
                           </label>
-                          <label className="flex items-center justify-between gap-1 rounded-md border border-slate-200 bg-white px-1.5 py-1">
+                          <label className="flex items-center justify-between gap-1 rounded-md bg-white px-1.5 py-1">
                             <span className="text-[10px] text-slate-500">帯①</span>
                             <span className="flex items-center gap-1">
                               <input
@@ -598,7 +598,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                               <span className="text-[10px] text-slate-400">枚</span>
                             </span>
                           </label>
-                          <label className="flex items-center justify-between gap-1 rounded-md border border-slate-200 bg-white px-1.5 py-1">
+                          <label className="flex items-center justify-between gap-1 rounded-md bg-white px-1.5 py-1">
                             <span className="text-[10px] text-slate-500">帯②</span>
                             <span className="flex items-center gap-1">
                               <input
@@ -615,7 +615,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                       </div>
                     </td>
                     <td className="px-3 py-3 text-right">
-                      <div className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 p-1 border border-slate-200 whitespace-nowrap">
+                      <div className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 p-1 whitespace-nowrap">
                         <button
                           onClick={() => {
                             void handleSave(sheet.id);

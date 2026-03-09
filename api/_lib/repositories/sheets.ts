@@ -99,6 +99,30 @@ const toSafeIso = (value: string | undefined, fallback: string): string => {
   return Number.isNaN(parsed.getTime()) ? fallback : parsed.toISOString();
 };
 
+const FULLWIDTH_SEARCH_CHARS =
+  'ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ' +
+  'ａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ' +
+  '０１２３４５６７８９　';
+const HALFWIDTH_SEARCH_CHARS =
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZ' +
+  'abcdefghijklmnopqrstuvwxyz' +
+  '0123456789 ';
+const KATAKANA_SEARCH_CHARS =
+  'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨ' +
+  'ラリルレロワヲンァィゥェォャュョッヵヶヴ';
+const HIRAGANA_SEARCH_CHARS =
+  'あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよ' +
+  'らりるれろわをんぁぃぅぇぉゃゅょっゕゖゔ';
+
+const normalizeKanaToHiragana = (value: string): string =>
+  value.replace(/[\u30a1-\u30f6]/g, (ch) =>
+    String.fromCharCode(ch.charCodeAt(0) - 0x60)
+  );
+
+const normalizeSearchText = (value: string): string => {
+  return normalizeKanaToHiragana(value.normalize('NFKC')).toLowerCase().trim();
+};
+
 let ensureSnapshotColumnsPromise: Promise<void> | null = null;
 let ensureCreatorReferencePromise: Promise<void> | null = null;
 let ensureAdminMemoTablePromise: Promise<void> | null = null;
@@ -1392,6 +1416,7 @@ export const searchProductsByManufacturerId = async (
   limit: number = 30
 ): Promise<ProductEntry[]> => {
   const trimmedKeyword = keyword.trim();
+  const normalizedKeyword = normalizeSearchText(keyword);
   const result = await db.query<{
     id: string;
     shelf_name: string;
@@ -1450,6 +1475,20 @@ export const searchProductsByManufacturerId = async (
         $2 = ''
         OR p.product_name ILIKE ('%' || $2 || '%')
         OR p.jan_code ILIKE ('%' || $2 || '%')
+        OR lower(
+          translate(
+            translate(p.product_name, '${FULLWIDTH_SEARCH_CHARS}', '${HALFWIDTH_SEARCH_CHARS}'),
+            '${KATAKANA_SEARCH_CHARS}',
+            '${HIRAGANA_SEARCH_CHARS}'
+          )
+        ) LIKE ('%' || $3 || '%')
+        OR lower(
+          translate(
+            translate(p.jan_code, '${FULLWIDTH_SEARCH_CHARS}', '${HALFWIDTH_SEARCH_CHARS}'),
+            '${KATAKANA_SEARCH_CHARS}',
+            '${HIRAGANA_SEARCH_CHARS}'
+          )
+        ) LIKE ('%' || $3 || '%')
       )
     GROUP BY
       p.id,
@@ -1475,9 +1514,9 @@ export const searchProductsByManufacturerId = async (
       p.promo_depth,
       p.promo_image_url
     ORDER BY p.jan_code ASC, p.product_name ASC
-    LIMIT $3
+    LIMIT $4
     `,
-    [manufacturerId, trimmedKeyword, limit]
+    [manufacturerId, trimmedKeyword, normalizedKeyword, limit]
   );
 
   return result.rows.map((row) => ({

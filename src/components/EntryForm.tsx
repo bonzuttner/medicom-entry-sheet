@@ -994,18 +994,14 @@ export const EntryForm: React.FC<EntryFormProps> = ({
           {revisions.length === 0 ? (
             <p className="text-sm text-slate-500">履歴はまだありません。</p>
           ) : (
-            <ul className="max-h-80 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-100">
+            <ul className="h-80 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-100">
               {revisions.map((revision) => (
                 <li key={revision.id} className="px-3 py-2.5 hover:bg-slate-50">
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="text-[11px] text-slate-500">
-                      {new Date(revision.changedAt).toLocaleString('ja-JP')}
-                    </span>
-                    <span className="inline-flex items-center rounded-md bg-slate-100 text-slate-600 px-2 py-0.5 text-[11px]">
-                      {revision.changedByName || '不明ユーザー'}
-                    </span>
+                  <div className="flex items-center gap-2 mb-1 text-[11px] text-slate-500">
+                    <span>{new Date(revision.changedAt).toLocaleString('ja-JP')}</span>
+                    <span>{revision.changedByName || '不明ユーザー'}</span>
                   </div>
-                  <div className="text-xs text-slate-700 whitespace-pre-wrap leading-5 line-clamp-2">
+                  <div className="text-xs text-slate-700 whitespace-pre-wrap leading-5">
                     {revision.summary}
                   </div>
                 </li>
@@ -1052,7 +1048,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             </button>
         </div>
 
-        <section className="mb-5 sm:mb-6 mt-4 sm:mt-0">
+        <section className="mb-5 sm:mb-6 mt-4 sm:mt-0 pr-12 sm:pr-14">
           <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3 sm:p-4">
             <div className="flex items-center gap-2 mb-2.5">
               <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white text-slate-500 border border-slate-200">
