@@ -74,22 +74,32 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     const end = formatYearMonth(endYear, resolvedEndMonth);
     return { start, end };
   })();
+  const getEndMonthLabel = (month: number): string => {
+    if (!selectedStartMonth) return `-/${month}`;
+    const endYear = month < selectedStartMonth.month ? selectedStartMonth.year + 1 : selectedStartMonth.year;
+    return formatYearMonth(endYear, month);
+  };
 
   const parseRequiredNumber = (value: string): number => {
-    const parsed = Number(value);
+    const parsed = Number(value.normalize('NFKC'));
     return Number.isFinite(parsed) ? parsed : 0;
   };
 
   const parseOptionalNumber = (value: string): number | undefined => {
-    if (value === '') return undefined;
-    const parsed = Number(value);
+    const normalized = value.normalize('NFKC').trim();
+    if (normalized === '') return undefined;
+    const parsed = Number(normalized);
     return Number.isFinite(parsed) ? parsed : undefined;
   };
 
+  const normalizeDigitsInput = (value: string): string =>
+    value.normalize('NFKC').replace(/[^0-9]/g, '');
+
+  const normalizePromoCodeInput = (value: string): string =>
+    value.normalize('NFKC').toUpperCase();
+
   const normalizeJanCodeInput = (value: string): string =>
-    value
-      .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
-      .replace(/[^0-9]/g, '');
+    normalizeDigitsInput(value);
 
   const getShelfOptions = (): string[] => {
     return (
@@ -903,7 +913,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                             >
                               {[...Array(12)].map((_, idx) => (
                                 <option key={idx + 1} value={idx + 1}>
-                                  {idx + 1}月
+                                  {getEndMonthLabel(idx + 1)}
                                 </option>
                               ))}
                             </select>
@@ -994,7 +1004,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
           {revisions.length === 0 ? (
             <p className="text-sm text-slate-500">履歴はまだありません。</p>
           ) : (
-            <ul className="h-80 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-100">
+            <ul className="max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-100">
               {revisions.map((revision) => (
                 <li key={revision.id} className="px-3 py-2.5 hover:bg-slate-50">
                   <div className="flex items-center gap-2 mb-1 text-[11px] text-slate-500">
@@ -1504,7 +1514,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                 type="text"
                 className="w-full border-slate-300 rounded-lg shadow-sm p-3 font-mono"
                 value={formData.adminMemo?.promoCode || ''}
-                onChange={(e) => handleAdminMemoChange('promoCode', e.target.value)}
+                onChange={(e) => handleAdminMemoChange('promoCode', normalizePromoCodeInput(e.target.value))}
                 placeholder="X000000"
               />
             ) : (
@@ -1549,14 +1559,15 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             {isAdminUser ? (
               <div className="flex items-center gap-2">
                 <input
-                  type="number"
-                  min={0}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   className="w-24 border-slate-300 rounded-lg shadow-sm p-2.5"
                   value={formData.adminMemo?.bandPattern || ''}
                   onChange={(e) =>
                     handleAdminMemoChange(
                       'bandPattern',
-                      e.target.value === '' ? undefined : e.target.value
+                      normalizeDigitsInput(e.target.value) || undefined
                     )
                   }
                   placeholder="1"
@@ -1572,8 +1583,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             {isAdminUser ? (
               <div className="flex items-center gap-2">
                 <input
-                  type="number"
-                  min={0}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   className="w-24 border-slate-300 rounded-lg shadow-sm p-2.5"
                   value={formData.adminMemo?.targetStoreCount ?? ''}
                   onChange={(e) =>
@@ -1592,8 +1604,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             {isAdminUser ? (
               <div className="flex items-center gap-2">
                 <input
-                  type="number"
-                  min={0}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   className="w-24 border-slate-300 rounded-lg shadow-sm p-2.5"
                   value={formData.adminMemo?.printBoard1Count ?? ''}
                   onChange={(e) =>
@@ -1612,8 +1625,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             {isAdminUser ? (
               <div className="flex items-center gap-2">
                 <input
-                  type="number"
-                  min={0}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   className="w-24 border-slate-300 rounded-lg shadow-sm p-2.5"
                   value={formData.adminMemo?.printBoard2Count ?? ''}
                   onChange={(e) =>
@@ -1632,8 +1646,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             {isAdminUser ? (
               <div className="flex items-center gap-2">
                 <input
-                  type="number"
-                  min={0}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   className="w-24 border-slate-300 rounded-lg shadow-sm p-2.5"
                   value={formData.adminMemo?.printBand1Count ?? ''}
                   onChange={(e) =>
@@ -1652,8 +1667,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             {isAdminUser ? (
               <div className="flex items-center gap-2">
                 <input
-                  type="number"
-                  min={0}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   className="w-24 border-slate-300 rounded-lg shadow-sm p-2.5"
                   value={formData.adminMemo?.printBand2Count ?? ''}
                   onChange={(e) =>

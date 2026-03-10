@@ -34,6 +34,18 @@ const toNumericDraftValue = (value: string | number | null | undefined): string 
   return '';
 };
 
+const normalizeToHalfWidth = (value: string): string => value.normalize('NFKC');
+const normalizeDigitsInput = (value: string): string =>
+  normalizeToHalfWidth(value).replace(/[^0-9]/g, '');
+const NUMERIC_DRAFT_FIELDS: ReadonlySet<keyof MemoDraft> = new Set([
+  'bandPattern',
+  'targetStoreCount',
+  'printBoard1Count',
+  'printBoard2Count',
+  'printBand1Count',
+  'printBand2Count',
+]);
+
 const buildDraftFromSheet = (sheet: EntrySheet): MemoDraft => ({
   version: sheet.adminMemo?.version || 1,
   promoCode: sheet.adminMemo?.promoCode || '',
@@ -213,6 +225,12 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
 
   const selectedCount = filteredSheets.filter((sheet) => selectedSheets.has(sheet.id)).length;
   const setDraftValue = (sheetId: string, field: keyof MemoDraft, value: string) => {
+    const normalizedValue =
+      field === 'promoCode'
+        ? normalizeToHalfWidth(value).toUpperCase()
+        : NUMERIC_DRAFT_FIELDS.has(field)
+          ? normalizeDigitsInput(value)
+          : value;
     setDrafts((prev) => ({
       ...prev,
       [sheetId]: {
@@ -228,13 +246,13 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
           printBand2Count: '',
           adminNote: '',
         }),
-        [field]: value,
+        [field]: normalizedValue,
       },
     }));
   };
 
   const toOptionalInteger = (raw: string): number | undefined => {
-    const trimmed = raw.trim();
+    const trimmed = normalizeToHalfWidth(raw).trim();
     if (trimmed === '') return undefined;
     const parsed = Number(trimmed);
     if (!Number.isFinite(parsed) || parsed < 0) return undefined;
@@ -439,7 +457,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                 </button>
               </th>
               <th className="w-[70px] px-1 py-3 text-left text-[10px] font-bold text-slate-400">ID</th>
-              <th className="w-[42px] px-1 py-3 text-center text-[10px] font-bold text-slate-400">✎</th>
+              <th className="w-[42px] px-1 py-3 text-center text-[10px] font-bold text-slate-400"></th>
               <th className="w-[90px] px-3 py-3 text-left text-xs font-bold text-slate-500">状態</th>
               <th className="w-[220px] px-3 py-3 text-left text-xs font-bold text-slate-500">タイトル</th>
               <th className="w-[120px] px-3 py-3 text-left text-xs font-bold text-slate-500">展開期間</th>
@@ -450,7 +468,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
               <th className="w-[120px] px-3 py-3 text-left text-xs font-bold text-slate-500">帯パターン</th>
               <th className="w-[110px] px-3 py-3 text-left text-xs font-bold text-slate-500">対象店舗数</th>
               <th className="hidden md:table-cell w-[260px] px-3 py-3 text-left text-xs font-bold text-slate-500">印刷依頼数量</th>
-              <th className="w-[100px] px-3 py-3 text-right text-xs font-bold text-slate-500">保存</th>
+              <th className="w-[100px] px-3 py-3 text-left text-xs font-bold text-slate-500">保存</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -478,10 +496,10 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                       <button
                         type="button"
                         onClick={() => onEdit(sheet)}
-                        className="inline-flex items-center justify-center h-6 w-6 p-0 border-0 bg-transparent shadow-none rounded-none text-slate-500 hover:text-slate-700 transition-colors"
+                        className="inline-flex items-center justify-center p-2 rounded text-primary hover:text-sky-700 hover:bg-sky-100 transition-colors"
                         title="詳細編集"
                       >
-                        <Edit3 size={13} />
+                        <Edit3 size={18} />
                       </button>
                     </td>
                     <td className="px-3 py-3 text-xs text-slate-700">
@@ -535,8 +553,9 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                     <td className="px-3 py-3">
                       <label className="inline-flex items-center gap-1.5 text-xs text-slate-700">
                         <input
-                          type="number"
-                          min={0}
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           value={draft.bandPattern}
                           onChange={(e) => setDraftValue(sheet.id, 'bandPattern', e.target.value)}
                           className="w-14 border border-slate-300 rounded-md px-1.5 py-1 text-xs bg-white text-right text-slate-700 focus:border-slate-400 focus:ring-1 focus:ring-slate-200 transition-colors"
@@ -547,8 +566,9 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                     <td className="px-3 py-3">
                       <label className="inline-flex items-center gap-1.5 text-xs text-slate-700">
                         <input
-                          type="number"
-                          min={0}
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           value={draft.targetStoreCount}
                           onChange={(e) => setDraftValue(sheet.id, 'targetStoreCount', e.target.value)}
                           className="w-14 border border-slate-300 rounded-md px-1.5 py-1 text-xs bg-white text-right text-slate-700 focus:border-slate-400 focus:ring-1 focus:ring-slate-200 transition-colors"
@@ -563,11 +583,12 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                             <span className="text-[10px] text-slate-500">ボード①</span>
                             <span className="flex items-center gap-1">
                               <input
-                                type="number"
-                                min={0}
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={draft.printBoard1Count}
                                 onChange={(e) => setDraftValue(sheet.id, 'printBoard1Count', e.target.value)}
-                                className="w-11 border border-transparent rounded px-1 py-0.5 text-[11px] bg-transparent text-right text-slate-700 hover:bg-slate-50 hover:border-slate-200 focus:bg-white focus:border-slate-300 focus:ring-1 focus:ring-slate-200 transition-colors"
+                                className="w-12 border border-slate-300 rounded px-1 py-0.5 text-[11px] bg-white text-right text-slate-700 focus:border-slate-400 focus:ring-1 focus:ring-slate-200 transition-colors"
                               />
                               <span className="text-[10px] text-slate-400">枚</span>
                             </span>
@@ -576,11 +597,12 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                             <span className="text-[10px] text-slate-500">ボード②</span>
                             <span className="flex items-center gap-1">
                               <input
-                                type="number"
-                                min={0}
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={draft.printBoard2Count}
                                 onChange={(e) => setDraftValue(sheet.id, 'printBoard2Count', e.target.value)}
-                                className="w-11 border border-transparent rounded px-1 py-0.5 text-[11px] bg-transparent text-right text-slate-700 hover:bg-slate-50 hover:border-slate-200 focus:bg-white focus:border-slate-300 focus:ring-1 focus:ring-slate-200 transition-colors"
+                                className="w-12 border border-slate-300 rounded px-1 py-0.5 text-[11px] bg-white text-right text-slate-700 focus:border-slate-400 focus:ring-1 focus:ring-slate-200 transition-colors"
                               />
                               <span className="text-[10px] text-slate-400">枚</span>
                             </span>
@@ -589,11 +611,12 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                             <span className="text-[10px] text-slate-500">帯①</span>
                             <span className="flex items-center gap-1">
                               <input
-                                type="number"
-                                min={0}
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={draft.printBand1Count}
                                 onChange={(e) => setDraftValue(sheet.id, 'printBand1Count', e.target.value)}
-                                className="w-11 border border-transparent rounded px-1 py-0.5 text-[11px] bg-transparent text-right text-slate-700 hover:bg-slate-50 hover:border-slate-200 focus:bg-white focus:border-slate-300 focus:ring-1 focus:ring-slate-200 transition-colors"
+                                className="w-12 border border-slate-300 rounded px-1 py-0.5 text-[11px] bg-white text-right text-slate-700 focus:border-slate-400 focus:ring-1 focus:ring-slate-200 transition-colors"
                               />
                               <span className="text-[10px] text-slate-400">枚</span>
                             </span>
@@ -602,11 +625,12 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                             <span className="text-[10px] text-slate-500">帯②</span>
                             <span className="flex items-center gap-1">
                               <input
-                                type="number"
-                                min={0}
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={draft.printBand2Count}
                                 onChange={(e) => setDraftValue(sheet.id, 'printBand2Count', e.target.value)}
-                                className="w-11 border border-transparent rounded px-1 py-0.5 text-[11px] bg-transparent text-right text-slate-700 hover:bg-slate-50 hover:border-slate-200 focus:bg-white focus:border-slate-300 focus:ring-1 focus:ring-slate-200 transition-colors"
+                                className="w-12 border border-slate-300 rounded px-1 py-0.5 text-[11px] bg-white text-right text-slate-700 focus:border-slate-400 focus:ring-1 focus:ring-slate-200 transition-colors"
                               />
                               <span className="text-[10px] text-slate-400">枚</span>
                             </span>
@@ -614,7 +638,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 py-3 text-right">
+                    <td className="px-3 py-3 text-left">
                       <div className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 p-1 whitespace-nowrap">
                         <button
                           onClick={() => {

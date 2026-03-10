@@ -75,9 +75,13 @@ const findTooLongField = (sheet: EntrySheet): string | null => {
   return null;
 };
 
+const normalizeToHalfWidth = (value: string): string => value.normalize('NFKC');
+const normalizeDigitsInput = (value: string): string =>
+  normalizeToHalfWidth(value).replace(/[^0-9]/g, '');
+
 const toOptionalNumber = (value: unknown): number | undefined => {
   if (value === '' || value === null || value === undefined) return undefined;
-  const parsed = Number(value);
+  const parsed = Number(normalizeToHalfWidth(String(value)).trim());
   if (!Number.isFinite(parsed) || parsed < 0) return undefined;
   return Math.floor(parsed);
 };
@@ -107,10 +111,10 @@ const normalizeAdminMemo = (
         : Number(existing?.version) > 0
           ? Number(existing?.version)
           : 1,
-    promoCode: String(incoming?.promoCode || '').trim() || undefined,
-    boardPickingJan: String(incoming?.boardPickingJan || '').trim() || undefined,
+    promoCode: normalizeToHalfWidth(String(incoming?.promoCode || '')).trim().toUpperCase() || undefined,
+    boardPickingJan: normalizeDigitsInput(String(incoming?.boardPickingJan || '')).trim() || undefined,
     deadlineTableUrl: String(incoming?.deadlineTableUrl || '').trim() || undefined,
-    bandPattern: String(incoming?.bandPattern || '').trim() || undefined,
+    bandPattern: normalizeDigitsInput(String(incoming?.bandPattern || '')).trim() || undefined,
     targetStoreCount: toOptionalNumber(incoming?.targetStoreCount),
     printBoard1Count: toOptionalNumber(incoming?.printBoard1Count),
     printBoard2Count: toOptionalNumber(incoming?.printBoard2Count),
