@@ -31,6 +31,83 @@ const SHEET_PAGE_SIZE = 30;
 
 const normalizeProductName = (value: string): string => value.trim().toLowerCase();
 const normalizeManufacturerKey = (value: string): string => value.trim();
+const normalizeOptionalString = (value: unknown): string =>
+  typeof value === 'string' ? value.trim() : '';
+const normalizeOptionalNumber = (value: unknown): number | null => {
+  if (value === '' || value === null || value === undefined) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+const toComparableAdminMemo = (memo: EntrySheet['adminMemo']) => ({
+  promoCode: normalizeOptionalString(memo?.promoCode),
+  boardPickingJan: normalizeOptionalString(memo?.boardPickingJan),
+  deadlineTableUrl: normalizeOptionalString(memo?.deadlineTableUrl),
+  bandPattern: normalizeOptionalString(memo?.bandPattern),
+  targetStoreCount: normalizeOptionalNumber(memo?.targetStoreCount),
+  printBoard1Count: normalizeOptionalNumber(memo?.printBoard1Count),
+  printBoard2Count: normalizeOptionalNumber(memo?.printBoard2Count),
+  printBand1Count: normalizeOptionalNumber(memo?.printBand1Count),
+  printBand2Count: normalizeOptionalNumber(memo?.printBand2Count),
+  printOther: normalizeOptionalString(memo?.printOther),
+  equipmentNote: normalizeOptionalString(memo?.equipmentNote),
+  adminNote: normalizeOptionalString(memo?.adminNote),
+});
+const toComparableAttachments = (attachments: EntrySheet['attachments']) =>
+  (attachments || []).map((attachment) => ({
+    name: normalizeOptionalString(attachment.name),
+    size: Number(attachment.size) || 0,
+    type: normalizeOptionalString(attachment.type),
+    url: normalizeOptionalString(attachment.url),
+  }));
+const toComparableProducts = (products: EntrySheet['products']) =>
+  (products || []).map((product) => ({
+    id: normalizeOptionalString(product.id),
+    shelfName: normalizeOptionalString(product.shelfName),
+    manufacturerName: normalizeOptionalString(product.manufacturerName),
+    janCode: normalizeOptionalString(product.janCode),
+    productName: normalizeOptionalString(product.productName),
+    productImage: normalizeOptionalString(product.productImage),
+    riskClassification: normalizeOptionalString(product.riskClassification),
+    specificIngredients: [...(product.specificIngredients || [])]
+      .map((value) => normalizeOptionalString(value))
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b, 'ja')),
+    catchCopy: normalizeOptionalString(product.catchCopy),
+    productMessage: normalizeOptionalString(product.productMessage),
+    productNotes: normalizeOptionalString(product.productNotes),
+    width: normalizeOptionalNumber(product.width),
+    height: normalizeOptionalNumber(product.height),
+    depth: normalizeOptionalNumber(product.depth),
+    facingCount: normalizeOptionalNumber(product.facingCount),
+    arrivalDate: normalizeOptionalString(product.arrivalDate),
+    hasPromoMaterial: product.hasPromoMaterial === 'yes' ? 'yes' : 'no',
+    promoSample: normalizeOptionalString(product.promoSample),
+    specialFixture: normalizeOptionalString(product.specialFixture),
+    promoWidth: normalizeOptionalNumber(product.promoWidth),
+    promoHeight: normalizeOptionalNumber(product.promoHeight),
+    promoDepth: normalizeOptionalNumber(product.promoDepth),
+    promoImage: normalizeOptionalString(product.promoImage),
+    productAttachments: (product.productAttachments || []).map((attachment) => ({
+      name: normalizeOptionalString(attachment.name),
+      size: Number(attachment.size) || 0,
+      type: normalizeOptionalString(attachment.type),
+      url: normalizeOptionalString(attachment.url),
+    })),
+  }));
+const toComparableSheetCore = (sheet: EntrySheet) => ({
+  manufacturerName: normalizeOptionalString(sheet.manufacturerName),
+  creatorId: normalizeOptionalString(sheet.creatorId),
+  creatorName: normalizeOptionalString(sheet.creatorName),
+  email: normalizeOptionalString(sheet.email),
+  phoneNumber: normalizeOptionalString(sheet.phoneNumber),
+  title: normalizeOptionalString(sheet.title),
+  notes: normalizeOptionalString(sheet.notes),
+  deploymentStartMonth: normalizeOptionalNumber(sheet.deploymentStartMonth),
+  deploymentEndMonth: normalizeOptionalNumber(sheet.deploymentEndMonth),
+  status: sheet.status,
+  products: toComparableProducts(sheet.products),
+  attachments: toComparableAttachments(sheet.attachments),
+});
 const upsertSheetInList = (source: EntrySheet[], saved: EntrySheet): EntrySheet[] => {
   const idx = source.findIndex((sheet) => sheet.id === saved.id);
   if (idx === -1) {
@@ -372,8 +449,19 @@ const App: React.FC = () => {
   };
 
   const handleSaveSheet = async (sheet: EntrySheet) => {
+    const existingSheet = sheets.find((row) => row.id === sheet.id);
+    const adminMemoOnlyChanged =
+      currentUser?.role === UserRole.ADMIN &&
+      existingSheet != null &&
+      JSON.stringify(toComparableSheetCore(existingSheet)) ===
+        JSON.stringify(toComparableSheetCore(sheet)) &&
+      JSON.stringify(toComparableAdminMemo(existingSheet.adminMemo)) !==
+        JSON.stringify(toComparableAdminMemo(sheet.adminMemo));
+
     try {
-      const savedSheet = await dataService.saveSheet(sheet);
+      const savedSheet = adminMemoOnlyChanged
+        ? await dataService.saveSheetAdminMemo(sheet.id, sheet.adminMemo)
+        : await dataService.saveSheet(sheet);
       setEditingSheet(null);
       setEditingSheetRevisions([]);
       setCurrentPage(Page.LIST);
@@ -382,11 +470,17 @@ const App: React.FC = () => {
     } catch (error) {
       if (isVersionConflictError(error)) {
         const confirmOverwrite = window.confirm(
-          '他のユーザーが先にこのシートを更新しました。\n最新内容を上書きして保存しますか？'
+          adminMemoOnlyChanged
+            ? '他のユーザーが先にAdminメモを更新しました。\n上書き保存しますか？'
+            : '他のユーザーが先にこのシートを更新しました。\n最新内容を上書きして保存しますか？'
         );
         if (confirmOverwrite) {
           try {
-            const savedSheet = await dataService.saveSheet(sheet, { forceOverwrite: true });
+            const savedSheet = adminMemoOnlyChanged
+              ? await dataService.saveSheetAdminMemo(sheet.id, sheet.adminMemo, {
+                  forceOverwrite: true,
+                })
+              : await dataService.saveSheet(sheet, { forceOverwrite: true });
             setEditingSheet(null);
             setEditingSheetRevisions([]);
             setCurrentPage(Page.LIST);

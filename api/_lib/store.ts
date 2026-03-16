@@ -21,9 +21,7 @@ const readStoreFromFile = async (): Promise<StoreData> => {
     return JSON.parse(raw) as StoreData;
   } catch {
     if (isProductionRuntime()) {
-      throw new Error(
-        'Persistent store is not initialized. For production, migrate data to PostgreSQL first.'
-      );
+      throw new Error('Persistent store is not initialized.');
     }
     const initial = createInitialStoreData();
     await fs.writeFile(STORE_PATH, JSON.stringify(initial), 'utf8');
@@ -42,7 +40,6 @@ export const readStore = async (): Promise<StoreData> => {
   let changed = false;
 
   // Password migration: Only run in non-production environments
-  // Production should use /api/admin/migrate-to-postgres instead
   if (!isProductionRuntime()) {
     const migratedUsers = parsed.users.map((user) => {
       if (!user.password || isHashedPassword(user.password)) {

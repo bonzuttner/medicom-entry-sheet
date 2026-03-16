@@ -116,10 +116,14 @@ ORDER BY table_name;
 - `manufacturers`
 - `users`
 - `entry_sheets`
+- `entry_sheet_admin_memos`
+- `entry_sheet_revisions`
 - `product_entries`
 - `product_ingredients`
 - `attachments`
 - `master_data`
+- `manufacturer_shelf_names`
+- `manufacturer_default_start_months`
 
 ## 7. よくある詰まりポイント
 

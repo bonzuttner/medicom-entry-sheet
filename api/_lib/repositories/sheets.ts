@@ -1291,10 +1291,10 @@ export const addRevision = async (
 export const updateAdminMemoOnly = async (
   sheetId: string,
   adminMemo: EntrySheet['adminMemo'] | undefined,
-  revision?: {
-    changedByUserId: string | null;
-    changedByName: string;
-    summary: string;
+  options?: {
+    changedByUserId?: string | null;
+    changedByName?: string;
+    summary?: string;
     keepLatestCount?: number;
     expectedVersion?: number;
     forceOverwrite?: boolean;
@@ -1316,14 +1316,14 @@ export const updateAdminMemoOnly = async (
   );
   const currentVersion = currentMemo.rows[0]?.version;
   const expectedVersion =
-    Number.isInteger(Number(revision?.expectedVersion)) && Number(revision?.expectedVersion) > 0
-      ? Number(revision?.expectedVersion)
+    Number.isInteger(Number(options?.expectedVersion)) && Number(options?.expectedVersion) > 0
+      ? Number(options?.expectedVersion)
       : undefined;
   if (
     currentVersion !== undefined &&
     expectedVersion !== undefined &&
     currentVersion !== expectedVersion &&
-    !revision?.forceOverwrite
+    !options?.forceOverwrite
   ) {
     throw new Error('ADMIN_MEMO_VERSION_CONFLICT');
   }
@@ -1376,13 +1376,13 @@ export const updateAdminMemoOnly = async (
   );
   if (result.rowCount === 0) return false;
 
-  if (revision) {
+  if (options?.summary && options.changedByName) {
     await addRevision(
       sheetId,
-      revision.changedByUserId,
-      revision.changedByName,
-      revision.summary,
-      revision.keepLatestCount ?? 30
+      options.changedByUserId ?? null,
+      options.changedByName,
+      options.summary,
+      options.keepLatestCount ?? 30
     );
   }
 

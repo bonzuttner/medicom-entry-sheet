@@ -457,7 +457,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                 </button>
               </th>
               <th className="w-[70px] px-1 py-3 text-left text-[10px] font-bold text-slate-400">ID</th>
-              <th className="w-[42px] px-1 py-3 text-center text-[10px] font-bold text-slate-400"></th>
+              <th className="w-[42px] px-1 py-3 text-center" aria-label="詳細編集"></th>
               <th className="w-[90px] px-3 py-3 text-left text-xs font-bold text-slate-500">状態</th>
               <th className="w-[220px] px-3 py-3 text-left text-xs font-bold text-slate-500">タイトル</th>
               <th className="w-[120px] px-3 py-3 text-left text-xs font-bold text-slate-500">展開期間</th>

@@ -70,11 +70,6 @@ const parseErrorMessage = (status: number, raw: string): string => {
         '画像保存先の設定が未完了です。管理者に連絡してください。',
       'Bulk update is deprecated. Use /api/users/:id':
         '一括更新は利用できません。個別更新で実行してください。',
-      'Only admin can migrate data': '移行処理を実行できるのは管理者のみです。',
-      'Only admin can migrate data to PostgreSQL':
-        'PostgreSQL移行を実行できるのは管理者のみです。',
-      'data with users/sheets/master is required':
-        '移行データが不足しています。users/sheets/master の各データを確認してください。',
       'Manufacturer is required': 'メーカーが未選択です。メーカーを選択して再試行してください。',
       'Invalid data URL':
         '画像データの形式が不正です。画像を選択し直して再アップロードしてください。',

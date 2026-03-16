@@ -253,22 +253,6 @@ const buildRevisionSummary = (before: EntrySheet | null, after: EntrySheet): str
   pushChange('展開スタート月', before.deploymentStartMonth, after.deploymentStartMonth);
   pushChange('展開終了月', before.deploymentEndMonth, after.deploymentEndMonth);
 
-  pushChange('Adminメモ.販促CD', before.adminMemo?.promoCode, after.adminMemo?.promoCode);
-  pushChange(
-    'Adminメモ.ボードピッキングJAN',
-    before.adminMemo?.boardPickingJan,
-    after.adminMemo?.boardPickingJan
-  );
-  pushChange('Adminメモ.期限表URL', before.adminMemo?.deadlineTableUrl, after.adminMemo?.deadlineTableUrl);
-  pushChange('Adminメモ.帯パターン', before.adminMemo?.bandPattern, after.adminMemo?.bandPattern);
-  pushChange(
-    'Adminメモ.対象店舗数',
-    before.adminMemo?.targetStoreCount,
-    after.adminMemo?.targetStoreCount
-  );
-  pushChange('Adminメモ.備品', before.adminMemo?.equipmentNote, after.adminMemo?.equipmentNote);
-  pushChange('Adminメモ.備考', before.adminMemo?.adminNote, after.adminMemo?.adminNote);
-
   if (before.products.length !== after.products.length) {
     changes.push(`商品件数: ${before.products.length} -> ${after.products.length}`);
   }
@@ -349,21 +333,12 @@ export default async function handler(req: any, res: any) {
         return;
       }
 
-      const summary = buildRevisionSummary(existingSheet, {
-        ...existingSheet,
-        adminMemo: normalizedMemo,
-      });
-
       let updated: boolean;
       try {
         updated = await SheetRepository.updateAdminMemoOnly(
           sheetId,
           normalizedMemo,
           {
-            changedByUserId: currentUser.id,
-            changedByName: currentUser.displayName || currentUser.username,
-            summary,
-            keepLatestCount: 30,
             expectedVersion: normalizedMemo?.version,
             forceOverwrite: body.forceOverwrite === true,
           }
@@ -501,19 +476,11 @@ export default async function handler(req: any, res: any) {
 
     // Save to database
     if (existingSheet && isAdmin(currentUser) && !nonAdminSheetChanged && adminMemoChanged) {
-      const memoOnlyNextSheet: EntrySheet = {
-        ...existingSheet,
-        adminMemo: safeSheet.adminMemo,
-      };
       try {
         const updated = await SheetRepository.updateAdminMemoOnly(
           sheetId,
           safeSheet.adminMemo,
           {
-            changedByUserId: currentUser.id,
-            changedByName: currentUser.displayName || currentUser.username,
-            summary: buildRevisionSummary(existingSheet, memoOnlyNextSheet),
-            keepLatestCount: 30,
             expectedVersion: safeSheet.adminMemo?.version,
             forceOverwrite: body.forceOverwrite === true,
           }

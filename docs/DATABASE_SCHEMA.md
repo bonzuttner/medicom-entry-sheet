@@ -124,9 +124,37 @@
 - 制約:
   - `UNIQUE (manufacturer_id, month)`
 
-## 10. `entry_sheet_revisions`
+## 10. `entry_sheet_admin_memos`
+
+- 目的: エントリーシートに紐づく Adminメモの分離保存
+- 主キー: `sheet_id (UUID)`
+- 外部キー:
+  - `sheet_id -> entry_sheets.id`（`ON DELETE CASCADE`）
+- 主項目:
+  - `version`
+  - `promo_code`
+  - `board_picking_jan`
+  - `deadline_table_url`
+  - `band_pattern`
+  - `target_store_count`
+  - `print_board1_count`
+  - `print_board2_count`
+  - `print_band1_count`
+  - `print_band2_count`
+  - `print_other`
+  - `equipment_note`
+  - `admin_note`
+  - `created_at`
+  - `updated_at`
+- 補足:
+  - `entry_sheets.updated_at` とは独立して更新される
+  - 変更履歴 `entry_sheet_revisions` には含めない
+
+## 11. `entry_sheet_revisions`
 
 - 目的: エントリーシート変更履歴
+- 対象: 通常シート項目の更新のみ
+- 非対象: `entry_sheet_admin_memos` の更新（Adminメモ変更は履歴を残さない）
 - 主キー: `id (UUID)`
 - 外部キー:
   - `sheet_id -> entry_sheets.id`
@@ -136,16 +164,16 @@
   - `summary`
   - `created_at`
 
-## 11. インデックス補足
+## 12. インデックス補足
 
 - 一覧・絞り込み高速化のために `manufacturer_id` / `status` / `created_at` 等へインデックスを付与
 - `entry_sheets` は `manufacturer_id, updated_at DESC` の複合インデックスを利用
 
-## 12. バリデーション一覧（DB制約 + API実装）
+## 13. バリデーション一覧（DB制約 + API実装）
 
 ここでは「DBが強制する制約」と「API/画面で追加実装している入力チェック」を分けて記載する。
 
-### 12.1 `users`
+### 13.1 `users`
 
 - DB制約:
   - `username`: `NOT NULL`, `UNIQUE`, `VARCHAR(100)`
@@ -160,7 +188,7 @@
   - 電話番号: ハイフンなし半角数字10〜11桁
   - 最後の `ADMIN` ユーザーは削除不可
 
-### 12.2 `entry_sheets`
+### 13.2 `entry_sheets`
 
 - DB制約:
   - `creator_id`: `NULL許容`, `FK`（ユーザー削除時は `NULL`）
@@ -172,7 +200,7 @@
     - `title`, `notes`, `email`, `phoneNumber`
   - `products` は1件以上必須
 
-### 12.3 `product_entries`
+### 13.3 `product_entries`
 
 - DB制約:
   - `sheet_id`: `NOT NULL`, `FK`
@@ -192,14 +220,14 @@
     - `product_image` が不足している場合は `completed_no_image` で保存
     - 販促物ありの場合 `promo_width` と `promo_image` は必須
 
-### 12.4 `product_ingredients`
+### 13.4 `product_ingredients`
 
 - DB制約:
   - `product_id`: `NOT NULL`, `FK`
   - `ingredient_name`: `NOT NULL`, `VARCHAR(200)`
   - `UNIQUE (product_id, ingredient_name)`（同一商品で重複禁止）
 
-### 12.5 `attachments`
+### 13.5 `attachments`
 
 - DB制約:
   - `name`: `NOT NULL`, `VARCHAR(500)`
@@ -214,7 +242,7 @@
     - 短辺1500px未満はエラー
     - 許可MIMEのみ（JPEG/PNG/WebP/GIF/BMP）
 
-### 12.6 `master_data`
+### 13.6 `master_data`
 
 - DB制約:
   - `UNIQUE (category, value)`
@@ -222,7 +250,7 @@
   - マスタ値は20文字以内
   - 対象カテゴリ: メーカー名 / リスク分類 / 特定成分
 
-## 13. 参照先
+## 14. 参照先
 
 - スキーマ本体: `api/admin/schema.sql`
 - Repository実装:

@@ -129,6 +129,8 @@
   - `version` 不一致時は `409 VERSION_CONFLICT`
 - シート削除: `DELETE /api/sheets/:id`
 - シート変更履歴: `GET /api/sheets/:id/revisions`
+  - 通常シート項目の変更のみ記録
+  - Adminメモ更新は履歴対象外
 - 過去商品検索: `GET /api/products/search`
 - ユーザー一覧: `GET /api/users`
 - ユーザー保存: `PUT /api/users/:id`
@@ -148,14 +150,17 @@
 ### 6.2 Adminメモ保存
 
 1. Admin一覧または編集画面で Adminメモを更新
-2. `dataService.saveSheetAdminMemo` 実行（`PUT /api/sheets/:id` + `mode=admin_memo`）
-3. API側で ADMIN権限・入力検証・`adminMemo.version` 競合検知
-4. `entry_sheet_admin_memos` のみ更新
-5. 成功時に更新済みシートを再取得し画面へ反映
+2. Admin一覧では `dataService.saveSheetAdminMemo` を実行（`PUT /api/sheets/:id` + `mode=admin_memo`）
+3. 編集画面では、Adminメモのみ変更時は `dataService.saveSheetAdminMemo`、通常項目も同時に変更した場合は `dataService.saveSheet` を実行
+4. API側で ADMIN権限・入力検証・`adminMemo.version` 競合検知を実施
+5. `entry_sheet_admin_memos` を更新し、通常項目も同時保存された場合のみ `entry_sheets` 側も更新
+6. 成功時に更新済みシートを再取得し画面へ反映
 
 補足:
 - Adminメモのみ更新では `entry_sheets.updated_at` は更新しない
 - 一覧の並び替え（`updated_at`）は通常シート更新のみ反映
+- Adminメモ更新では `entry_sheet_revisions` を追加しない
+- 変更履歴画面には Adminメモ差分を表示しない
 
 ### 6.3 画像/添付
 

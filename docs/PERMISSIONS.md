@@ -56,9 +56,6 @@
 ### 管理者限定API
 
 - マスター更新: `api/master.ts` の `PUT`（`ADMIN` のみ）
-- 移行処理:
-  - `api/admin/migrate.ts`
-  - `api/admin/migrate-to-postgres.ts`
 
 ## UI側の表示制御（補助）
 
