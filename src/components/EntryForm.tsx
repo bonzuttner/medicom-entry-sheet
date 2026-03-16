@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { EntrySheet, EntrySheetRevision, MasterData, ProductEntry, User, UserRole } from '../types';
-import { Save, ArrowLeft, Plus, Trash2, AlertTriangle, Image as ImageIcon, Search } from 'lucide-react';
+import { Save, ArrowLeft, Plus, Trash2, AlertTriangle, Image as ImageIcon, Search, ChevronRight } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 interface EntryFormProps {
@@ -1022,28 +1022,37 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       </div>
 
       {/* Products Tabs */}
-      <div className="flex items-center overflow-x-auto gap-2 mb-0 pb-2 no-scrollbar">
-        <button 
-            onClick={addProduct}
-            className="flex items-center gap-1 px-4 py-2 text-sm text-primary font-bold hover:bg-sky-50 rounded-lg transition-colors flex-shrink-0"
-        >
-            <Plus size={16} /> 商品追加
-        </button>
-        {formData.products.map((prod, idx) => (
-            <button
-                key={prod.id}
-                onClick={() => setActiveTab(idx)}
-                className={`
-                    px-4 sm:px-5 py-3 rounded-t-lg font-bold text-sm whitespace-nowrap border-t border-l border-r flex-shrink-0
-                    ${activeTab === idx 
-                        ? 'bg-white border-slate-200 text-primary z-10 relative -mb-[1px]' 
-                        : 'bg-slate-100 border-transparent text-slate-500 hover:bg-slate-200'}
-                `}
-            >
-                {prod.productName || `商品 ${idx + 1}`}
-                {!prod.productName && <span className="ml-2 text-warning">●</span>}
-            </button>
-        ))}
+      <div className="relative">
+        <div className="flex items-center overflow-x-auto gap-2 mb-0 pb-2 no-scrollbar pr-8 sm:pr-0">
+          <button
+              onClick={addProduct}
+              className="flex items-center gap-1 px-3 sm:px-4 py-2 text-sm text-primary font-bold hover:bg-sky-50 rounded-lg transition-colors flex-shrink-0"
+          >
+              <Plus size={16} /> <span className="hidden sm:inline">商品追加</span><span className="sm:hidden">追加</span>
+          </button>
+          {formData.products.map((prod, idx) => (
+              <button
+                  key={prod.id}
+                  onClick={() => setActiveTab(idx)}
+                  className={`
+                      px-3 sm:px-5 py-3 rounded-t-lg font-bold text-xs sm:text-sm whitespace-nowrap border-t border-l border-r flex-shrink-0 max-w-[120px] sm:max-w-none truncate
+                      ${activeTab === idx
+                          ? 'bg-white border-slate-200 text-primary z-10 relative -mb-[1px]'
+                          : 'bg-slate-100 border-transparent text-slate-500 hover:bg-slate-200'}
+                  `}
+                  title={prod.productName || `商品 ${idx + 1}`}
+              >
+                  {prod.productName || `商品 ${idx + 1}`}
+                  {!prod.productName && <span className="ml-1 sm:ml-2 text-warning">●</span>}
+              </button>
+          ))}
+        </div>
+        {/* Scroll hint for mobile when there are multiple products */}
+        {formData.products.length > 2 && (
+          <div className="sm:hidden absolute right-0 top-0 bottom-2 w-8 bg-gradient-to-l from-slate-50 to-transparent flex items-center justify-end pointer-events-none">
+            <ChevronRight size={16} className="text-slate-400 mr-1" />
+          </div>
+        )}
       </div>
 
       {/* Product Form Area */}

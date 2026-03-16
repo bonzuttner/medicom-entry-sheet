@@ -52,6 +52,24 @@
         outline: none;
         box-shadow: none;
       }
+
+      /* Hide scrollbar but keep scroll functionality */
+      .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+      }
+
+      /* Hide scrollbar for horizontal scroll areas on mobile */
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
     </style>
   </head>
   <body class="bg-slate-50 text-slate-900 antialiased">

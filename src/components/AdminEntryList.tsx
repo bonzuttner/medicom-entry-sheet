@@ -386,7 +386,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
         </div>
         <button
           onClick={() => setShowExportModal(true)}
-          className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-2.5 rounded-lg flex items-center gap-2 font-bold shadow-sm"
+          className="bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 px-4 py-2.5 rounded-lg flex items-center gap-2 font-bold shadow-sm transition-all"
         >
           <Download size={18} />
           Admin CSV出力

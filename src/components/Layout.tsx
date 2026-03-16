@@ -46,12 +46,13 @@ export const Layout: React.FC<LayoutProps> = ({ currentUser, currentPage, onNavi
 
         {/* Main Nav (Simple Toolbar) */}
         <div className="border-t border-slate-100">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-6 overflow-x-auto">
-            <NavButton 
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-4 sm:space-x-6 overflow-x-auto scrollbar-hide">
+            <NavButton
               active={currentPage === Page.LIST || currentPage === Page.EDIT}
               onClick={() => onNavigate(Page.LIST)}
               icon={<LayoutGrid size={17} />}
-              label="エントリーシート一覧"
+              label="シート一覧"
+              fullLabel="エントリーシート一覧"
             />
 
             {/* Account Management - All users can manage accounts in their own company */}
@@ -59,16 +60,18 @@ export const Layout: React.FC<LayoutProps> = ({ currentUser, currentPage, onNavi
               active={currentPage === Page.ACCOUNTS}
               onClick={() => onNavigate(Page.ACCOUNTS)}
               icon={<Users size={17} />}
-              label="アカウント管理"
+              label="アカウント"
+              fullLabel="アカウント管理"
             />
 
             {/* Master Management - Explicitly Admin Only */}
             {currentUser.role === UserRole.ADMIN && (
-              <NavButton 
-                active={currentPage === Page.MASTERS} 
+              <NavButton
+                active={currentPage === Page.MASTERS}
                 onClick={() => onNavigate(Page.MASTERS)}
                 icon={<Settings size={17} />}
-                label="マスタ管理"
+                label="マスタ"
+                fullLabel="マスタ管理"
               />
             )}
 
@@ -77,7 +80,8 @@ export const Layout: React.FC<LayoutProps> = ({ currentUser, currentPage, onNavi
                 active={currentPage === Page.ADMIN_LIST}
                 onClick={() => onNavigate(Page.ADMIN_LIST)}
                 icon={<ListChecks size={17} />}
-                label="エントリー履歴(Admin)"
+                label="履歴(Admin)"
+                fullLabel="エントリー履歴(Admin)"
               />
             )}
           </div>
@@ -92,17 +96,18 @@ export const Layout: React.FC<LayoutProps> = ({ currentUser, currentPage, onNavi
   );
 };
 
-const NavButton = ({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) => (
+const NavButton = ({ active, onClick, icon, label, fullLabel }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string, fullLabel?: string }) => (
   <button
     onClick={onClick}
     className={`
-      flex items-center gap-2 py-3 px-1 border-b-2 font-medium text-[13px] transition-colors whitespace-nowrap
-      ${active 
-        ? 'border-primary text-primary' 
+      flex items-center gap-1.5 sm:gap-2 py-3 px-1 border-b-2 font-medium text-[12px] sm:text-[13px] transition-colors whitespace-nowrap
+      ${active
+        ? 'border-primary text-primary'
         : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}
     `}
   >
     {icon}
-    {label}
+    <span className="sm:hidden">{label}</span>
+    <span className="hidden sm:inline">{fullLabel || label}</span>
   </button>
 );

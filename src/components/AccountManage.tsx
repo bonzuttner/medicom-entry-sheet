@@ -338,7 +338,52 @@ export const AccountManage: React.FC<AccountManageProps> = ({
             </div>
         )}
 
-        <div className="bg-white rounded-lg shadow border overflow-hidden">
+        {/* Mobile Card View */}
+        <div className="md:hidden space-y-3">
+            {users.map(u => {
+                const canEdit = canModifyUser(u);
+                return (
+                    <div key={u.id} className="bg-white rounded-lg shadow border p-4">
+                        <div className="flex justify-between items-start mb-2">
+                            <div>
+                                <div className="font-bold text-slate-800">{u.displayName}</div>
+                                <div className="text-sm text-slate-500">{u.username}</div>
+                            </div>
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${u.role === UserRole.ADMIN ? 'bg-purple-100 text-purple-800' : 'bg-slate-100 text-slate-700'}`}>
+                                {u.role === UserRole.ADMIN ? '管理者' : '一般'}
+                            </span>
+                        </div>
+                        <div className="text-sm text-slate-600 mb-3">{u.manufacturerName}</div>
+                        <div className="flex justify-end gap-2 border-t pt-3">
+                            <button
+                                onClick={() => {
+                                  if (!canEdit) return;
+                                  const { password: _password, ...safeUser } = u;
+                                  setEditingUser(safeUser);
+                                  setIsPasswordVisible(false);
+                                }}
+                                disabled={!canEdit}
+                                className={`p-2 rounded ${canEdit ? 'text-primary hover:bg-blue-50' : 'text-slate-300 cursor-not-allowed'}`}
+                                title={canEdit ? '編集' : '編集権限がありません'}
+                            >
+                                <Edit size={18} />
+                            </button>
+                            <button
+                                onClick={() => canEdit && window.confirm('本当に削除しますか？') && onDeleteUser(u.id)}
+                                disabled={!canEdit}
+                                className={`p-2 rounded ${canEdit ? 'text-danger hover:bg-red-50' : 'text-slate-300 cursor-not-allowed'}`}
+                                title={canEdit ? '削除' : '削除権限がありません'}
+                            >
+                                <Trash2 size={18} />
+                            </button>
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden md:block bg-white rounded-lg shadow border overflow-hidden">
             <table className="w-full">
                 <thead className="bg-slate-50 border-b">
                     <tr>

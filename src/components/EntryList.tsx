@@ -570,24 +570,24 @@ export const EntryList: React.FC<EntryListProps> = ({
             </p>
         </div>
         <div className="w-full sm:w-auto flex flex-row gap-3">
-            <button 
+            <button
               onClick={() => setShowExportModal(true)}
-              className="flex-1 sm:flex-none justify-center bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-3 rounded-lg flex items-center gap-2 font-bold shadow-sm transition-all"
+              className="flex-1 sm:flex-none justify-center bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 px-4 py-3 rounded-lg flex items-center gap-2 font-bold shadow-sm transition-all"
             >
               <Download size={20} />
               CSV出力
             </button>
-            <button 
+            <button
               onClick={downloadSelectedProductImages}
               disabled={isDownloadingImages}
               className={`flex-1 sm:flex-none justify-center px-4 py-3 rounded-lg flex items-center gap-2 font-bold shadow-sm transition-all
-                ${isDownloadingImages ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'}
+                ${isDownloadingImages ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-violet-50 border border-violet-200 text-violet-700 hover:bg-violet-100 hover:border-violet-300'}
               `}
             >
               <ImageIcon size={20} />
               {isDownloadingImages ? '画像準備中...' : '商品画像一括DL'}
             </button>
-            <button 
+            <button
               onClick={onCreate}
               className="flex-1 sm:flex-none justify-center bg-primary hover:bg-sky-600 text-white px-6 py-3 rounded-lg shadow-lg shadow-sky-200 flex items-center gap-2 font-bold transition-all transform hover:-translate-y-0.5"
             >
@@ -597,9 +597,9 @@ export const EntryList: React.FC<EntryListProps> = ({
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+      <div className="flex flex-col gap-3">
         {/* Search Bar */}
-        <div className="relative flex-1 min-w-0">
+        <div className="relative w-full">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <Search className="h-4 w-4 text-slate-400" />
           </div>
@@ -612,39 +612,42 @@ export const EntryList: React.FC<EntryListProps> = ({
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-bold text-slate-600">絞り込み</span>
-          <select
-            value={dateFilterBy}
-            onChange={(e) => setDateFilterBy(e.target.value as 'createdAt' | 'updatedAt' | 'deploymentPeriod')}
-            className="border border-slate-300 rounded-md px-2 py-1.5 text-xs bg-white"
-          >
-            <option value="createdAt">作成日</option>
-            <option value="updatedAt">更新日</option>
-            <option value="deploymentPeriod">展開期間</option>
-          </select>
-          <input
-            type="date"
-            value={dateSince}
-            onChange={(e) => setDateSince(e.target.value)}
-            className="border border-slate-300 rounded-md px-2 py-1.5 text-xs bg-white"
-          />
-          <select
-            value={dateFilterMode}
-            onChange={(e) => setDateFilterMode(e.target.value as 'since' | 'until')}
-            className="border border-slate-300 rounded-md px-2 py-1.5 text-xs bg-white"
-          >
-            <option value="since">以降</option>
-            <option value="until">以前</option>
-          </select>
-          {dateSince && (
-            <button
-              onClick={() => setDateSince('')}
-              className="px-2 py-1.5 rounded-md border border-slate-300 text-xs text-slate-600 hover:bg-slate-50"
+        {/* Filter Controls */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <span className="text-[11px] font-bold text-slate-600 shrink-0">絞り込み</span>
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 flex-1">
+            <select
+              value={dateFilterBy}
+              onChange={(e) => setDateFilterBy(e.target.value as 'createdAt' | 'updatedAt' | 'deploymentPeriod')}
+              className="border border-slate-300 rounded-md px-2 py-2 sm:py-1.5 text-xs bg-white"
             >
-              解除
-            </button>
-          )}
+              <option value="createdAt">作成日</option>
+              <option value="updatedAt">更新日</option>
+              <option value="deploymentPeriod">展開期間</option>
+            </select>
+            <select
+              value={dateFilterMode}
+              onChange={(e) => setDateFilterMode(e.target.value as 'since' | 'until')}
+              className="border border-slate-300 rounded-md px-2 py-2 sm:py-1.5 text-xs bg-white"
+            >
+              <option value="since">以降</option>
+              <option value="until">以前</option>
+            </select>
+            <input
+              type="date"
+              value={dateSince}
+              onChange={(e) => setDateSince(e.target.value)}
+              className="border border-slate-300 rounded-md px-2 py-2 sm:py-1.5 text-xs bg-white col-span-2 sm:col-span-1"
+            />
+            {dateSince && (
+              <button
+                onClick={() => setDateSince('')}
+                className="px-2 py-2 sm:py-1.5 rounded-md border border-slate-300 text-xs text-slate-600 hover:bg-slate-50 col-span-2 sm:col-span-1 sm:w-auto"
+              >
+                解除
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
