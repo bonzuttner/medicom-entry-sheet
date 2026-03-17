@@ -15,6 +15,7 @@ interface AdminEntryListProps {
 type MemoDraft = {
   version: number;
   promoCode: string;
+  boardPickingJan: string;
   deadlineTableUrl: string;
   bandPattern: string;
   targetStoreCount: string;
@@ -49,6 +50,7 @@ const NUMERIC_DRAFT_FIELDS: ReadonlySet<keyof MemoDraft> = new Set([
 const buildDraftFromSheet = (sheet: EntrySheet): MemoDraft => ({
   version: sheet.adminMemo?.version || 1,
   promoCode: sheet.adminMemo?.promoCode || '',
+  boardPickingJan: toNumericDraftValue(sheet.adminMemo?.boardPickingJan),
   deadlineTableUrl: sheet.adminMemo?.deadlineTableUrl || '',
   bandPattern: toNumericDraftValue(sheet.adminMemo?.bandPattern),
   targetStoreCount: toNumericDraftValue(sheet.adminMemo?.targetStoreCount),
@@ -228,6 +230,8 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
     const normalizedValue =
       field === 'promoCode'
         ? normalizeToHalfWidth(value).toUpperCase()
+        : field === 'boardPickingJan'
+          ? normalizeDigitsInput(value)
         : NUMERIC_DRAFT_FIELDS.has(field)
           ? normalizeDigitsInput(value)
           : value;
@@ -237,6 +241,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
         ...(prev[sheetId] || {
           version: 1,
           promoCode: '',
+          boardPickingJan: '',
           deadlineTableUrl: '',
           bandPattern: '',
           targetStoreCount: '',
@@ -274,6 +279,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
     const draft = drafts[sheetId] || {
       version: 1,
       promoCode: '',
+      boardPickingJan: '',
       deadlineTableUrl: '',
       bandPattern: '',
       targetStoreCount: '',
@@ -286,6 +292,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
     const memo: EntrySheetAdminMemo = {
       version: draft.version,
       promoCode: draft.promoCode.trim() || undefined,
+      boardPickingJan: draft.boardPickingJan.trim() || undefined,
       deadlineTableUrl: draft.deadlineTableUrl.trim() || undefined,
       bandPattern: draft.bandPattern.trim() || undefined,
       targetStoreCount: toOptionalInteger(draft.targetStoreCount),
@@ -318,9 +325,22 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
         'シートID',
         '状態',
         'タイトル',
+        'シート補足情報',
+        'メーカー名',
+        '作成者ID',
+        '作成者',
+        '作成日',
+        '更新日',
+        '展開期間開始',
+        '展開期間終了',
+        '担当者メール',
+        '担当者電話',
+        'シート添付ファイル数',
+        'シート添付ファイル名一覧',
+        'シート添付ファイル種別一覧',
+        'シート添付ファイルURL一覧',
         '展開期間',
         '棚割名',
-        'メーカー名',
         '販促CD',
         'ボードピッキングJAN',
         '期限表URL',
@@ -339,15 +359,33 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
     targetSheets.forEach((sheet) => {
       const draft = drafts[sheet.id] || buildDraftFromSheet(sheet);
       const memo = sheet.adminMemo;
+      const deploymentPeriod = getDeploymentPeriod(sheet);
+      const sheetAttachmentCount = sheet.attachments?.length ?? 0;
+      const sheetAttachmentNames = (sheet.attachments || []).map((file) => file.name).join(' / ');
+      const sheetAttachmentTypes = (sheet.attachments || []).map((file) => file.type).join(' / ');
+      const sheetAttachmentUrls = (sheet.attachments || []).map((file) => file.url).join(' / ');
       rows.push([
         toSafeCsvCell(sheet.id),
-        toSafeCsvCell(sheet.status),
+        toSafeCsvCell(getStatusLabel(sheet.status)),
         toSafeCsvCell(sheet.title),
+        toSafeCsvCell(sheet.notes || ''),
+        toSafeCsvCell(sheet.manufacturerName),
+        toSafeCsvCell(sheet.creatorId),
+        toSafeCsvCell(sheet.creatorName),
+        toSafeCsvCell(new Date(sheet.createdAt).toLocaleDateString()),
+        toSafeCsvCell(new Date(sheet.updatedAt).toLocaleDateString()),
+        toSafeCsvCell(deploymentPeriod.start),
+        toSafeCsvCell(deploymentPeriod.end),
+        toSafeCsvCell(sheet.email),
+        toSafeCsvCell(sheet.phoneNumber),
+        toSafeCsvCell(sheetAttachmentCount),
+        toSafeCsvCell(sheetAttachmentNames),
+        toSafeCsvCell(sheetAttachmentTypes),
+        toSafeCsvCell(sheetAttachmentUrls),
         toSafeCsvCell(getDeploymentPeriodLabel(sheet)),
         toSafeCsvCell(getShelfNames(sheet)),
-        toSafeCsvCell(sheet.manufacturerName),
         toSafeCsvCell(draft.promoCode),
-        toSafeCsvCell(memo?.boardPickingJan || ''),
+        toSafeCsvCell(draft.boardPickingJan),
         toSafeCsvCell(draft.deadlineTableUrl),
         toSafeCsvCell(draft.bandPattern),
         toSafeCsvCell(draft.targetStoreCount),
@@ -447,7 +485,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
         <table className="min-w-[1380px] w-full divide-y divide-slate-200 table-fixed">
           <thead className="bg-slate-50 [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-slate-50">
             <tr>
-              <th className="w-[42px] px-1 py-3 text-center text-xs font-bold text-slate-500">
+              <th className="sticky left-0 z-20 w-[42px] px-1 py-3 text-center text-xs font-bold text-slate-500 bg-slate-50 shadow-[1px_0_0_0_rgba(226,232,240,1)]">
                 <button onClick={toggleSelectAll} className="inline-flex items-center justify-center text-slate-500 hover:text-slate-700">
                   {filteredSheets.length > 0 && selectedCount === filteredSheets.length ? (
                     <CheckSquare size={15} />
@@ -465,6 +503,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
               <th className="w-[130px] px-3 py-3 text-left text-xs font-bold text-slate-500">メーカー名</th>
               <th className="w-[72px] px-3 py-3 text-center text-xs font-bold text-slate-500">期限表</th>
               <th className="w-[120px] px-3 py-3 text-left text-xs font-bold text-slate-500">販促CD</th>
+              <th className="w-[150px] px-3 py-3 text-left text-xs font-bold text-slate-500">ボードピッキングJAN</th>
               <th className="w-[120px] px-3 py-3 text-left text-xs font-bold text-slate-500">帯パターン</th>
               <th className="w-[110px] px-3 py-3 text-left text-xs font-bold text-slate-500">対象店舗数</th>
               <th className="hidden md:table-cell w-[260px] px-3 py-3 text-left text-xs font-bold text-slate-500">印刷依頼数量</th>
@@ -479,7 +518,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
               return (
                 <React.Fragment key={sheet.id}>
                   <tr className="hover:bg-slate-50">
-                    <td className="px-1 py-3 text-center">
+                    <td className="sticky left-0 z-10 px-1 py-3 text-center bg-white shadow-[1px_0_0_0_rgba(241,245,249,1)]">
                       <button
                         type="button"
                         onClick={() => toggleSelect(sheet.id)}
@@ -548,6 +587,17 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                         onChange={(e) => setDraftValue(sheet.id, 'promoCode', e.target.value)}
                         className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs bg-white text-slate-700 focus:border-slate-400 focus:ring-1 focus:ring-slate-200 transition-colors"
                         placeholder="X000000"
+                      />
+                    </td>
+                    <td className="px-3 py-3">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={draft.boardPickingJan}
+                        onChange={(e) => setDraftValue(sheet.id, 'boardPickingJan', e.target.value)}
+                        className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs bg-white text-slate-700 focus:border-slate-400 focus:ring-1 focus:ring-slate-200 transition-colors"
+                        placeholder="9999999999999"
                       />
                     </td>
                     <td className="px-3 py-3">

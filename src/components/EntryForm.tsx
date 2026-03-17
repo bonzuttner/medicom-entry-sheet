@@ -17,7 +17,7 @@ interface EntryFormProps {
 
 const normalizeProductName = (value: string): string => value.trim().toLowerCase();
 const LARGE_IMAGE_UPLOAD_ERROR =
-  '画像サイズが大きすぎてアップロードできません。BMPは通信量が大きくなりやすいため、JPEG/PNGに変換するか画像サイズを下げて再試行してください。それでもできない場合は、担当者へメールで画像を送信ください。';
+  '画像サイズが大きすぎてアップロードできません。25MB以下の画像を使用してください。BMPは通信量が大きくなりやすいため、JPEG/PNGに変換するか画像サイズを下げて再試行してください。それでもできない場合は、担当者へメールで画像を送信ください。';
 
 export const EntryForm: React.FC<EntryFormProps> = ({
   initialData,
@@ -681,8 +681,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
   // Helper for mock image upload
   const handleImageUpload = (index: number, field: 'productImage' | 'promoImage') => {
-    const MAX_IMAGE_BYTES = 50 * 1024 * 1024;
-    const MIN_SHORT_SIDE_PX = 1500;
+    const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
+    const MIN_SHORT_SIDE_PX = 1000;
     const getImageDimensions = (file: File): Promise<{ width: number; height: number }> =>
       new Promise((resolve, reject) => {
         const objectUrl = URL.createObjectURL(file);
@@ -706,7 +706,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         const file = (e.target as HTMLInputElement).files?.[0];
         if (file) {
             if (field === 'productImage' && (file.size <= 0 || file.size > MAX_IMAGE_BYTES)) {
-                alert("画像容量は50MB以下にしてください。");
+                alert("画像容量は25MB以下にしてください。");
                 return;
             }
             try {
@@ -733,7 +733,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
               }
               if (message.includes('解像度不足')) {
                 if (field === 'productImage') {
-                  alert(`商品画像の解像度が不足しています（${file.name}）。短辺1500px以上の画像を選択してください。`);
+                  alert(`商品画像の解像度が不足しています（${file.name}）。短辺1000px以上の画像を選択してください。`);
                   return;
                 }
                 alert(`画像の解像度要件に合致していません（${file.name}）。`);

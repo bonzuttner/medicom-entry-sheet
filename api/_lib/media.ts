@@ -24,9 +24,9 @@ const ATTACHMENT_MIME_TYPES = new Set([
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 ]);
 
-const MAX_IMAGE_BYTES = 50 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
-const MIN_IMAGE_SHORT_SIDE_PX = 1500;
+const MIN_IMAGE_SHORT_SIDE_PX = 1000;
 type UploadKind = 'image' | 'attachment' | 'promo';
 
 const safeFileName = (name: string): string =>

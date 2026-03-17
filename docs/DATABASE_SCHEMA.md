@@ -238,8 +238,8 @@
 - API/画面バリデーション:
   - 添付ファイル: 25MB以下、許可MIMEのみ
   - 画像:
-    - 50MB以下
-    - 短辺1500px未満はエラー
+    - 25MB以下
+    - 短辺1000px未満はエラー
     - 許可MIMEのみ（JPEG/PNG/WebP/GIF/BMP）
 
 ### 13.6 `master_data`
