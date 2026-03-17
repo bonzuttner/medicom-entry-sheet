@@ -572,7 +572,7 @@ export const EntryList: React.FC<EntryListProps> = ({
         <div className="w-full sm:w-auto flex flex-row gap-3">
             <button
               onClick={() => setShowExportModal(true)}
-              className="flex-1 sm:flex-none justify-center bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 px-4 py-3 rounded-lg flex items-center gap-2 font-bold shadow-sm transition-all"
+              className="flex-1 sm:flex-none justify-center bg-sky-50 border border-sky-200 text-primary hover:bg-sky-100 hover:border-sky-300 px-4 py-3 rounded-lg flex items-center gap-2 font-bold shadow-sm transition-all"
             >
               <Download size={20} />
               CSV出力
@@ -581,7 +581,7 @@ export const EntryList: React.FC<EntryListProps> = ({
               onClick={downloadSelectedProductImages}
               disabled={isDownloadingImages}
               className={`flex-1 sm:flex-none justify-center px-4 py-3 rounded-lg flex items-center gap-2 font-bold shadow-sm transition-all
-                ${isDownloadingImages ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-violet-50 border border-violet-200 text-violet-700 hover:bg-violet-100 hover:border-violet-300'}
+                ${isDownloadingImages ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-sky-50 border border-sky-200 text-primary hover:bg-sky-100 hover:border-sky-300'}
               `}
             >
               <ImageIcon size={20} />
