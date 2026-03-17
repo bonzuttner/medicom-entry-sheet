@@ -494,13 +494,13 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                   )}
                 </button>
               </th>
-              <th className="w-[70px] px-1 py-3 text-left text-[10px] font-bold text-slate-400">ID</th>
+              <th className="w-[62px] px-1 py-3 text-left text-[10px] font-bold text-slate-400">ID</th>
               <th className="w-[42px] px-1 py-3 text-center" aria-label="詳細編集"></th>
-              <th className="w-[90px] px-3 py-3 text-left text-xs font-bold text-slate-500">状態</th>
-              <th className="w-[220px] px-3 py-3 text-left text-xs font-bold text-slate-500">タイトル</th>
-              <th className="w-[120px] px-3 py-3 text-left text-xs font-bold text-slate-500">展開期間</th>
-              <th className="w-[125px] px-3 py-3 text-left text-xs font-bold text-slate-500">棚割り</th>
-              <th className="w-[130px] px-3 py-3 text-left text-xs font-bold text-slate-500">メーカー名</th>
+              <th className="w-[82px] px-2 py-3 text-left text-xs font-bold text-slate-500">状態</th>
+              <th className="w-[180px] px-2 py-3 text-left text-xs font-bold text-slate-500">タイトル</th>
+              <th className="w-[104px] px-2 py-3 text-left text-xs font-bold text-slate-500">展開期間</th>
+              <th className="w-[110px] px-2 py-3 text-left text-xs font-bold text-slate-500">棚割り</th>
+              <th className="w-[116px] px-2 py-3 text-left text-xs font-bold text-slate-500">メーカー名</th>
               <th className="w-[72px] px-3 py-3 text-center text-xs font-bold text-slate-500">期限表</th>
               <th className="w-[120px] px-3 py-3 text-left text-xs font-bold text-slate-500">販促CD</th>
               <th className="w-[150px] px-3 py-3 text-left text-xs font-bold text-slate-500">ボードピッキングJAN</th>
@@ -541,25 +541,25 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                         <Edit3 size={18} />
                       </button>
                     </td>
-                    <td className="px-3 py-3 text-xs text-slate-700">
+                    <td className="px-2 py-3 text-xs text-slate-700">
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-0.5 font-medium ${getStatusPillClass(sheet.status)}`}
                       >
                         {getStatusLabel(sheet.status)}
                       </span>
                     </td>
-                    <td className="px-3 py-3 text-xs font-semibold text-slate-700 break-words leading-4">
+                    <td className="px-2 py-3 text-xs font-semibold text-slate-700 break-words leading-4">
                       {sheet.title}
                     </td>
-                    <td className="px-3 py-3 text-xs text-slate-700 whitespace-nowrap">
+                    <td className="px-2 py-3 text-xs text-slate-700 whitespace-nowrap">
                       {getDeploymentPeriodLabel(sheet)}
                     </td>
-                    <td className="px-3 py-3 text-xs text-slate-700">
+                    <td className="px-2 py-3 text-xs text-slate-700">
                       <div className="truncate" title={getShelfNames(sheet)}>
                         {getShelfNames(sheet)}
                       </div>
                     </td>
-                    <td className="px-3 py-3 text-xs text-slate-700 whitespace-nowrap">{sheet.manufacturerName}</td>
+                    <td className="px-2 py-3 text-xs text-slate-700 whitespace-nowrap">{sheet.manufacturerName}</td>
                     <td className="px-3 py-3 text-center">
                       {urlEnabled ? (
                         <a

@@ -775,7 +775,10 @@ export const EntryList: React.FC<EntryListProps> = ({
               <table className="min-w-full divide-y divide-slate-200 table-fixed">
                 <thead className="bg-slate-50 [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-slate-50">
                   <tr>
-                    <th scope="col" className="px-4 py-3 w-12 text-center">
+                    <th
+                      scope="col"
+                      className="sticky left-0 z-20 w-12 px-4 py-3 text-center bg-slate-50 shadow-[1px_0_0_0_rgba(226,232,240,1)]"
+                    >
                       <button onClick={toggleSelectAll} className="text-slate-400 hover:text-slate-600">
                         {selectedSheets.size === filteredSheets.length && filteredSheets.length > 0 ? <CheckSquare size={20} /> : <Square size={20} />}
                       </button>
@@ -824,7 +827,10 @@ export const EntryList: React.FC<EntryListProps> = ({
                           className={`hover:bg-slate-50 transition-colors cursor-pointer ${isExpanded ? 'bg-slate-50' : ''}`}
                           onClick={() => toggleExpand(sheet.id)}
                         >
-                          <td className="px-4 py-4 text-center" onClick={(e) => toggleSelect(sheet.id, e)}>
+                          <td
+                            className="sticky left-0 z-10 px-4 py-4 text-center bg-white shadow-[1px_0_0_0_rgba(241,245,249,1)]"
+                            onClick={(e) => toggleSelect(sheet.id, e)}
+                          >
                              <div className="text-primary cursor-pointer inline-block">
                                {isSelected ? <CheckSquare size={20} /> : <Square size={20} className="text-slate-300" />}
                              </div>
