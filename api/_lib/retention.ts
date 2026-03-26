@@ -1,26 +1,29 @@
-import { EntrySheet } from './types.js';
+const SHEET_RETENTION_YEARS = 5;
+const MANUFACTURER_PRODUCT_RETENTION_YEARS = 5;
+const RETENTION_RUN_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
-const HISTORY_RETENTION_YEARS = 3;
+let lastRetentionRunAt = 0;
 
-const getRetentionCutoff = (): Date => {
+const yearsAgo = (years: number): Date => {
   const cutoff = new Date();
-  cutoff.setFullYear(cutoff.getFullYear() - HISTORY_RETENTION_YEARS);
+  cutoff.setFullYear(cutoff.getFullYear() - years);
   return cutoff;
 };
 
-const getSheetBaseDate = (sheet: EntrySheet): Date | null => {
-  const base = sheet.createdAt || sheet.updatedAt;
-  if (!base) return null;
-  const parsed = new Date(base);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed;
+export const getSheetRetentionCutoff = (): Date => yearsAgo(SHEET_RETENTION_YEARS);
+
+export const getManufacturerProductRetentionCutoff = (): Date =>
+  yearsAgo(MANUFACTURER_PRODUCT_RETENTION_YEARS);
+
+export const shouldRunRetention = (): boolean =>
+  Date.now() - lastRetentionRunAt >= RETENTION_RUN_INTERVAL_MS;
+
+export const markRetentionRun = (): void => {
+  lastRetentionRunAt = Date.now();
 };
 
-export const pruneSheetsByRetention = (sheets: EntrySheet[]): EntrySheet[] => {
-  const cutoff = getRetentionCutoff();
-  return sheets.filter((sheet) => {
-    const baseDate = getSheetBaseDate(sheet);
-    if (!baseDate) return true;
-    return baseDate >= cutoff;
-  });
-};
+export const getRetentionConfig = () => ({
+  sheetRetentionYears: SHEET_RETENTION_YEARS,
+  manufacturerProductRetentionYears: MANUFACTURER_PRODUCT_RETENTION_YEARS,
+  runIntervalMs: RETENTION_RUN_INTERVAL_MS,
+});
