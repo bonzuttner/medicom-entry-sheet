@@ -1075,7 +1075,13 @@ export const EntryForm: React.FC<EntryFormProps> = ({
               </span>
               <h4 className="text-xs sm:text-sm font-semibold text-slate-700 tracking-wide">過去商品検索</h4>
             </div>
-            <div className="flex flex-col sm:flex-row gap-2">
+            <form
+              className="flex flex-col sm:flex-row gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void runProductSearch();
+              }}
+            >
               <input
                 type="text"
                 className="flex-1 border-slate-300 rounded-md py-2 px-2.5 bg-white text-sm"
@@ -1084,35 +1090,33 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                 placeholder="商品名またはJANで検索"
               />
               <button
-                type="button"
-                onClick={() => {
-                  void runProductSearch();
-                }}
+                type="submit"
                 disabled={isSearchingProducts}
                 className="px-3 py-2 rounded-md bg-slate-700 text-white hover:bg-slate-800 disabled:opacity-60 text-sm"
               >
                 {isSearchingProducts ? '検索中...' : '検索'}
               </button>
-            </div>
+            </form>
             {productSearchResults.length > 0 && (
               <ul className="mt-2.5 max-h-44 overflow-auto space-y-1.5">
                 {productSearchResults.map((item) => (
                   <li
                     key={item.id}
-                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-white border border-slate-200 rounded-md px-2.5 py-2"
+                    className="bg-white border border-slate-200 rounded-md"
                   >
-                    <div className="text-xs sm:text-sm min-w-0">
-                      <div className="font-medium text-slate-700 truncate">{item.productName}</div>
-                      <div className="text-[11px] text-slate-500 truncate">
-                        JAN: {item.janCode} / 棚割名: {item.shelfName}
-                      </div>
-                    </div>
                     <button
                       type="button"
                       onClick={() => applySearchedProduct(activeTab, item)}
-                      className="px-2.5 py-1.5 rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 text-xs shrink-0"
+                      className="w-full text-left px-2.5 py-2 transition-colors hover:bg-sky-50 focus:bg-sky-50 rounded-md group cursor-pointer"
                     >
-                      反映
+                      <div className="text-xs sm:text-sm min-w-0">
+                        <div className="font-medium text-slate-700 truncate underline-offset-2 group-hover:underline group-focus:underline">
+                          {item.productName}
+                        </div>
+                        <div className="text-[11px] text-slate-500 truncate">
+                          JAN: {item.janCode} / 棚割名: {item.shelfName}
+                        </div>
+                      </div>
                     </button>
                   </li>
                 ))}
@@ -1212,7 +1216,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             </h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                  <div>
-                     <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">幅 (mm) <span className="text-danger">*</span></label>
+                     <label className="block text-xs font-bold text-slate-500 mb-1">幅 (mm) <span className="text-danger">*</span></label>
                      <input 
                         type="number" 
                         className="w-full border-slate-300 rounded-lg p-3"
@@ -1221,7 +1225,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      />
                 </div>
                 <div>
-                     <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">高さ (mm) <span className="text-danger">*</span></label>
+                     <label className="block text-xs font-bold text-slate-500 mb-1">高さ (mm) <span className="text-danger">*</span></label>
                      <input 
                         type="number" 
                         className="w-full border-slate-300 rounded-lg p-3"
@@ -1230,7 +1234,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      />
                 </div>
                 <div>
-                     <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">奥行 (mm) <span className="text-danger">*</span></label>
+                     <label className="block text-xs font-bold text-slate-500 mb-1">奥行 (mm) <span className="text-danger">*</span></label>
                      <input 
                         type="number" 
                         className="w-full border-slate-300 rounded-lg p-3"

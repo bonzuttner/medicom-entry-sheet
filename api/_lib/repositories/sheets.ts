@@ -107,17 +107,109 @@ const HALFWIDTH_SEARCH_CHARS =
   'ABCDEFGHIJKLMNOPQRSTUVWXYZ' +
   'abcdefghijklmnopqrstuvwxyz' +
   '0123456789 ';
-const KATAKANA_SEARCH_CHARS =
-  'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨ' +
-  'ラリルレロワヲンァィゥェォャュョッヵヶヴ';
-const HIRAGANA_SEARCH_CHARS =
-  'あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよ' +
-  'らりるれろわをんぁぃぅぇぉゃゅょっゕゖゔ';
+const KATAKANA_SEARCH_CHARS = Array.from(
+  { length: 0x30f6 - 0x30a1 + 1 },
+  (_, index) => String.fromCharCode(0x30a1 + index)
+).join('');
+const HIRAGANA_SEARCH_CHARS = Array.from(
+  { length: 0x30f6 - 0x30a1 + 1 },
+  (_, index) => String.fromCharCode(0x3041 + index)
+).join('');
 
 const normalizeKanaToHiragana = (value: string): string =>
   value.replace(/[\u30a1-\u30f6]/g, (ch) =>
     String.fromCharCode(ch.charCodeAt(0) - 0x60)
   );
+
+const normalizeKanaToKatakana = (value: string): string =>
+  value.replace(/[\u3041-\u3096]/g, (ch) =>
+    String.fromCharCode(ch.charCodeAt(0) + 0x60)
+  );
+
+const FULLWIDTH_TO_HALFWIDTH_KANA_MAP: Record<string, string> = {
+  '。': '｡',
+  '「': '｢',
+  '」': '｣',
+  '、': '､',
+  '・': '･',
+  'ヲ': 'ｦ',
+  'ァ': 'ｧ',
+  'ィ': 'ｨ',
+  'ゥ': 'ｩ',
+  'ェ': 'ｪ',
+  'ォ': 'ｫ',
+  'ャ': 'ｬ',
+  'ュ': 'ｭ',
+  'ョ': 'ｮ',
+  'ッ': 'ｯ',
+  'ー': 'ｰ',
+  'ア': 'ｱ',
+  'イ': 'ｲ',
+  'ウ': 'ｳ',
+  'エ': 'ｴ',
+  'オ': 'ｵ',
+  'カ': 'ｶ',
+  'キ': 'ｷ',
+  'ク': 'ｸ',
+  'ケ': 'ｹ',
+  'コ': 'ｺ',
+  'サ': 'ｻ',
+  'シ': 'ｼ',
+  'ス': 'ｽ',
+  'セ': 'ｾ',
+  'ソ': 'ｿ',
+  'タ': 'ﾀ',
+  'チ': 'ﾁ',
+  'ツ': 'ﾂ',
+  'テ': 'ﾃ',
+  'ト': 'ﾄ',
+  'ナ': 'ﾅ',
+  'ニ': 'ﾆ',
+  'ヌ': 'ﾇ',
+  'ネ': 'ﾈ',
+  'ノ': 'ﾉ',
+  'ハ': 'ﾊ',
+  'ヒ': 'ﾋ',
+  'フ': 'ﾌ',
+  'ヘ': 'ﾍ',
+  'ホ': 'ﾎ',
+  'マ': 'ﾏ',
+  'ミ': 'ﾐ',
+  'ム': 'ﾑ',
+  'メ': 'ﾒ',
+  'モ': 'ﾓ',
+  'ヤ': 'ﾔ',
+  'ユ': 'ﾕ',
+  'ヨ': 'ﾖ',
+  'ラ': 'ﾗ',
+  'リ': 'ﾘ',
+  'ル': 'ﾙ',
+  'レ': 'ﾚ',
+  'ロ': 'ﾛ',
+  'ワ': 'ﾜ',
+  'ン': 'ﾝ',
+  '゛': 'ﾞ',
+  '゜': 'ﾟ',
+  ' ': ' ',
+  '　': ' ',
+};
+
+const normalizeSearchTextToHalfwidthKana = (value: string): string => {
+  const normalized = normalizeKanaToKatakana(value.normalize('NFKD'));
+  let result = '';
+  for (const ch of normalized) {
+    if (ch === '\u3099') {
+      result += 'ﾞ';
+      continue;
+    }
+    if (ch === '\u309A') {
+      result += 'ﾟ';
+      continue;
+    }
+    result += FULLWIDTH_TO_HALFWIDTH_KANA_MAP[ch] ?? ch;
+  }
+  return result.toLowerCase().trim();
+};
 
 const normalizeSearchText = (value: string): string => {
   return normalizeKanaToHiragana(value.normalize('NFKC')).toLowerCase().trim();
@@ -1417,6 +1509,7 @@ export const searchProductsByManufacturerId = async (
 ): Promise<ProductEntry[]> => {
   const trimmedKeyword = keyword.trim();
   const normalizedKeyword = normalizeSearchText(keyword);
+  const halfwidthKanaKeyword = normalizeSearchTextToHalfwidthKana(keyword);
   const result = await db.query<{
     id: string;
     shelf_name: string;
@@ -1475,6 +1568,7 @@ export const searchProductsByManufacturerId = async (
         $2 = ''
         OR p.product_name ILIKE ('%' || $2 || '%')
         OR p.jan_code ILIKE ('%' || $2 || '%')
+        OR ($4 <> '' AND p.product_name ILIKE ('%' || $4 || '%'))
         OR lower(
           translate(
             translate(p.product_name, '${FULLWIDTH_SEARCH_CHARS}', '${HALFWIDTH_SEARCH_CHARS}'),
@@ -1514,9 +1608,9 @@ export const searchProductsByManufacturerId = async (
       p.promo_depth,
       p.promo_image_url
     ORDER BY p.jan_code ASC, p.product_name ASC
-    LIMIT $4
+    LIMIT $5
     `,
-    [manufacturerId, trimmedKeyword, normalizedKeyword, limit]
+    [manufacturerId, trimmedKeyword, normalizedKeyword, halfwidthKanaKeyword, limit]
   );
 
   return result.rows.map((row) => ({
