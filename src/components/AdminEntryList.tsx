@@ -485,7 +485,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
         <table className="min-w-[1380px] w-full divide-y divide-slate-200 table-fixed">
           <thead className="bg-slate-50 [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-slate-50">
             <tr>
-              <th className="sticky left-0 z-20 w-[42px] px-1 py-3 text-center text-xs font-bold text-slate-500 bg-slate-50 shadow-[1px_0_0_0_rgba(226,232,240,1)]">
+              <th className="sticky left-0 top-0 z-40 w-[52px] px-2 py-3 text-center text-xs font-bold text-slate-500 bg-slate-50 shadow-[1px_0_0_0_rgba(226,232,240,1)]">
                 <button onClick={toggleSelectAll} className="inline-flex items-center justify-center text-slate-500 hover:text-slate-700">
                   {filteredSheets.length > 0 && selectedCount === filteredSheets.length ? (
                     <CheckSquare size={15} />
@@ -518,7 +518,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
               return (
                 <React.Fragment key={sheet.id}>
                   <tr className="hover:bg-slate-50">
-                    <td className="sticky left-0 z-10 px-1 py-3 text-center bg-white shadow-[1px_0_0_0_rgba(241,245,249,1)]">
+                    <td className="sticky left-0 z-30 w-[52px] px-2 py-3 text-center bg-white shadow-[1px_0_0_0_rgba(241,245,249,1)]">
                       <button
                         type="button"
                         onClick={() => toggleSelect(sheet.id)}
