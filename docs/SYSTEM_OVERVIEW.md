@@ -92,6 +92,19 @@
 4. `api/_lib/repositories/sheets.ts` が DB へトランザクション保存し、`product_entries` と `manufacturer_products` を同時更新
 5. レスポンス後に不要Blobを非同期クリーンアップ
 
+### 6.3 保持ポリシー
+
+1. `entry_sheets`
+- `updated_at` から5年で削除
+- `product_entries`, `product_ingredients`, `attachments`, `entry_sheet_admin_memos`, `entry_sheet_revisions` は親削除に追従
+
+2. `manufacturer_products`
+- `last_used_at` から5年で削除
+- `manufacturer_product_ingredients` は親削除に追従
+
+3. 実行方式
+- 既存APIアクセス時に、1日1回まで自動で保持期間削除を実行
+
 ### 6.2 一覧表示
 
 1. `src/components/EntryList.tsx` が `GET /api/sheets`
