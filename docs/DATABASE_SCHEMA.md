@@ -40,12 +40,43 @@
   - `status`: `draft` / `completed` / `completed_no_image`
   - `created_at`, `updated_at`
 
-## 4. `product_entries`
+## 4. `manufacturer_products`
+
+- 目的: メーカー内 JAN 一意の検索用商品マスタ
+- 主キー: `id (UUID)`
+- 外部キー:
+  - `manufacturer_id -> manufacturers.id`
+- 主項目:
+  - `jan_code`, `shelf_name`, `product_name`
+  - `product_image_url`
+  - `risk_classification`
+  - `catch_copy`, `product_message`, `product_notes`
+  - `width`, `height`, `depth`, `facing_count`
+  - `arrival_date`
+  - `has_promo_material`
+  - `promo_*`
+  - `created_at`, `updated_at`
+- 制約:
+  - `UNIQUE (manufacturer_id, jan_code)`
+
+## 5. `manufacturer_product_ingredients`
+
+- 目的: 商品マスタと特定成分の多対多管理
+- 主キー: `id (UUID)`
+- 外部キー:
+  - `manufacturer_product_id -> manufacturer_products.id`
+- 主項目:
+  - `ingredient_name`
+- 制約:
+  - `UNIQUE (manufacturer_product_id, ingredient_name)`
+
+## 6. `product_entries`
 
 - 目的: シート配下の商品明細
 - 主キー: `id (UUID)`
 - 外部キー:
   - `sheet_id -> entry_sheets.id`
+  - `manufacturer_product_id -> manufacturer_products.id`
   - `manufacturer_id -> manufacturers.id`
 - 主項目:
   - `shelf_name`, `jan_code`, `product_name`
@@ -58,7 +89,7 @@
   - `promo_*`（販促物情報）
   - `created_at`, `updated_at`
 
-## 5. `product_ingredients`
+## 7. `product_ingredients`
 
 - 目的: 商品と特定成分の多対多管理
 - 主キー: `id (UUID)`
@@ -69,7 +100,7 @@
 - 制約:
   - `UNIQUE (product_id, ingredient_name)`
 
-## 6. `attachments`
+## 8. `attachments`
 
 - 目的: シート/商品の添付ファイル
 - 主キー: `id (UUID)`
@@ -81,7 +112,7 @@
 - 制約:
   - `sheet_id` と `product_id` はどちらか一方のみ必須
 
-## 7. `master_data`
+## 9. `master_data`
 
 - 目的: 共通マスタ値管理（メーカー名、リスク分類、特定成分など）
 - 主キー: `id (UUID)`
@@ -98,7 +129,7 @@
 - `risk_classification` -> `riskClassifications`
 - `specific_ingredient` -> `specificIngredients`
 
-## 8. `manufacturer_shelf_names`
+## 10. `manufacturer_shelf_names`
 
 - 目的: メーカー別棚割り名マスタ
 - 主キー: `id (UUID)`
@@ -111,7 +142,7 @@
 - 制約:
   - `UNIQUE (manufacturer_id, shelf_name)`
 
-## 9. `manufacturer_default_start_months`
+## 11. `manufacturer_default_start_months`
 
 - 目的: メーカー別デフォルト展開スタート月
 - 主キー: `id (UUID)`
@@ -200,10 +231,26 @@
     - `title`, `notes`, `email`, `phoneNumber`
   - `products` は1件以上必須
 
-### 13.3 `product_entries`
+### 13.3 `manufacturer_products`
+
+- DB制約:
+  - `manufacturer_id`: `NOT NULL`, `FK`
+  - `jan_code`: `NOT NULL`, `VARCHAR(50)`
+  - `shelf_name`: `NOT NULL`, `VARCHAR(200)`
+  - `product_name`: `NOT NULL`, `VARCHAR(500)`
+  - `has_promo_material`: `NOT NULL`, `BOOLEAN`
+  - `UNIQUE (manufacturer_id, jan_code)`（メーカー内で JAN 一意）
+- 運用方針:
+  - 過去商品検索の検索元として利用する
+  - 保存時に `product_entries` と同一トランザクションで upsert する
+  - 途中失敗時はロールバックし、中途半端なマスタ更新を残さない
+  - 一時移行用の補助カラムは追加しない
+
+### 13.4 `product_entries`
 
 - DB制約:
   - `sheet_id`: `NOT NULL`, `FK`
+  - `manufacturer_product_id`: `NULL許容`, `FK`
   - `manufacturer_id`: `NOT NULL`, `FK`
   - `shelf_name`: `NOT NULL`, `VARCHAR(200)`
   - `jan_code`: `NOT NULL`, `VARCHAR(50)`
@@ -220,14 +267,14 @@
     - `product_image` が不足している場合は `completed_no_image` で保存
     - 販促物ありの場合 `promo_width` と `promo_image` は必須
 
-### 13.4 `product_ingredients`
+### 13.5 `product_ingredients`
 
 - DB制約:
   - `product_id`: `NOT NULL`, `FK`
   - `ingredient_name`: `NOT NULL`, `VARCHAR(200)`
   - `UNIQUE (product_id, ingredient_name)`（同一商品で重複禁止）
 
-### 13.5 `attachments`
+### 13.6 `attachments`
 
 - DB制約:
   - `name`: `NOT NULL`, `VARCHAR(500)`

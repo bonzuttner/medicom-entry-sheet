@@ -160,6 +160,11 @@ const isVersionConflictError = (error: unknown): boolean => {
   return raw.includes('VERSION_CONFLICT') || raw.includes('他のユーザーが先に更新');
 };
 
+const isJanConflictError = (error: unknown): boolean => {
+  const raw = error instanceof Error ? error.message : '';
+  return raw.includes('JAN_CONFLICT');
+};
+
 const cloneProductTemplate = (product: ProductEntry): ProductEntry => ({
   ...product,
   specificIngredients: [...product.specificIngredients],
@@ -422,6 +427,48 @@ const App: React.FC = () => {
       });
   };
 
+  const saveSheetWithConflictHandling = async (
+    sheet: EntrySheet,
+    options?: { adminMemoOnlyChanged?: boolean }
+  ): Promise<EntrySheet | null> => {
+    const adminMemoOnlyChanged = options?.adminMemoOnlyChanged === true;
+
+    try {
+      return adminMemoOnlyChanged
+        ? await dataService.saveSheetAdminMemo(sheet.id, sheet.adminMemo)
+        : await dataService.saveSheet(sheet);
+    } catch (error) {
+      if (isVersionConflictError(error)) {
+        const confirmOverwrite = window.confirm(
+          adminMemoOnlyChanged
+            ? '他のユーザーが先にAdminメモを更新しました。\n上書き保存しますか？'
+            : '他のユーザーが先にこのシートを更新しました。\n最新内容を上書きして保存しますか？'
+        );
+        if (!confirmOverwrite) {
+          return null;
+        }
+
+        return adminMemoOnlyChanged
+          ? await dataService.saveSheetAdminMemo(sheet.id, sheet.adminMemo, {
+              forceOverwrite: true,
+            })
+          : await dataService.saveSheet(sheet, { forceOverwrite: true });
+      }
+
+      if (isJanConflictError(error) && !adminMemoOnlyChanged) {
+        const confirmJanOverwrite = window.confirm(
+          'このJANコードは既に存在しています。上書きしますか？\n既存の商品が不明の場合は担当者へご連絡ください'
+        );
+        if (!confirmJanOverwrite) {
+          return null;
+        }
+        return await dataService.saveSheet(sheet, { forceJanOverwrite: true });
+      }
+
+      throw error;
+    }
+  };
+
   const handleDuplicateSheet = async (sheet: EntrySheet) => {
     try {
       const duplicatedProducts = sheet.products.map((product) => ({
@@ -439,12 +486,13 @@ const App: React.FC = () => {
         status: 'draft',
         products: duplicatedProducts,
       };
-      const saved = await dataService.saveSheet(duplicated);
+      const saved = await saveSheetWithConflictHandling(duplicated);
+      if (!saved) return;
       setSheets((prev) => upsertSheetInList(prev, saved));
       refreshFirstSheetsPage();
     } catch (error) {
       console.error('Failed to duplicate sheet:', error);
-      alert('複製の保存に失敗しました。時間をおいて再試行してください。');
+      alert(`複製の保存に失敗しました。\n${getSheetSaveErrorMessage(error)}`);
     }
   };
 
@@ -459,41 +507,14 @@ const App: React.FC = () => {
         JSON.stringify(toComparableAdminMemo(sheet.adminMemo));
 
     try {
-      const savedSheet = adminMemoOnlyChanged
-        ? await dataService.saveSheetAdminMemo(sheet.id, sheet.adminMemo)
-        : await dataService.saveSheet(sheet);
+      const savedSheet = await saveSheetWithConflictHandling(sheet, { adminMemoOnlyChanged });
+      if (!savedSheet) return;
       setEditingSheet(null);
       setEditingSheetRevisions([]);
       setCurrentPage(Page.LIST);
       setSheets((prev) => upsertSheetInList(prev, savedSheet));
       refreshFirstSheetsPage();
     } catch (error) {
-      if (isVersionConflictError(error)) {
-        const confirmOverwrite = window.confirm(
-          adminMemoOnlyChanged
-            ? '他のユーザーが先にAdminメモを更新しました。\n上書き保存しますか？'
-            : '他のユーザーが先にこのシートを更新しました。\n最新内容を上書きして保存しますか？'
-        );
-        if (confirmOverwrite) {
-          try {
-            const savedSheet = adminMemoOnlyChanged
-              ? await dataService.saveSheetAdminMemo(sheet.id, sheet.adminMemo, {
-                  forceOverwrite: true,
-                })
-              : await dataService.saveSheet(sheet, { forceOverwrite: true });
-            setEditingSheet(null);
-            setEditingSheetRevisions([]);
-            setCurrentPage(Page.LIST);
-            setSheets((prev) => upsertSheetInList(prev, savedSheet));
-            refreshFirstSheetsPage();
-            return;
-          } catch (retryError) {
-            console.error('Failed to overwrite save sheet after conflict:', retryError);
-            alert(`上書き保存に失敗しました。\n${getSheetSaveErrorMessage(retryError)}`);
-            return;
-          }
-        }
-      }
       console.error('Failed to save sheet:', error);
       alert(`保存に失敗しました。\n${getSheetSaveErrorMessage(error)}`);
     }

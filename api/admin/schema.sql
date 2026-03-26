@@ -106,10 +106,55 @@ CREATE TABLE IF NOT EXISTS entry_sheet_admin_memos (
 CREATE INDEX IF NOT EXISTS idx_entry_sheet_admin_memos_updated_at
   ON entry_sheet_admin_memos(updated_at DESC);
 
+-- メーカー商品マスタ（検索用の正本）
+CREATE TABLE IF NOT EXISTS manufacturer_products (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  manufacturer_id UUID NOT NULL REFERENCES manufacturers(id) ON DELETE CASCADE,
+  jan_code VARCHAR(50) NOT NULL,
+  shelf_name VARCHAR(200) NOT NULL,
+  product_name VARCHAR(500) NOT NULL,
+  product_image_url TEXT,
+  risk_classification VARCHAR(100),
+  catch_copy TEXT,
+  product_message TEXT,
+  product_notes TEXT,
+  width NUMERIC(10, 2),
+  height NUMERIC(10, 2),
+  depth NUMERIC(10, 2),
+  facing_count INTEGER,
+  arrival_date DATE,
+  has_promo_material BOOLEAN NOT NULL DEFAULT FALSE,
+  promo_sample TEXT,
+  special_fixture TEXT,
+  promo_width NUMERIC(10, 2),
+  promo_height NUMERIC(10, 2),
+  promo_depth NUMERIC(10, 2),
+  promo_image_url TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE (manufacturer_id, jan_code)
+);
+
+CREATE INDEX IF NOT EXISTS idx_manufacturer_products_manufacturer
+  ON manufacturer_products(manufacturer_id);
+CREATE INDEX IF NOT EXISTS idx_manufacturer_products_updated_at
+  ON manufacturer_products(manufacturer_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS manufacturer_product_ingredients (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  manufacturer_product_id UUID NOT NULL REFERENCES manufacturer_products(id) ON DELETE CASCADE,
+  ingredient_name VARCHAR(200) NOT NULL,
+  UNIQUE (manufacturer_product_id, ingredient_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_manufacturer_product_ingredients_product
+  ON manufacturer_product_ingredients(manufacturer_product_id);
+
 -- 商品エントリー
 CREATE TABLE IF NOT EXISTS product_entries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sheet_id UUID NOT NULL REFERENCES entry_sheets(id) ON DELETE CASCADE,
+  manufacturer_product_id UUID REFERENCES manufacturer_products(id) ON DELETE SET NULL,
   shelf_name VARCHAR(200) NOT NULL,
   manufacturer_id UUID NOT NULL REFERENCES manufacturers(id) ON DELETE RESTRICT,
   jan_code VARCHAR(50) NOT NULL,

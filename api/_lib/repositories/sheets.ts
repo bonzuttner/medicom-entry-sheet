@@ -56,6 +56,7 @@ interface EntrySheetRevisionRow {
 interface ProductRow {
   id: string;
   sheet_id: string;
+  manufacturer_product_id: string | null;
   shelf_name: string;
   manufacturer_name: string;
   jan_code: string;
@@ -77,6 +78,33 @@ interface ProductRow {
   promo_height: number | null;
   promo_depth: number | null;
   promo_image_url: string | null;
+}
+
+interface ManufacturerProductRow {
+  id: string;
+  manufacturer_id: string;
+  manufacturer_name: string;
+  jan_code: string;
+  shelf_name: string;
+  product_name: string;
+  product_image_url: string | null;
+  risk_classification: string | null;
+  catch_copy: string | null;
+  product_message: string | null;
+  product_notes: string | null;
+  width: number | null;
+  height: number | null;
+  depth: number | null;
+  facing_count: number | null;
+  arrival_date: Date | string | null;
+  has_promo_material: boolean;
+  promo_sample: string | null;
+  special_fixture: string | null;
+  promo_width: number | null;
+  promo_height: number | null;
+  promo_depth: number | null;
+  promo_image_url: string | null;
+  updated_at: Date | string;
 }
 
 const toIsoString = (value: Date | string | null | undefined): string => {
@@ -222,6 +250,8 @@ let ensureSheetVersionColumnPromise: Promise<void> | null = null;
 let ensureSheetRevisionTablePromise: Promise<void> | null = null;
 let ensureSheetStatusConstraintPromise: Promise<void> | null = null;
 let ensureDeploymentColumnsPromise: Promise<void> | null = null;
+let ensureManufacturerProductTablesPromise: Promise<void> | null = null;
+let ensureProductManufacturerProductColumnPromise: Promise<void> | null = null;
 
 const ensureSheetSnapshotColumns = async (): Promise<void> => {
   if (!ensureSnapshotColumnsPromise) {
@@ -317,6 +347,90 @@ const ensureDeploymentColumns = async (): Promise<void> => {
     });
   }
   await ensureDeploymentColumnsPromise;
+};
+
+const ensureManufacturerProductTables = async (): Promise<void> => {
+  if (!ensureManufacturerProductTablesPromise) {
+    ensureManufacturerProductTablesPromise = (async () => {
+      await db.query(
+        `
+        CREATE TABLE IF NOT EXISTS manufacturer_products (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          manufacturer_id UUID NOT NULL REFERENCES manufacturers(id) ON DELETE CASCADE,
+          jan_code VARCHAR(50) NOT NULL,
+          shelf_name VARCHAR(200) NOT NULL,
+          product_name VARCHAR(500) NOT NULL,
+          product_image_url TEXT,
+          risk_classification VARCHAR(100),
+          catch_copy TEXT,
+          product_message TEXT,
+          product_notes TEXT,
+          width NUMERIC(10, 2),
+          height NUMERIC(10, 2),
+          depth NUMERIC(10, 2),
+          facing_count INTEGER,
+          arrival_date DATE,
+          has_promo_material BOOLEAN NOT NULL DEFAULT FALSE,
+          promo_sample TEXT,
+          special_fixture TEXT,
+          promo_width NUMERIC(10, 2),
+          promo_height NUMERIC(10, 2),
+          promo_depth NUMERIC(10, 2),
+          promo_image_url TEXT,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          UNIQUE (manufacturer_id, jan_code)
+        )
+        `
+      );
+      await db.query(
+        `
+        CREATE TABLE IF NOT EXISTS manufacturer_product_ingredients (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          manufacturer_product_id UUID NOT NULL REFERENCES manufacturer_products(id) ON DELETE CASCADE,
+          ingredient_name VARCHAR(200) NOT NULL,
+          UNIQUE (manufacturer_product_id, ingredient_name)
+        )
+        `
+      );
+      await db.query(
+        `CREATE INDEX IF NOT EXISTS idx_manufacturer_products_manufacturer
+         ON manufacturer_products(manufacturer_id)`
+      );
+      await db.query(
+        `CREATE INDEX IF NOT EXISTS idx_manufacturer_products_updated_at
+         ON manufacturer_products(manufacturer_id, updated_at DESC)`
+      );
+      await db.query(
+        `CREATE INDEX IF NOT EXISTS idx_manufacturer_product_ingredients_product
+         ON manufacturer_product_ingredients(manufacturer_product_id)`
+      );
+    })().catch((error) => {
+      ensureManufacturerProductTablesPromise = null;
+      throw error;
+    });
+  }
+  await ensureManufacturerProductTablesPromise;
+};
+
+const ensureProductManufacturerProductColumn = async (): Promise<void> => {
+  if (!ensureProductManufacturerProductColumnPromise) {
+    ensureProductManufacturerProductColumnPromise = (async () => {
+      await ensureManufacturerProductTables();
+      await db.query(
+        `ALTER TABLE product_entries
+         ADD COLUMN IF NOT EXISTS manufacturer_product_id UUID REFERENCES manufacturer_products(id) ON DELETE SET NULL`
+      );
+      await db.query(
+        `CREATE INDEX IF NOT EXISTS idx_product_entries_manufacturer_product
+         ON product_entries(manufacturer_product_id)`
+      );
+    })().catch((error) => {
+      ensureProductManufacturerProductColumnPromise = null;
+      throw error;
+    });
+  }
+  await ensureProductManufacturerProductColumnPromise;
 };
 
 const ensureSheetRevisionTable = async (): Promise<void> => {
@@ -428,6 +542,7 @@ const rowsToSheet = (
 
     return {
       id: p.id,
+      manufacturerProductId: p.manufacturer_product_id || undefined,
       shelfName: p.shelf_name,
       manufacturerName: p.manufacturer_name,
       janCode: p.jan_code,
@@ -566,6 +681,179 @@ const fetchAdminMemoBySheetIds = async (
   return buildAdminMemoBySheetId(result.rows);
 };
 
+const toUniqueTrimmedIngredients = (ingredients: string[] | undefined): string[] =>
+  [...new Set((ingredients || []).map((value) => value.trim()).filter(Boolean))];
+
+const productToMasterPayload = (product: ProductEntry) => ({
+  shelfName: String(product.shelfName || '').trim(),
+  janCode: String(product.janCode || '').trim(),
+  productName: String(product.productName || '').trim(),
+  productImage: product.productImage || null,
+  riskClassification: product.riskClassification || null,
+  catchCopy: product.catchCopy || null,
+  productMessage: product.productMessage || null,
+  productNotes: product.productNotes || null,
+  width: product.width,
+  height: product.height,
+  depth: product.depth,
+  facingCount: product.facingCount,
+  arrivalDate: product.arrivalDate || null,
+  hasPromoMaterial: product.hasPromoMaterial === 'yes',
+  promoSample: product.promoSample || null,
+  specialFixture: product.specialFixture || null,
+  promoWidth: product.promoWidth || null,
+  promoHeight: product.promoHeight || null,
+  promoDepth: product.promoDepth || null,
+  promoImage: product.promoImage || null,
+  specificIngredients: toUniqueTrimmedIngredients(product.specificIngredients),
+});
+
+const ensureNoDuplicateJanWithinSheet = (products: ProductEntry[]): void => {
+  const janToIndex = new Map<string, number>();
+  for (let index = 0; index < products.length; index += 1) {
+    const janCode = String(products[index].janCode || '').trim();
+    if (!janCode) continue;
+    if (janToIndex.has(janCode)) {
+      throw new Error('DUPLICATE_JAN_WITHIN_SHEET');
+    }
+    janToIndex.set(janCode, index);
+  }
+};
+
+const syncManufacturerProducts = async (
+  products: ProductEntry[],
+  getManufacturerIdCached: (manufacturerName: string) => Promise<string>,
+  options?: { forceJanOverwrite?: boolean }
+): Promise<Array<string | null>> => {
+  const resolvedIds: Array<string | null> = [];
+
+  for (const product of products) {
+    const janCode = String(product.janCode || '').trim();
+    if (!janCode) {
+      resolvedIds.push(null);
+      continue;
+    }
+
+    const manufacturerName = String(product.manufacturerName || '').trim();
+    const manufacturerId = await getManufacturerIdCached(manufacturerName);
+    const currentMasterId = String(product.manufacturerProductId || '').trim() || null;
+    const existingMaster = await db.queryOne<{ id: string }>(
+      `
+      SELECT id
+      FROM manufacturer_products
+      WHERE manufacturer_id = $1 AND jan_code = $2
+      FOR UPDATE
+      `,
+      [manufacturerId, janCode]
+    );
+
+    const conflictingMasterId = existingMaster?.id || null;
+    if (
+      conflictingMasterId &&
+      currentMasterId &&
+      conflictingMasterId !== currentMasterId &&
+      !options?.forceJanOverwrite
+    ) {
+      throw new Error('JAN_CONFLICT');
+    }
+    if (conflictingMasterId && !currentMasterId && !options?.forceJanOverwrite) {
+      throw new Error('JAN_CONFLICT');
+    }
+
+    const targetMasterId = conflictingMasterId || currentMasterId || randomUUID();
+    const master = productToMasterPayload(product);
+
+    await db.query(
+      `
+      INSERT INTO manufacturer_products (
+        id, manufacturer_id, jan_code, shelf_name, product_name,
+        product_image_url, risk_classification, catch_copy, product_message,
+        product_notes, width, height, depth, facing_count, arrival_date,
+        has_promo_material, promo_sample, special_fixture,
+        promo_width, promo_height, promo_depth, promo_image_url,
+        created_at, updated_at
+      ) VALUES (
+        $1, $2, $3, $4, $5,
+        $6, $7, $8, $9,
+        $10, $11, $12, $13, $14, $15,
+        $16, $17, $18,
+        $19, $20, $21, $22,
+        NOW(), NOW()
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        manufacturer_id = EXCLUDED.manufacturer_id,
+        jan_code = EXCLUDED.jan_code,
+        shelf_name = EXCLUDED.shelf_name,
+        product_name = EXCLUDED.product_name,
+        product_image_url = EXCLUDED.product_image_url,
+        risk_classification = EXCLUDED.risk_classification,
+        catch_copy = EXCLUDED.catch_copy,
+        product_message = EXCLUDED.product_message,
+        product_notes = EXCLUDED.product_notes,
+        width = EXCLUDED.width,
+        height = EXCLUDED.height,
+        depth = EXCLUDED.depth,
+        facing_count = EXCLUDED.facing_count,
+        arrival_date = EXCLUDED.arrival_date,
+        has_promo_material = EXCLUDED.has_promo_material,
+        promo_sample = EXCLUDED.promo_sample,
+        special_fixture = EXCLUDED.special_fixture,
+        promo_width = EXCLUDED.promo_width,
+        promo_height = EXCLUDED.promo_height,
+        promo_depth = EXCLUDED.promo_depth,
+        promo_image_url = EXCLUDED.promo_image_url,
+        updated_at = NOW()
+      `,
+      [
+        targetMasterId,
+        manufacturerId,
+        master.janCode,
+        master.shelfName,
+        master.productName,
+        master.productImage,
+        master.riskClassification,
+        master.catchCopy,
+        master.productMessage,
+        master.productNotes,
+        master.width,
+        master.height,
+        master.depth,
+        master.facingCount,
+        master.arrivalDate,
+        master.hasPromoMaterial,
+        master.promoSample,
+        master.specialFixture,
+        master.promoWidth,
+        master.promoHeight,
+        master.promoDepth,
+        master.promoImage,
+      ]
+    );
+
+    await db.query(
+      `DELETE FROM manufacturer_product_ingredients WHERE manufacturer_product_id = $1`,
+      [targetMasterId]
+    );
+    if (master.specificIngredients.length > 0) {
+      await db.query(
+        `
+        INSERT INTO manufacturer_product_ingredients (manufacturer_product_id, ingredient_name)
+        SELECT items.manufacturer_product_id, items.ingredient_name
+        FROM unnest($1::uuid[], $2::text[]) AS items(manufacturer_product_id, ingredient_name)
+        `,
+        [
+          master.specificIngredients.map(() => targetMasterId),
+          master.specificIngredients,
+        ]
+      );
+    }
+
+    resolvedIds.push(targetMasterId);
+  }
+
+  return resolvedIds;
+};
+
 /**
  * Get all sheets (for ADMIN)
  */
@@ -575,6 +863,8 @@ export const findAll = async (limit?: number, offset: number = 0): Promise<Entry
   await ensureAdminMemoTable();
   await ensureSheetVersionColumn();
   await ensureDeploymentColumns();
+  await ensureManufacturerProductTables();
+  await ensureProductManufacturerProductColumn();
   const hasPaging = typeof limit === 'number';
   const sheetQuery = `
     SELECT
@@ -672,6 +962,8 @@ export const findByManufacturerId = async (
   await ensureAdminMemoTable();
   await ensureSheetVersionColumn();
   await ensureDeploymentColumns();
+  await ensureManufacturerProductTables();
+  await ensureProductManufacturerProductColumn();
   const hasPaging = typeof limit === 'number';
   const sheetQuery = `
     SELECT
@@ -781,6 +1073,8 @@ export const findById = async (sheetId: string): Promise<EntrySheet | null> => {
   await ensureAdminMemoTable();
   await ensureSheetVersionColumn();
   await ensureDeploymentColumns();
+  await ensureManufacturerProductTables();
+  await ensureProductManufacturerProductColumn();
   const sheetResult = await db.query<SheetRow>(
     `
     SELECT
@@ -862,6 +1156,7 @@ export const upsert = async (
     updateAdminMemo?: boolean;
     expectedVersion?: number;
     forceOverwrite?: boolean;
+    forceJanOverwrite?: boolean;
   }
 ): Promise<void> => {
   await ensureSheetCreatorReference();
@@ -871,6 +1166,8 @@ export const upsert = async (
   await ensureSheetRevisionTable();
   await ensureSheetStatusConstraint();
   await ensureDeploymentColumns();
+  await ensureManufacturerProductTables();
+  await ensureProductManufacturerProductColumn();
   return await db.transaction(async () => {
     const nowIso = new Date().toISOString();
     const normalizedSheet: EntrySheet = {
@@ -939,6 +1236,7 @@ export const upsert = async (
 
     const manufacturerId = await getManufacturerIdCached(normalizedSheet.manufacturerName);
     const creatorId = String(normalizedSheet.creatorId || '').trim() || null;
+    ensureNoDuplicateJanWithinSheet(normalizedSheet.products);
     const existingVersionResult = await db.query<{ version: number }>(
       `SELECT version FROM entry_sheets WHERE id = $1 FOR UPDATE`,
       [normalizedSheet.id]
@@ -1004,6 +1302,11 @@ export const upsert = async (
       `SELECT id FROM product_entries WHERE sheet_id = $1`,
       [normalizedSheet.id]
     );
+    const manufacturerProductIdsByIndex = await syncManufacturerProducts(
+      normalizedSheet.products,
+      getManufacturerIdCached,
+      { forceJanOverwrite: revision?.forceJanOverwrite === true }
+    );
     const existingProductIds = new Set(existingProductRows.rows.map((row) => row.id));
     const incomingIds = normalizedSheet.products
       .map((product) => product.id)
@@ -1028,11 +1331,13 @@ export const upsert = async (
       type: string;
       url: string;
     }> = [];
-    for (const product of normalizedSheet.products) {
+    for (let index = 0; index < normalizedSheet.products.length; index += 1) {
+      const product = normalizedSheet.products[index];
       const productManufacturerName = String(
         product.manufacturerName || normalizedSheet.manufacturerName
       ).trim();
       const productManufacturerId = await getManufacturerIdCached(productManufacturerName);
+      const manufacturerProductId = manufacturerProductIdsByIndex[index] || null;
       let productId = product.id || randomUUID();
 
       // Ensure product ID uniqueness within this save request.
@@ -1052,17 +1357,18 @@ export const upsert = async (
       await db.query(
         `
         INSERT INTO product_entries (
-          id, sheet_id, shelf_name, manufacturer_id, jan_code, product_name,
+          id, sheet_id, manufacturer_product_id, shelf_name, manufacturer_id, jan_code, product_name,
           product_image_url, risk_classification, catch_copy, product_message,
           product_notes, width, height, depth, facing_count, arrival_date,
           has_promo_material, promo_sample, special_fixture,
           promo_width, promo_height, promo_depth, promo_image_url
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-          $17, $18, $19, $20, $21, $22, $23
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
+          $18, $19, $20, $21, $22, $23, $24
         )
         ON CONFLICT (id) DO UPDATE SET
           sheet_id = EXCLUDED.sheet_id,
+          manufacturer_product_id = EXCLUDED.manufacturer_product_id,
           shelf_name = EXCLUDED.shelf_name,
           manufacturer_id = EXCLUDED.manufacturer_id,
           jan_code = EXCLUDED.jan_code,
@@ -1088,6 +1394,7 @@ export const upsert = async (
         [
           productId,
           normalizedSheet.id,
+          manufacturerProductId,
           String(product.shelfName || '').trim(),
           productManufacturerId,
           String(product.janCode || '').trim(),
@@ -1507,40 +1814,18 @@ export const searchProductsByManufacturerId = async (
   keyword: string,
   limit: number = 30
 ): Promise<ProductEntry[]> => {
+  await ensureManufacturerProductTables();
   const trimmedKeyword = keyword.trim();
   const normalizedKeyword = normalizeSearchText(keyword);
   const halfwidthKanaKeyword = normalizeSearchTextToHalfwidthKana(keyword);
-  const result = await db.query<{
-    id: string;
-    shelf_name: string;
-    manufacturer_name: string;
-    jan_code: string;
-    product_name: string;
-    product_image_url: string | null;
-    risk_classification: string | null;
-    catch_copy: string | null;
-    product_message: string | null;
-    product_notes: string | null;
-    width: number | null;
-    height: number | null;
-    depth: number | null;
-    facing_count: number | null;
-    arrival_date: Date | string | null;
-    has_promo_material: boolean;
-    promo_sample: string | null;
-    special_fixture: string | null;
-    promo_width: number | null;
-    promo_height: number | null;
-    promo_depth: number | null;
-    promo_image_url: string | null;
-    ingredient_names: string[] | null;
-  }>(
+  const result = await db.query<ManufacturerProductRow & { ingredient_names: string[] | null }>(
     `
     SELECT
       p.id,
-      p.shelf_name,
+      p.manufacturer_id,
       m.name as manufacturer_name,
       p.jan_code,
+      p.shelf_name,
       p.product_name,
       p.product_image_url,
       p.risk_classification,
@@ -1560,9 +1845,9 @@ export const searchProductsByManufacturerId = async (
       p.promo_depth,
       p.promo_image_url,
       array_remove(array_agg(pi.ingredient_name ORDER BY pi.ingredient_name), NULL) as ingredient_names
-    FROM product_entries p
+    FROM manufacturer_products p
     JOIN manufacturers m ON p.manufacturer_id = m.id
-    LEFT JOIN product_ingredients pi ON pi.product_id = p.id
+    LEFT JOIN manufacturer_product_ingredients pi ON pi.manufacturer_product_id = p.id
     WHERE p.manufacturer_id = $1
       AND (
         $2 = ''
@@ -1584,30 +1869,8 @@ export const searchProductsByManufacturerId = async (
           )
         ) LIKE ('%' || $3 || '%')
       )
-    GROUP BY
-      p.id,
-      p.shelf_name,
-      m.name,
-      p.jan_code,
-      p.product_name,
-      p.product_image_url,
-      p.risk_classification,
-      p.catch_copy,
-      p.product_message,
-      p.product_notes,
-      p.width,
-      p.height,
-      p.depth,
-      p.facing_count,
-      p.arrival_date,
-      p.has_promo_material,
-      p.promo_sample,
-      p.special_fixture,
-      p.promo_width,
-      p.promo_height,
-      p.promo_depth,
-      p.promo_image_url
-    ORDER BY p.jan_code ASC, p.product_name ASC
+    GROUP BY p.id, m.name
+    ORDER BY p.updated_at DESC, p.product_name ASC, p.jan_code ASC
     LIMIT $5
     `,
     [manufacturerId, trimmedKeyword, normalizedKeyword, halfwidthKanaKeyword, limit]
@@ -1615,6 +1878,7 @@ export const searchProductsByManufacturerId = async (
 
   return result.rows.map((row) => ({
     id: row.id,
+    manufacturerProductId: row.id,
     shelfName: row.shelf_name,
     manufacturerName: row.manufacturer_name,
     janCode: row.jan_code,

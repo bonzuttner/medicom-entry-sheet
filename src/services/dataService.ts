@@ -16,7 +16,10 @@ export interface DataService {
   setCurrentUser: (user: User | null) => Promise<void>;
   getSheets: () => Promise<EntrySheet[]>;
   getSheetsPage: (offset: number, limit: number) => Promise<PagedResult<EntrySheet>>;
-  saveSheet: (sheet: EntrySheet, options?: { forceOverwrite?: boolean }) => Promise<EntrySheet>;
+  saveSheet: (
+    sheet: EntrySheet,
+    options?: { forceOverwrite?: boolean; forceJanOverwrite?: boolean }
+  ) => Promise<EntrySheet>;
   saveSheetAdminMemo: (
     sheetId: string,
     adminMemo: EntrySheet['adminMemo'],
@@ -57,6 +60,7 @@ const apiDataService: DataService = {
       .put<{ ok: boolean; sheet: EntrySheet }>(`/api/sheets/${sheet.id}`, {
         sheet,
         forceOverwrite: options?.forceOverwrite === true,
+        forceJanOverwrite: options?.forceJanOverwrite === true,
       })
       .then((result) => result.sheet),
   saveSheetAdminMemo: async (sheetId, adminMemo, options) =>

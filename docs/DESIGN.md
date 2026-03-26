@@ -77,6 +77,8 @@
   - `users`
   - `entry_sheets`
   - `entry_sheet_admin_memos`
+  - `manufacturer_products`
+  - `manufacturer_product_ingredients`
   - `product_entries`
   - `product_ingredients`
   - `attachments`
@@ -95,7 +97,8 @@
   - `version` を保持（競合制御）
   - `status`: `draft` / `completed` / `completed_no_image`
   - `adminMemo` を保持（編集は ADMIN のみ、`entry_sheet_admin_memos` に分離保存）
-- `ProductEntry`: 商品情報（JAN、画像、販促物情報など）
+- `ProductEntry`: シート保存時点の商品スナップショット（JAN、画像、販促物情報など）
+- `manufacturer_products`: メーカー内で JAN 一意の検索用商品マスタ
 - `MasterData`: メーカー名・リスク分類・特定成分・メーカー別棚割名・メーカー別デフォルト展開スタート月
 
 補足:
@@ -127,6 +130,7 @@
 - シート保存: `PUT /api/sheets/:id`
   - 通常保存（シート全体）と `mode=admin_memo`（Adminメモのみ）に対応
   - `version` 不一致時は `409 VERSION_CONFLICT`
+  - JAN重複時は `409 JAN_CONFLICT`
 - シート削除: `DELETE /api/sheets/:id`
 - シート変更履歴: `GET /api/sheets/:id/revisions`
   - 通常シート項目の変更のみ記録
@@ -147,8 +151,14 @@
 1. UIで入力
 2. `dataService.saveSheet` 実行
 3. API側で認証・認可・入力検証
-4. DBへ `entry_sheets` / `product_entries` / `product_ingredients` / `attachments` を保存
+4. DBへ `entry_sheets` / `manufacturer_products` / `manufacturer_product_ingredients` / `product_entries` / `product_ingredients` / `attachments` を保存
 5. 一覧を再取得し画面反映
+
+補足:
+- 過去商品検索は `manufacturer_products` を検索元とする
+- `product_entries` はシート保存時点のスナップショットとして維持する
+- 保存は 1 トランザクションで実施し、途中失敗時は全ロールバックする
+- 本対応では、本番後に不要になる一時DB項目・移行専用テーブルは追加しない
 
 ### 6.2 Adminメモ保存
 

@@ -38,6 +38,7 @@ export interface EntrySheetAdminMemo {
 
 export interface ProductEntry {
   id: string;
+  manufacturerProductId?: string;
   shelfName: string;
   manufacturerName: string;
   janCode: string;

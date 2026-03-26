@@ -9,6 +9,7 @@ interface PutSheetBody {
   mode?: 'admin_memo';
   adminMemo?: EntrySheetAdminMemo;
   forceOverwrite?: boolean;
+  forceJanOverwrite?: boolean;
 }
 
 const MAX_GENERAL_TEXT_LENGTH = 4000;
@@ -521,6 +522,7 @@ export default async function handler(req: any, res: any) {
           updateAdminMemo: canEditAdminMemo && adminMemoChanged,
           expectedVersion: safeSheet.version,
           forceOverwrite: body.forceOverwrite === true,
+          forceJanOverwrite: body.forceJanOverwrite === true,
         }
       );
     } catch (error) {
@@ -530,6 +532,16 @@ export default async function handler(req: any, res: any) {
       ) {
         await deleteUnusedManagedBlobUrls([normalizedSheet], beforeSheets);
         sendError(res, 409, 'VERSION_CONFLICT');
+        return;
+      }
+      if (error instanceof Error && error.message === 'JAN_CONFLICT') {
+        await deleteUnusedManagedBlobUrls([normalizedSheet], beforeSheets);
+        sendError(res, 409, 'JAN_CONFLICT');
+        return;
+      }
+      if (error instanceof Error && error.message === 'DUPLICATE_JAN_WITHIN_SHEET') {
+        await deleteUnusedManagedBlobUrls([normalizedSheet], beforeSheets);
+        sendError(res, 400, '同じシート内で同一JANコードは登録できません。JANコードを確認してください。');
         return;
       }
       // DB save failed after media normalization/upload.

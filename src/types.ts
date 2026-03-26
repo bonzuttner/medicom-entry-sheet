@@ -42,6 +42,7 @@ export interface EntrySheetAdminMemo {
 // Product Level Data
 export interface ProductEntry {
   id: string;
+  manufacturerProductId?: string;
   shelfName: string; // Master: Pull-down
   manufacturerName: string; // Server-side normalized to sheet manufacturer
   janCode: string; // 8, 13, or 16 digits

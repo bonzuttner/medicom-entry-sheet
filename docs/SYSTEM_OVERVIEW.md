@@ -65,7 +65,7 @@
 - `api/_lib/repositories/users.ts`
   - `users`, `manufacturers` を操作
 - `api/_lib/repositories/sheets.ts`
-  - `entry_sheets`, `product_entries`, `product_ingredients`, `attachments` を操作
+  - `entry_sheets`, `manufacturer_products`, `manufacturer_product_ingredients`, `product_entries`, `product_ingredients`, `attachments` を操作
 - `api/_lib/repositories/masters.ts`
   - `master_data` を操作
 
@@ -77,7 +77,8 @@
 | `GET /api/users` | `users`, `manufacturers` | ロールで参照範囲を制御 |
 | `PUT /api/users/:id` | `users`, `manufacturers` | ユーザー更新 |
 | `GET /api/sheets` | `entry_sheets` 他3表 | 商品・成分・添付を結合返却 |
-| `PUT /api/sheets/:id` | `entry_sheets` 他3表 | トランザクションで一括保存 |
+| `PUT /api/sheets/:id` | `entry_sheets` 他5表 | シート保存と商品マスタ更新をトランザクションで一括保存 |
+| `GET /api/products/search` | `manufacturer_products`, `manufacturer_product_ingredients` | JAN一意の商品マスタを検索 |
 | `PUT /api/master` | `master_data` | 20文字制約あり |
 | `POST /api/upload` | DB直接更新なし | Blob保存してURL返却 |
 
@@ -88,7 +89,7 @@
 1. `src/components/EntryForm.tsx` が `PUT /api/sheets/:id` を実行
 2. `api/sheets/[id].ts` が認証・認可・文字数チェックを実施
 3. `api/_lib/media.ts` が画像/添付を検証して Blob URL に正規化
-4. `api/_lib/repositories/sheets.ts` がDBへトランザクション保存
+4. `api/_lib/repositories/sheets.ts` が DB へトランザクション保存し、`product_entries` と `manufacturer_products` を同時更新
 5. レスポンス後に不要Blobを非同期クリーンアップ
 
 ### 6.2 一覧表示
