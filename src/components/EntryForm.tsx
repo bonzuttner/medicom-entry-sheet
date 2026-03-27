@@ -16,6 +16,9 @@ interface EntryFormProps {
 }
 
 const normalizeProductName = (value: string): string => value.trim().toLowerCase();
+const AUTO_TITLE_BRAND_PLACEHOLDER = '"ブランド名を記入"';
+const AUTO_TITLE_PATTERN =
+  /^\d{4}(?:\/|年)\d{1,2}(?:月)?\s+.+\s+"ブランド名を記入"$/;
 const LARGE_IMAGE_UPLOAD_ERROR =
   '画像サイズが大きすぎてアップロードできません。25MB以下の画像を使用してください。BMPは通信量が大きくなりやすいため、JPEG/PNGに変換するか画像サイズを下げて再試行してください。それでもできない場合は、担当者へメールで画像を送信ください。';
 
@@ -38,6 +41,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   const [productSearchResults, setProductSearchResults] = useState<ProductEntry[]>([]);
   const [isSearchingProducts, setIsSearchingProducts] = useState(false);
   const askedPrefillByProductRef = useRef<Map<number, string>>(new Map());
+  const lastAutoTitleRef = useRef('');
   const isAdminUser = currentUser.role === UserRole.ADMIN;
 
   const selectableStartMonths = (() => {
@@ -60,6 +64,19 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   const selectedStartMonth = selectableStartMonths.find(
     (item) => item.month === formData.deploymentStartMonth
   );
+  const buildAutoTitle = (
+    startMonth: { year: number; month: number; label: string } | undefined,
+    caseName?: string
+  ): string => {
+    const parts = [
+      startMonth ? `${startMonth.year}年${startMonth.month}月` : 'YYYY年MM月',
+    ];
+    if (caseName?.trim()) {
+      parts.push(caseName.trim());
+    }
+    parts.push(AUTO_TITLE_BRAND_PLACEHOLDER);
+    return parts.join(' ');
+  };
   const computeAutoEndMonth = (startMonth: number | undefined): number | undefined => {
     if (!startMonth) return undefined;
     return ((startMonth + 1) % 12) + 1;
@@ -181,6 +198,30 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     masterData.manufacturerDefaultStartMonths,
     selectableStartMonths,
   ]);
+
+  useEffect(() => {
+    const nextAutoTitle = buildAutoTitle(selectedStartMonth, formData.caseName);
+    if (!nextAutoTitle) return;
+
+    setFormData((prev) => {
+      const currentTitle = prev.title.trim();
+      const shouldApplyAutoTitle =
+        currentTitle === '' ||
+        currentTitle === lastAutoTitleRef.current ||
+        AUTO_TITLE_PATTERN.test(currentTitle);
+
+      if (!shouldApplyAutoTitle || currentTitle === nextAutoTitle) {
+        lastAutoTitleRef.current = nextAutoTitle;
+        return prev;
+      }
+
+      lastAutoTitleRef.current = nextAutoTitle;
+      return {
+        ...prev,
+        title: nextAutoTitle,
+      };
+    });
+  }, [formData.caseName, selectedStartMonth]);
 
   const handleHeaderChange = (field: keyof EntrySheet, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
