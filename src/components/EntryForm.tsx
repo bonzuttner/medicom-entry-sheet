@@ -1507,6 +1507,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
       </div>
 
+      {isAdminUser && (
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 mt-4 sm:mt-6">
         <h4 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
           <span className="w-1 h-5 bg-violet-500 rounded-full"></span>
@@ -1730,6 +1731,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 };

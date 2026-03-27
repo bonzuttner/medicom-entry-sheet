@@ -272,6 +272,11 @@ const buildRevisionSummary = (before: EntrySheet | null, after: EntrySheet): str
   return changes.slice(0, 80).join('\n');
 };
 
+const stripAdminMemo = (sheet: EntrySheet): EntrySheet => ({
+  ...sheet,
+  adminMemo: undefined,
+});
+
 export default async function handler(req: any, res: any) {
   const method = getMethod(req);
   if (method !== 'PUT' && method !== 'DELETE') {
@@ -366,7 +371,7 @@ export default async function handler(req: any, res: any) {
         sendError(res, 500, 'Failed to reload saved sheet');
         return;
       }
-      sendJson(res, 200, { ok: true, sheet: updatedSheet });
+      sendJson(res, 200, { ok: true, sheet: stripAdminMemo(updatedSheet) });
       return;
     }
 
@@ -509,7 +514,7 @@ export default async function handler(req: any, res: any) {
         sendError(res, 500, 'Failed to reload saved sheet');
         return;
       }
-      sendJson(res, 200, { ok: true, sheet: updatedSheet });
+      sendJson(res, 200, { ok: true, sheet: stripAdminMemo(updatedSheet) });
       return;
     }
 
@@ -559,7 +564,7 @@ export default async function handler(req: any, res: any) {
       sendError(res, 500, 'Failed to reload saved sheet');
       return;
     }
-    sendJson(res, 200, { ok: true, sheet: updatedSheet });
+    sendJson(res, 200, { ok: true, sheet: isAdmin(currentUser) ? updatedSheet : stripAdminMemo(updatedSheet) });
     // Clean up unused blob URLs in background to reduce response latency.
     void deleteUnusedManagedBlobUrls(beforeSheets, [normalizedSheet]).catch((error) => {
       console.warn('Deferred blob cleanup failed after save:', error);

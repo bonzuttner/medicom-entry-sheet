@@ -2,6 +2,7 @@ import { isAdmin, requireUser } from './_lib/auth.js';
 import { getMethod, methodNotAllowed, sendJson } from './_lib/http.js';
 import * as SheetRepository from './_lib/repositories/sheets.js';
 import * as UserRepository from './_lib/repositories/users.js';
+import { EntrySheet } from './_lib/types.js';
 
 const DEFAULT_PAGE_SIZE = 30;
 const MAX_PAGE_SIZE = 100;
@@ -12,6 +13,11 @@ const parsePositiveInt = (value: unknown): number | null => {
   if (!Number.isInteger(num) || num < 0) return null;
   return num;
 };
+
+const stripAdminMemo = (sheet: EntrySheet): EntrySheet => ({
+  ...sheet,
+  adminMemo: undefined,
+});
 
 export default async function handler(req: any, res: any) {
   if (getMethod(req) !== 'GET') {
@@ -54,9 +60,10 @@ export default async function handler(req: any, res: any) {
   if (hasPagingQuery) {
     const hasMore = sheets.length > pageSize;
     const items = hasMore ? sheets.slice(0, pageSize) : sheets;
-    sendJson(res, 200, { items, hasMore, totalCount });
+    const responseItems = isAdmin(currentUser) ? items : items.map(stripAdminMemo);
+    sendJson(res, 200, { items: responseItems, hasMore, totalCount });
     return;
   }
 
-  sendJson(res, 200, sheets);
+  sendJson(res, 200, isAdmin(currentUser) ? sheets : sheets.map(stripAdminMemo));
 }
