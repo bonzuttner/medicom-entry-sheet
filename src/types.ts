@@ -52,7 +52,6 @@ export interface ProductEntry {
   riskClassification: string; // Master: Pull-down
   specificIngredients: string[]; // Master: Multi-select
   catchCopy: string;
-  productMessage: string;
   productNotes?: string;
   productAttachments?: Attachment[];
   

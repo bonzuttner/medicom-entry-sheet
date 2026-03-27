@@ -477,7 +477,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     riskClassification: product.riskClassification,
     specificIngredients: [...product.specificIngredients].sort(),
     catchCopy: product.catchCopy,
-    productMessage: product.productMessage,
     productNotes: product.productNotes || '',
     width: product.width,
     height: product.height,
@@ -585,7 +584,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       riskClassification: masterData.riskClassifications[0] || '',
       specificIngredients: [],
       catchCopy: '',
-      productMessage: '',
       productNotes: '',
       productAttachments: [],
       width: 0,
@@ -1343,16 +1341,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                         placeholder="例：胃のもたれには〇〇胃薬"
                         value={activeProduct.catchCopy}
                         onChange={(e) => handleProductChange(activeTab, 'catchCopy', e.target.value)}
-                     />
-                </div>
-                 <div>
-                     <label className="block text-sm font-bold text-slate-700 mb-2">商品メッセージ (制作反映希望)</label>
-                     <textarea 
-                        rows={3}
-                        className="w-full border-slate-300 rounded-lg py-3 px-3 focus:ring-primary focus:border-primary"
-                        placeholder="具体的な強みなど"
-                        value={activeProduct.productMessage}
-                        onChange={(e) => handleProductChange(activeTab, 'productMessage', e.target.value)}
                      />
                 </div>
             </div>

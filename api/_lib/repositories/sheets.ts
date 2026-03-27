@@ -71,7 +71,6 @@ interface ProductRow {
   product_image_url: string | null;
   risk_classification: string | null;
   catch_copy: string | null;
-  product_message: string | null;
   product_notes: string | null;
   width: number | null;
   height: number | null;
@@ -96,7 +95,6 @@ interface ManufacturerProductRow {
   product_image_url: string | null;
   risk_classification: string | null;
   catch_copy: string | null;
-  product_message: string | null;
   product_notes: string | null;
   width: number | null;
   height: number | null;
@@ -378,7 +376,6 @@ const ensureManufacturerProductTables = async (): Promise<void> => {
           product_image_url TEXT,
           risk_classification VARCHAR(100),
           catch_copy TEXT,
-          product_message TEXT,
           product_notes TEXT,
           width NUMERIC(10, 2),
           height NUMERIC(10, 2),
@@ -429,6 +426,7 @@ const ensureManufacturerProductTables = async (): Promise<void> => {
         `ALTER TABLE manufacturer_products
          ADD COLUMN IF NOT EXISTS last_used_at TIMESTAMP NOT NULL DEFAULT NOW()`
       );
+      await db.query(`ALTER TABLE manufacturer_products DROP COLUMN IF EXISTS product_message`);
       await db.query(`ALTER TABLE manufacturer_products DROP COLUMN IF EXISTS shelf_name`);
     })().catch((error) => {
       ensureManufacturerProductTablesPromise = null;
@@ -446,6 +444,7 @@ const ensureProductManufacturerProductColumn = async (): Promise<void> => {
         `ALTER TABLE product_entries
          ADD COLUMN IF NOT EXISTS manufacturer_product_id UUID REFERENCES manufacturer_products(id) ON DELETE SET NULL`
       );
+      await db.query(`ALTER TABLE product_entries DROP COLUMN IF EXISTS product_message`);
       await db.query(
         `CREATE INDEX IF NOT EXISTS idx_product_entries_manufacturer_product
          ON product_entries(manufacturer_product_id)`
@@ -575,7 +574,6 @@ const rowsToSheet = (
       productImage: p.product_image_url || undefined,
       riskClassification: p.risk_classification || undefined,
       catchCopy: p.catch_copy || undefined,
-      productMessage: p.product_message || undefined,
       productNotes: p.product_notes || undefined,
       width: p.width || 0,
       height: p.height || 0,
@@ -717,7 +715,6 @@ const productToMasterPayload = (product: ProductEntry) => ({
   productImage: product.productImage || null,
   riskClassification: product.riskClassification || null,
   catchCopy: product.catchCopy || null,
-  productMessage: product.productMessage || null,
   productNotes: product.productNotes || null,
   width: product.width,
   height: product.height,
@@ -793,17 +790,17 @@ const syncManufacturerProducts = async (
       `
       INSERT INTO manufacturer_products (
         id, manufacturer_id, jan_code, product_name,
-        product_image_url, risk_classification, catch_copy, product_message,
+        product_image_url, risk_classification, catch_copy,
         product_notes, width, height, depth, facing_count, arrival_date,
         has_promo_material, promo_sample, special_fixture,
         promo_width, promo_height, promo_depth, promo_image_url, last_used_at,
         created_at, updated_at
       ) VALUES (
         $1, $2, $3, $4,
-        $5, $6, $7, $8,
-        $9, $10, $11, $12, $13, $14,
-        $15, $16, $17,
-        $18, $19, $20, $21, NOW(),
+        $5, $6, $7,
+        $8, $9, $10, $11, $12, $13,
+        $14, $15, $16,
+        $17, $18, $19, $20, NOW(),
         NOW(), NOW()
       )
       ON CONFLICT (id) DO UPDATE SET
@@ -813,7 +810,6 @@ const syncManufacturerProducts = async (
         product_image_url = EXCLUDED.product_image_url,
         risk_classification = EXCLUDED.risk_classification,
         catch_copy = EXCLUDED.catch_copy,
-        product_message = EXCLUDED.product_message,
         product_notes = EXCLUDED.product_notes,
         width = EXCLUDED.width,
         height = EXCLUDED.height,
@@ -838,7 +834,6 @@ const syncManufacturerProducts = async (
         master.productImage,
         master.riskClassification,
         master.catchCopy,
-        master.productMessage,
         master.productNotes,
         master.width,
         master.height,
@@ -1388,13 +1383,13 @@ export const upsert = async (
         `
         INSERT INTO product_entries (
           id, sheet_id, manufacturer_product_id, manufacturer_id, jan_code, product_name,
-          product_image_url, risk_classification, catch_copy, product_message,
+          product_image_url, risk_classification, catch_copy,
           product_notes, width, height, depth, facing_count, arrival_date,
           has_promo_material, promo_sample, special_fixture,
           promo_width, promo_height, promo_depth, promo_image_url
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-          $17, $18, $19, $20, $21, $22, $23
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
+          $16, $17, $18, $19, $20, $21, $22
         )
         ON CONFLICT (id) DO UPDATE SET
           sheet_id = EXCLUDED.sheet_id,
@@ -1405,7 +1400,6 @@ export const upsert = async (
           product_image_url = EXCLUDED.product_image_url,
           risk_classification = EXCLUDED.risk_classification,
           catch_copy = EXCLUDED.catch_copy,
-          product_message = EXCLUDED.product_message,
           product_notes = EXCLUDED.product_notes,
           width = EXCLUDED.width,
           height = EXCLUDED.height,
@@ -1430,7 +1424,6 @@ export const upsert = async (
           product.productImage || null,
           product.riskClassification || null,
           product.catchCopy || null,
-          product.productMessage || null,
           product.productNotes || null,
           product.width,
           product.height,
@@ -1857,7 +1850,6 @@ export const searchProductsByManufacturerId = async (
       p.product_image_url,
       p.risk_classification,
       p.catch_copy,
-      p.product_message,
       p.product_notes,
       p.width,
       p.height,
@@ -1913,7 +1905,6 @@ export const searchProductsByManufacturerId = async (
     riskClassification: row.risk_classification || '',
     specificIngredients: row.ingredient_names || [],
     catchCopy: row.catch_copy || '',
-    productMessage: row.product_message || '',
     productNotes: row.product_notes || undefined,
     width: row.width || 0,
     height: row.height || 0,

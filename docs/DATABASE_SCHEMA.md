@@ -51,7 +51,7 @@
   - `jan_code`, `product_name`
   - `product_image_url`
   - `risk_classification`
-  - `catch_copy`, `product_message`, `product_notes`
+  - `catch_copy`, `product_notes`
   - `width`, `height`, `depth`, `facing_count`
   - `arrival_date`
   - `has_promo_material`
@@ -85,7 +85,7 @@
   - `jan_code`, `product_name`
   - `product_image_url`
   - `risk_classification`
-  - `catch_copy`, `product_message`, `product_notes`
+  - `catch_copy`, `product_notes`
   - `width`, `height`, `depth`, `facing_count`
   - `arrival_date`
   - `has_promo_material`
@@ -264,7 +264,7 @@
     - 全角数字は半角へ正規化
     - `completed` 保存時は 8/13/16 桁のみ許可
   - テキスト系項目は最大4000文字
-    - `product_name`, `jan_code`, `catch_copy`, `product_message`, `product_notes`, `promo_sample`, `special_fixture`
+    - `product_name`, `jan_code`, `catch_copy`, `product_notes`, `promo_sample`, `special_fixture`
   - `completed` 保存時:
     - `product_name` / `jan_code` は必須
     - `product_image` が不足している場合は `completed_no_image` で保存

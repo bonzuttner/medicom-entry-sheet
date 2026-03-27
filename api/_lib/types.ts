@@ -48,7 +48,6 @@ export interface ProductEntry {
   riskClassification: string;
   specificIngredients: string[];
   catchCopy: string;
-  productMessage: string;
   productNotes?: string;
   productAttachments?: Attachment[];
   width: number;

@@ -123,7 +123,6 @@ CREATE TABLE IF NOT EXISTS manufacturer_products (
   product_image_url TEXT,
   risk_classification VARCHAR(100),
   catch_copy TEXT,
-  product_message TEXT,
   product_notes TEXT,
   width NUMERIC(10, 2),
   height NUMERIC(10, 2),
@@ -171,7 +170,6 @@ CREATE TABLE IF NOT EXISTS product_entries (
   product_image_url TEXT,
   risk_classification VARCHAR(100),
   catch_copy TEXT,
-  product_message TEXT,
   product_notes TEXT,
   width NUMERIC(10, 2),
   height NUMERIC(10, 2),
@@ -194,7 +192,13 @@ CREATE INDEX IF NOT EXISTS idx_products_jan_code ON product_entries(jan_code);
 CREATE INDEX IF NOT EXISTS idx_products_manufacturer ON product_entries(manufacturer_id);
 
 ALTER TABLE manufacturer_products
+  DROP COLUMN IF EXISTS product_message;
+
+ALTER TABLE manufacturer_products
   DROP COLUMN IF EXISTS shelf_name;
+
+ALTER TABLE product_entries
+  DROP COLUMN IF EXISTS product_message;
 
 ALTER TABLE product_entries
   DROP COLUMN IF EXISTS shelf_name;
