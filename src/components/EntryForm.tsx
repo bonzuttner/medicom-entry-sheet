@@ -1455,7 +1455,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     <textarea
                         rows={3}
                         className="w-full border-slate-300 rounded-lg py-3 px-3 focus:ring-primary focus:border-primary"
-                        placeholder="自由入力"
+                        placeholder="商品ブランドのURL等"
                         value={activeProduct.productNotes || ''}
                         onChange={(e) => handleProductChange(activeTab, 'productNotes', e.target.value)}
                     />
