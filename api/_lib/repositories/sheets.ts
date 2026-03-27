@@ -1,6 +1,6 @@
 import * as db from '../db.js';
 import { EntrySheet, ProductEntry, Attachment, EntrySheetRevision } from '../types.js';
-import { ensureManufacturer } from './users.js';
+import { ensureManufacturer, ensureManufacturerCodeInfrastructure } from './users.js';
 import { randomUUID } from 'crypto';
 import {
   getManufacturerProductRetentionCutoff,
@@ -17,6 +17,7 @@ import {
 
 interface SheetRow {
   id: string;
+  sheet_code: string | null;
   version: number;
   creator_id: string | null;
   creator_name: string;
@@ -257,6 +258,7 @@ let ensureSheetStatusConstraintPromise: Promise<void> | null = null;
 let ensureDeploymentColumnsPromise: Promise<void> | null = null;
 let ensureManufacturerProductTablesPromise: Promise<void> | null = null;
 let ensureProductManufacturerProductColumnPromise: Promise<void> | null = null;
+let ensureSheetCodeInfrastructurePromise: Promise<void> | null = null;
 let pruneRetentionIfDuePromise: Promise<{ deletedSheets: number; deletedManufacturerProducts: number }> | null = null;
 
 const ensureSheetSnapshotColumns = async (): Promise<void> => {
@@ -361,6 +363,110 @@ const ensureDeploymentColumns = async (): Promise<void> => {
     });
   }
   await ensureDeploymentColumnsPromise;
+};
+
+const formatSheetCode = (manufacturerCode: string, sequence: number): string =>
+  `${manufacturerCode}${String(sequence).padStart(5, '0')}`;
+
+const parseSheetCodeSequence = (sheetCode: string | null | undefined): number => {
+  const normalized = String(sheetCode || '').trim();
+  const matched = normalized.match(/^.{3}(\d{5})$/);
+  return matched ? Number(matched[1]) : 0;
+};
+
+const ensureSheetCodeInfrastructure = async (): Promise<void> => {
+  if (!ensureSheetCodeInfrastructurePromise) {
+    ensureSheetCodeInfrastructurePromise = (async () => {
+      await ensureManufacturerCodeInfrastructure();
+      await db.query(
+        `ALTER TABLE entry_sheets
+         ADD COLUMN IF NOT EXISTS sheet_code VARCHAR(8)`
+      );
+      await db.query(
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_sheets_sheet_code
+         ON entry_sheets(sheet_code)
+         WHERE sheet_code IS NOT NULL`
+      );
+      await db.query(
+        `
+        CREATE TABLE IF NOT EXISTS sheet_code_sequences (
+          manufacturer_code VARCHAR(3) PRIMARY KEY,
+          last_sequence INTEGER NOT NULL DEFAULT 0,
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+        `
+      );
+
+      const sheetCodeRows = await db.query<{
+        id: string;
+        manufacturer_code: string | null;
+        sheet_code: string | null;
+      }>(
+        `
+        SELECT s.id, m.code AS manufacturer_code, s.sheet_code
+        FROM entry_sheets s
+        JOIN manufacturers m ON s.manufacturer_id = m.id
+        ORDER BY s.created_at ASC, s.id ASC
+        `
+      );
+
+      const maxSequenceByCode = new Map<string, number>();
+      const requiresNormalization = sheetCodeRows.rows.some((row) => {
+        const manufacturerCode = String(row.manufacturer_code || '').trim();
+        const sheetCode = String(row.sheet_code || '').trim();
+        if (!/^\d{3}$/.test(manufacturerCode) || Number(manufacturerCode) < 100) return true;
+        if (!/^\d{8}$/.test(sheetCode)) return true;
+        if (!sheetCode.startsWith(manufacturerCode)) return true;
+        const sequence = parseSheetCodeSequence(sheetCode);
+        if (!Number.isInteger(sequence) || sequence < 1) return true;
+        maxSequenceByCode.set(
+          manufacturerCode,
+          Math.max(maxSequenceByCode.get(manufacturerCode) || 0, sequence)
+        );
+        return false;
+      });
+
+      if (requiresNormalization) {
+        await db.transaction(async () => {
+          const nextSequenceByCode = new Map<string, number>();
+          for (const row of sheetCodeRows.rows) {
+            const manufacturerCode = String(row.manufacturer_code || '').trim();
+            if (!/^\d{3}$/.test(manufacturerCode)) {
+              throw new Error('MANUFACTURER_CODE_MISSING');
+            }
+            const nextSequence = (nextSequenceByCode.get(manufacturerCode) || 0) + 1;
+            const nextSheetCode = formatSheetCode(manufacturerCode, nextSequence);
+            await db.query(`UPDATE entry_sheets SET sheet_code = $2 WHERE id = $1`, [
+              row.id,
+              nextSheetCode,
+            ]);
+            nextSequenceByCode.set(manufacturerCode, nextSequence);
+          }
+          maxSequenceByCode.clear();
+          for (const [manufacturerCode, lastSequence] of nextSequenceByCode.entries()) {
+            maxSequenceByCode.set(manufacturerCode, lastSequence);
+          }
+        });
+      }
+
+      for (const [manufacturerCode, lastSequence] of maxSequenceByCode.entries()) {
+        await db.query(
+          `
+          INSERT INTO sheet_code_sequences (manufacturer_code, last_sequence, updated_at)
+          VALUES ($1, $2, NOW())
+          ON CONFLICT (manufacturer_code) DO UPDATE SET
+            last_sequence = GREATEST(sheet_code_sequences.last_sequence, EXCLUDED.last_sequence),
+            updated_at = NOW()
+          `,
+          [manufacturerCode, lastSequence]
+        );
+      }
+    })().catch((error) => {
+      ensureSheetCodeInfrastructurePromise = null;
+      throw error;
+    });
+  }
+  await ensureSheetCodeInfrastructurePromise;
 };
 
 const ensureManufacturerProductTables = async (): Promise<void> => {
@@ -594,6 +700,7 @@ const rowsToSheet = (
 
   return {
     id: sheetRow.id,
+    sheetCode: sheetRow.sheet_code || undefined,
     version: sheetRow.version || 1,
     creatorId: sheetRow.creator_id || '',
     creatorName: sheetRow.creator_name,
@@ -883,12 +990,13 @@ export const findAll = async (limit?: number, offset: number = 0): Promise<Entry
   await ensureAdminMemoTable();
   await ensureSheetVersionColumn();
   await ensureDeploymentColumns();
+  await ensureSheetCodeInfrastructure();
   await ensureManufacturerProductTables();
   await ensureProductManufacturerProductColumn();
   const hasPaging = typeof limit === 'number';
   const sheetQuery = `
     SELECT
-      s.id, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
+      s.id, s.sheet_code, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
       s.shelf_name, s.case_name, s.deployment_start_month, s.deployment_end_month,
       s.created_at, s.updated_at,
       COALESCE(s.creator_name_snapshot, u.display_name, '') as creator_name,
@@ -982,12 +1090,13 @@ export const findByManufacturerId = async (
   await ensureAdminMemoTable();
   await ensureSheetVersionColumn();
   await ensureDeploymentColumns();
+  await ensureSheetCodeInfrastructure();
   await ensureManufacturerProductTables();
   await ensureProductManufacturerProductColumn();
   const hasPaging = typeof limit === 'number';
   const sheetQuery = `
     SELECT
-      s.id, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
+      s.id, s.sheet_code, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
       s.shelf_name, s.case_name, s.deployment_start_month, s.deployment_end_month,
       s.created_at, s.updated_at,
       COALESCE(s.creator_name_snapshot, u.display_name, '') as creator_name,
@@ -1093,12 +1202,13 @@ export const findById = async (sheetId: string): Promise<EntrySheet | null> => {
   await ensureAdminMemoTable();
   await ensureSheetVersionColumn();
   await ensureDeploymentColumns();
+  await ensureSheetCodeInfrastructure();
   await ensureManufacturerProductTables();
   await ensureProductManufacturerProductColumn();
   const sheetResult = await db.query<SheetRow>(
     `
     SELECT
-      s.id, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
+      s.id, s.sheet_code, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
       s.shelf_name, s.case_name, s.deployment_start_month, s.deployment_end_month,
       s.created_at, s.updated_at,
       COALESCE(s.creator_name_snapshot, u.display_name, '') as creator_name,
@@ -1186,6 +1296,7 @@ export const upsert = async (
   await ensureSheetRevisionTable();
   await ensureSheetStatusConstraint();
   await ensureDeploymentColumns();
+  await ensureSheetCodeInfrastructure();
   await ensureManufacturerProductTables();
   await ensureProductManufacturerProductColumn();
   return await db.transaction(async () => {
@@ -1258,11 +1369,13 @@ export const upsert = async (
     const manufacturerId = await getManufacturerIdCached(normalizedSheet.manufacturerName);
     const creatorId = String(normalizedSheet.creatorId || '').trim() || null;
     ensureNoDuplicateJanWithinSheet(normalizedSheet.products);
-    const existingVersionResult = await db.query<{ version: number }>(
-      `SELECT version FROM entry_sheets WHERE id = $1 FOR UPDATE`,
+    const existingVersionResult = await db.query<{ version: number; sheet_code: string | null }>(
+      `SELECT version, sheet_code FROM entry_sheets WHERE id = $1 FOR UPDATE`,
       [normalizedSheet.id]
     );
-    const existingVersion = existingVersionResult.rows[0]?.version;
+    const existingRow = existingVersionResult.rows[0];
+    const existingVersion = existingRow?.version;
+    let sheetCode = String(existingRow?.sheet_code || '').trim();
     const expectedVersion =
       Number.isInteger(Number(revision?.expectedVersion)) && Number(revision?.expectedVersion) > 0
         ? Number(revision?.expectedVersion)
@@ -1280,16 +1393,40 @@ export const upsert = async (
     normalizedSheet.version =
       existingVersion !== undefined ? existingVersion + 1 : Math.max(1, normalizedSheet.version || 1);
 
+    if (!sheetCode) {
+      const manufacturerCodeRow = await db.queryOne<{ code: string | null }>(
+        `SELECT code FROM manufacturers WHERE id = $1`,
+        [manufacturerId]
+      );
+      const manufacturerCode = String(manufacturerCodeRow?.code || '').trim();
+      if (!/^\d{3}$/.test(manufacturerCode)) {
+        throw new Error('MANUFACTURER_CODE_MISSING');
+      }
+      const sequenceResult = await db.queryOne<{ last_sequence: number }>(
+        `
+        INSERT INTO sheet_code_sequences (manufacturer_code, last_sequence, updated_at)
+        VALUES ($1, 1, NOW())
+        ON CONFLICT (manufacturer_code) DO UPDATE SET
+          last_sequence = sheet_code_sequences.last_sequence + 1,
+          updated_at = NOW()
+        RETURNING last_sequence
+        `,
+        [manufacturerCode]
+      );
+      sheetCode = formatSheetCode(manufacturerCode, Number(sequenceResult?.last_sequence || 1));
+    }
+
     // Upsert entry_sheet
     await db.query(
       `
       INSERT INTO entry_sheets (
-        id, version, creator_id, manufacturer_id,
+        id, sheet_code, version, creator_id, manufacturer_id,
         creator_name_snapshot, creator_email_snapshot, creator_phone_snapshot,
         title, case_name, notes, shelf_name, deployment_start_month, deployment_end_month,
         status, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
       ON CONFLICT (id) DO UPDATE SET
+        sheet_code = COALESCE(entry_sheets.sheet_code, EXCLUDED.sheet_code),
         version = EXCLUDED.version,
         creator_name_snapshot = EXCLUDED.creator_name_snapshot,
         creator_email_snapshot = EXCLUDED.creator_email_snapshot,
@@ -1305,6 +1442,7 @@ export const upsert = async (
       `,
       [
         normalizedSheet.id,
+        sheetCode,
         normalizedSheet.version,
         creatorId,
         manufacturerId,

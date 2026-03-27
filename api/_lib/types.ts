@@ -66,6 +66,7 @@ export interface ProductEntry {
 
 export interface EntrySheet {
   id: string;
+  sheetCode?: string;
   version: number;
   updatedAt: string;
   createdAt: string;

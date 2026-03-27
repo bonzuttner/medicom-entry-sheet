@@ -77,6 +77,7 @@ export interface ProductEntry {
 // Sheet Level Data (Header)
 export interface EntrySheet {
   id: string;
+  sheetCode?: string;
   version: number;
   updatedAt: string; // Auto
   createdAt: string; // Auto

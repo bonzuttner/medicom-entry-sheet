@@ -5,7 +5,22 @@
 CREATE TABLE IF NOT EXISTS manufacturers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(200) NOT NULL UNIQUE,
+  code VARCHAR(3) UNIQUE,
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE manufacturers
+  ADD COLUMN IF NOT EXISTS code VARCHAR(3);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_manufacturers_code
+  ON manufacturers(code)
+  WHERE code IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS manufacturer_code_sequence (
+  id BOOLEAN PRIMARY KEY DEFAULT TRUE,
+  last_code INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  CHECK (id = TRUE)
 );
 
 -- ユーザー管理
@@ -29,6 +44,7 @@ CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 -- エントリーシート
 CREATE TABLE IF NOT EXISTS entry_sheets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sheet_code VARCHAR(8) UNIQUE,
   version INTEGER NOT NULL DEFAULT 1,
   creator_id UUID REFERENCES users(id) ON DELETE SET NULL,
   manufacturer_id UUID NOT NULL REFERENCES manufacturers(id) ON DELETE RESTRICT,
@@ -45,6 +61,9 @@ CREATE TABLE IF NOT EXISTS entry_sheets (
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS sheet_code VARCHAR(8);
 
 ALTER TABLE entry_sheets
   ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
@@ -90,6 +109,16 @@ CREATE INDEX IF NOT EXISTS idx_sheets_status ON entry_sheets(status);
 CREATE INDEX IF NOT EXISTS idx_sheets_created_at ON entry_sheets(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_sheets_manufacturer_updated_at
   ON entry_sheets(manufacturer_id, updated_at DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sheets_sheet_code
+  ON entry_sheets(sheet_code)
+  WHERE sheet_code IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS sheet_code_sequences (
+  manufacturer_code VARCHAR(3) PRIMARY KEY,
+  last_sequence INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
 
 -- エントリーシート Adminメモ（分離）
 CREATE TABLE IF NOT EXISTS entry_sheet_admin_memos (

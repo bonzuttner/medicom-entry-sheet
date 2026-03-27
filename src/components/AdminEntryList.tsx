@@ -129,7 +129,9 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
   onEdit,
   onSaveAdminMemo,
 }) => {
-  const getShortSheetId = (id: string): string => id.slice(0, 8);
+  const getLegacyShortSheetId = (id: string): string => id.slice(0, 8);
+  const getDisplaySheetId = (sheet: EntrySheet): string =>
+    sheet.sheetCode?.trim() || getLegacyShortSheetId(sheet.id);
   const [keyword, setKeyword] = useState('');
   const [manufacturerFilter, setManufacturerFilter] = useState('');
   const [deploymentDate, setDeploymentDate] = useState('');
@@ -316,6 +318,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
     const rows: string[][] = [
       [
         'シートID',
+        '内部UUID',
         '状態',
         'タイトル',
         'シート補足情報',
@@ -358,6 +361,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
       const sheetAttachmentTypes = (sheet.attachments || []).map((file) => file.type).join(' / ');
       const sheetAttachmentUrls = (sheet.attachments || []).map((file) => file.url).join(' / ');
       rows.push([
+        toSafeCsvCell(getDisplaySheetId(sheet)),
         toSafeCsvCell(sheet.id),
         toSafeCsvCell(getStatusLabel(sheet.status)),
         toSafeCsvCell(sheet.title),
@@ -522,7 +526,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                       </button>
                     </td>
                     <td className="px-1 py-3 text-[10px] text-slate-400 font-mono whitespace-nowrap">
-                      {getShortSheetId(sheet.id)}
+                      {getDisplaySheetId(sheet)}
                     </td>
                     <td className="px-1 py-3 text-center">
                       <button

@@ -377,6 +377,7 @@ const App: React.FC = () => {
       masterData.manufacturerCaseNames?.[currentUser.manufacturerName] || masterData.caseNames;
     const newSheet: EntrySheet = {
       id: uuidv4(),
+      sheetCode: undefined,
       version: 1,
       updatedAt: new Date().toISOString(),
       createdAt: new Date().toISOString(),
@@ -483,6 +484,7 @@ const App: React.FC = () => {
       const duplicated: EntrySheet = {
         ...sheet,
         id: uuidv4(),
+        sheetCode: undefined,
         version: 1,
         title: `${sheet.title} (コピー)`,
         createdAt: new Date().toISOString(),

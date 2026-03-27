@@ -28,7 +28,9 @@ export const EntryList: React.FC<EntryListProps> = ({
   isLoadingMore = false,
   totalCount = 0,
 }) => {
-  const getShortSheetId = (id: string): string => id.slice(0, 8);
+  const getLegacyShortSheetId = (id: string): string => id.slice(0, 8);
+  const getDisplaySheetId = (sheet: EntrySheet): string =>
+    sheet.sheetCode?.trim() || getLegacyShortSheetId(sheet.id);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'updatedAt' | 'manufacturer'>('updatedAt');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
@@ -237,6 +239,7 @@ export const EntryList: React.FC<EntryListProps> = ({
     const csvRows: string[][] = [
       [
         'シートID',
+        '内部UUID',
         '状態',
         'タイトル',
         'シート補足情報',
@@ -294,6 +297,7 @@ export const EntryList: React.FC<EntryListProps> = ({
         const productAttachmentTypes = (prod.productAttachments || []).map((file) => file.type).join(' / ');
         const productAttachmentUrls = (prod.productAttachments || []).map((file) => file.url).join(' / ');
         csvRows.push([
+          toSafeCsvCell(getDisplaySheetId(sheet)),
           toSafeCsvCell(sheet.id),
           toSafeCsvCell(getStatusLabel(sheet.status)),
           toSafeCsvCell(sheet.title),
@@ -687,7 +691,7 @@ export const EntryList: React.FC<EntryListProps> = ({
                                     </span>
                                     <span className="text-xs text-slate-400">{new Date(sheet.updatedAt).toLocaleDateString()}</span>
                                 </div>
-                                <div className="text-[10px] text-slate-400 font-mono mb-1">ID: {getShortSheetId(sheet.id)}</div>
+                                <div className="text-[10px] text-slate-400 font-mono mb-1">ID: {getDisplaySheetId(sheet)}</div>
                                 <h3 className="text-base font-bold text-slate-900 leading-tight mb-1">{sheet.title}</h3>
                                 <div className="text-xs text-slate-500 truncate">
                                     {sheet.manufacturerName} / {sheet.creatorName}
@@ -827,7 +831,7 @@ export const EntryList: React.FC<EntryListProps> = ({
                              </div>
                           </td>
                           <td className="px-2 py-4 text-[10px] text-slate-400 font-mono whitespace-nowrap">
-                            {getShortSheetId(sheet.id)}
+                            {getDisplaySheetId(sheet)}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap">
                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusPillClass(sheet.status)}`}>
