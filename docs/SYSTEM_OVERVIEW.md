@@ -95,11 +95,11 @@
 ### 6.3 保持ポリシー
 
 1. `entry_sheets`
-- `updated_at` から5年で削除
+- `updated_at` から2年で削除
 - `product_entries`, `product_ingredients`, `attachments`, `entry_sheet_admin_memos`, `entry_sheet_revisions` は親削除に追従
 
 2. `manufacturer_products`
-- `last_used_at` から5年で削除
+- `last_used_at` から2年で削除
 - `manufacturer_product_ingredients` は親削除に追従
 
 3. 実行方式

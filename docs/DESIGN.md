@@ -99,6 +99,7 @@
   - `adminMemo` を保持（編集は ADMIN のみ、`entry_sheet_admin_memos` に分離保存）
 - `ProductEntry`: シート保存時点の商品スナップショット（JAN、画像、販促物情報など）
 - `manufacturer_products`: メーカー内で JAN 一意の検索用商品マスタ
+  - `lastUsedAt` を保持し、最終利用から2年で削除対象
 - `MasterData`: メーカー名・リスク分類・特定成分・メーカー別棚割名・メーカー別デフォルト展開スタート月
 
 補足:
@@ -159,6 +160,10 @@
 - `product_entries` はシート保存時点のスナップショットとして維持する
 - 保存は 1 トランザクションで実施し、途中失敗時は全ロールバックする
 - 本対応では、本番後に不要になる一時DB項目・移行専用テーブルは追加しない
+- 保持ポリシー:
+  - `entry_sheets` は `updated_at` から2年で削除
+  - `manufacturer_products` は `last_used_at` から2年で削除
+  - 関連テーブルは FK/CASCADE に従って削除
 
 ### 6.2 Adminメモ保存
 

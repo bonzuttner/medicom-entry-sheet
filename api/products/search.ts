@@ -19,6 +19,8 @@ export default async function handler(req: any, res: any) {
   const currentUser = await requireUser(req, res);
   if (!currentUser) return;
 
+  await SheetRepository.pruneRetentionIfDue();
+
   const query = String(Array.isArray(req.query?.q) ? req.query.q[0] : req.query?.q || '').trim();
   const requestedManufacturerName = String(
     Array.isArray(req.query?.manufacturerName)

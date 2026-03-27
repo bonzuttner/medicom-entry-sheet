@@ -22,6 +22,8 @@ export default async function handler(req: any, res: any) {
   const currentUser = await requireUser(req, res);
   if (!currentUser) return;
 
+  await SheetRepository.pruneRetentionIfDue();
+
   const hasPagingQuery = req.query?.limit !== undefined || req.query?.offset !== undefined;
   const requestedLimit = parsePositiveInt(req.query?.limit);
   const requestedOffset = parsePositiveInt(req.query?.offset);
