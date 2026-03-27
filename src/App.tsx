@@ -62,7 +62,6 @@ const toComparableAttachments = (attachments: EntrySheet['attachments']) =>
 const toComparableProducts = (products: EntrySheet['products']) =>
   (products || []).map((product) => ({
     id: normalizeOptionalString(product.id),
-    shelfName: normalizeOptionalString(product.shelfName),
     manufacturerName: normalizeOptionalString(product.manufacturerName),
     janCode: normalizeOptionalString(product.janCode),
     productName: normalizeOptionalString(product.productName),
@@ -102,6 +101,7 @@ const toComparableSheetCore = (sheet: EntrySheet) => ({
   phoneNumber: normalizeOptionalString(sheet.phoneNumber),
   title: normalizeOptionalString(sheet.title),
   notes: normalizeOptionalString(sheet.notes),
+  shelfName: normalizeOptionalString(sheet.shelfName),
   deploymentStartMonth: normalizeOptionalNumber(sheet.deploymentStartMonth),
   deploymentEndMonth: normalizeOptionalNumber(sheet.deploymentEndMonth),
   status: sheet.status,
@@ -379,6 +379,7 @@ const App: React.FC = () => {
       creatorId: currentUser.id,
       creatorName: currentUser.displayName,
       manufacturerName: currentUser.manufacturerName,
+      shelfName: shelfOptions[0] || '',
       email: currentUser.email,
       phoneNumber: currentUser.phoneNumber,
       title: '',
@@ -388,7 +389,6 @@ const App: React.FC = () => {
       products: [
         {
           id: uuidv4(),
-          shelfName: shelfOptions[0] || '',
           manufacturerName: currentUser.manufacturerName,
           janCode: '',
           productName: '',

@@ -97,14 +97,7 @@ const getDeploymentPeriodLabel = (sheet: EntrySheet): string => {
   return `${period.start}~${period.end}`;
 };
 
-const getShelfNames = (sheet: EntrySheet): string =>
-  Array.from(
-    new Set(
-      sheet.products
-        .map((product) => (product.shelfName || '').trim())
-        .filter((name) => name.length > 0)
-    )
-  ).join(' / ') || '未設定';
+const getShelfNames = (sheet: EntrySheet): string => sheet.shelfName?.trim() || '未設定';
 
 const isHttpUrl = (value: string): boolean => /^https?:\/\/.+/i.test(value.trim());
 const normalizeSheetStatus = (

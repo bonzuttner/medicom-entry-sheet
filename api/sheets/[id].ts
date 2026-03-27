@@ -42,7 +42,6 @@ const normalizeProducts = (
     manufacturerName: fallbackManufacturerName,
     janCode: String(product.janCode || '').trim(),
     productName: String(product.productName || '').trim(),
-    shelfName: String(product.shelfName || '').trim(),
   }));
 };
 
@@ -52,6 +51,7 @@ const isTooLong = (value: string | undefined): boolean =>
 const findTooLongField = (sheet: EntrySheet): string | null => {
   if (isTooLong(sheet.title)) return 'タイトル';
   if (isTooLong(sheet.notes)) return 'エントリシート補足情報';
+  if (isTooLong(sheet.shelfName)) return '棚割名';
   if (isTooLong(sheet.email)) return '担当者メール';
   if (isTooLong(sheet.phoneNumber)) return '担当者電話番号';
   if (isTooLong(sheet.adminMemo?.bandPattern)) return '帯パターン';
@@ -63,7 +63,6 @@ const findTooLongField = (sheet: EntrySheet): string | null => {
   for (let i = 0; i < sheet.products.length; i += 1) {
     const product = sheet.products[i];
     const prefix = `商品${i + 1}`;
-    if (isTooLong(product.shelfName)) return `${prefix} 棚割名`;
     if (isTooLong(product.productName)) return `${prefix} 商品名`;
     if (isTooLong(product.janCode)) return `${prefix} JANコード`;
     if (isTooLong(product.catchCopy)) return `${prefix} キャッチコピー`;
@@ -169,7 +168,6 @@ const toComparableAttachments = (attachments: EntrySheet['attachments']) =>
 const toComparableProducts = (products: EntrySheet['products']) =>
   (products || []).map((product) => ({
     id: normalizeOptionalString(product.id),
-    shelfName: normalizeOptionalString(product.shelfName),
     manufacturerName: normalizeOptionalString(product.manufacturerName),
     janCode: normalizeOptionalString(product.janCode),
     productName: normalizeOptionalString(product.productName),
@@ -210,6 +208,7 @@ const toComparableSheetCore = (sheet: EntrySheet) => ({
   phoneNumber: normalizeOptionalString(sheet.phoneNumber),
   title: normalizeOptionalString(sheet.title),
   notes: normalizeOptionalString(sheet.notes),
+  shelfName: normalizeOptionalString(sheet.shelfName),
   deploymentStartMonth: normalizeOptionalNumberForCompare(sheet.deploymentStartMonth),
   deploymentEndMonth: normalizeOptionalNumberForCompare(sheet.deploymentEndMonth),
   status: normalizeStatus(sheet.status),
@@ -247,6 +246,7 @@ const buildRevisionSummary = (before: EntrySheet | null, after: EntrySheet): str
 
   pushChange('タイトル', before.title, after.title);
   pushChange('補足', before.notes || '', after.notes || '');
+  pushChange('棚割名', before.shelfName || '', after.shelfName || '');
   pushChange('担当者名', before.creatorName, after.creatorName);
   pushChange('担当者メール', before.email, after.email);
   pushChange('担当者電話', before.phoneNumber, after.phoneNumber);
@@ -265,7 +265,6 @@ const buildRevisionSummary = (before: EntrySheet | null, after: EntrySheet): str
     const prefix = `商品${i + 1}`;
     pushChange(`${prefix}.商品名`, prev.productName, next.productName);
     pushChange(`${prefix}.JAN`, prev.janCode, next.janCode);
-    pushChange(`${prefix}.棚割名`, prev.shelfName, next.shelfName);
     pushChange(`${prefix}.リスク分類`, prev.riskClassification, next.riskClassification);
   }
 
@@ -288,6 +287,8 @@ export default async function handler(req: any, res: any) {
 
   const currentUser = await requireUser(req, res);
   if (!currentUser) return;
+
+  await SheetRepository.pruneRetentionIfDue();
 
   if (method === 'PUT') {
     const body = await readJsonBody<PutSheetBody>(req);
@@ -408,6 +409,7 @@ export default async function handler(req: any, res: any) {
       phoneNumber: String(sheet.phoneNumber || existingSheet?.phoneNumber || currentUser.phoneNumber || '').trim(),
       title: String(sheet.title || '').trim(),
       notes: sheet.notes ? String(sheet.notes).trim() : '',
+      shelfName: String(sheet.shelfName || existingSheet?.shelfName || '').trim(),
       deploymentStartMonth: resolvedStartMonth,
       deploymentEndMonth: resolvedEndMonth,
       adminMemo: normalizeAdminMemo(sheet.adminMemo, existingSheet?.adminMemo, canEditAdminMemo),

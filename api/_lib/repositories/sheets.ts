@@ -2,6 +2,12 @@ import * as db from '../db.js';
 import { EntrySheet, ProductEntry, Attachment, EntrySheetRevision } from '../types.js';
 import { ensureManufacturer } from './users.js';
 import { randomUUID } from 'crypto';
+import {
+  getManufacturerProductRetentionCutoff,
+  getSheetRetentionCutoff,
+  markRetentionRun,
+  shouldRunRetention,
+} from '../retention.js';
 
 /**
  * Sheet Repository
@@ -18,6 +24,7 @@ interface SheetRow {
   manufacturer_name: string;
   creator_email: string;
   creator_phone: string;
+  shelf_name: string | null;
   title: string;
   notes: string | null;
   deployment_start_month: number | null;
@@ -57,7 +64,6 @@ interface ProductRow {
   id: string;
   sheet_id: string;
   manufacturer_product_id: string | null;
-  shelf_name: string;
   manufacturer_name: string;
   jan_code: string;
   product_name: string;
@@ -85,7 +91,6 @@ interface ManufacturerProductRow {
   manufacturer_id: string;
   manufacturer_name: string;
   jan_code: string;
-  shelf_name: string;
   product_name: string;
   product_image_url: string | null;
   risk_classification: string | null;
@@ -104,6 +109,7 @@ interface ManufacturerProductRow {
   promo_height: number | null;
   promo_depth: number | null;
   promo_image_url: string | null;
+  last_used_at: Date | string;
   updated_at: Date | string;
 }
 
@@ -252,6 +258,7 @@ let ensureSheetStatusConstraintPromise: Promise<void> | null = null;
 let ensureDeploymentColumnsPromise: Promise<void> | null = null;
 let ensureManufacturerProductTablesPromise: Promise<void> | null = null;
 let ensureProductManufacturerProductColumnPromise: Promise<void> | null = null;
+let pruneRetentionIfDuePromise: Promise<{ deletedSheets: number; deletedManufacturerProducts: number }> | null = null;
 
 const ensureSheetSnapshotColumns = async (): Promise<void> => {
   if (!ensureSnapshotColumnsPromise) {
@@ -341,6 +348,10 @@ const ensureDeploymentColumns = async (): Promise<void> => {
         `ALTER TABLE entry_sheets
          ADD COLUMN IF NOT EXISTS deployment_end_month SMALLINT`
       );
+      await db.query(
+        `ALTER TABLE entry_sheets
+         ADD COLUMN IF NOT EXISTS shelf_name VARCHAR(200)`
+      );
     })().catch((error) => {
       ensureDeploymentColumnsPromise = null;
       throw error;
@@ -358,7 +369,6 @@ const ensureManufacturerProductTables = async (): Promise<void> => {
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           manufacturer_id UUID NOT NULL REFERENCES manufacturers(id) ON DELETE CASCADE,
           jan_code VARCHAR(50) NOT NULL,
-          shelf_name VARCHAR(200) NOT NULL,
           product_name VARCHAR(500) NOT NULL,
           product_image_url TEXT,
           risk_classification VARCHAR(100),
@@ -377,6 +387,7 @@ const ensureManufacturerProductTables = async (): Promise<void> => {
           promo_height NUMERIC(10, 2),
           promo_depth NUMERIC(10, 2),
           promo_image_url TEXT,
+          last_used_at TIMESTAMP NOT NULL DEFAULT NOW(),
           created_at TIMESTAMP NOT NULL DEFAULT NOW(),
           updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
           UNIQUE (manufacturer_id, jan_code)
@@ -402,9 +413,18 @@ const ensureManufacturerProductTables = async (): Promise<void> => {
          ON manufacturer_products(manufacturer_id, updated_at DESC)`
       );
       await db.query(
+        `CREATE INDEX IF NOT EXISTS idx_manufacturer_products_last_used_at
+         ON manufacturer_products(last_used_at)`
+      );
+      await db.query(
         `CREATE INDEX IF NOT EXISTS idx_manufacturer_product_ingredients_product
          ON manufacturer_product_ingredients(manufacturer_product_id)`
       );
+      await db.query(
+        `ALTER TABLE manufacturer_products
+         ADD COLUMN IF NOT EXISTS last_used_at TIMESTAMP NOT NULL DEFAULT NOW()`
+      );
+      await db.query(`ALTER TABLE manufacturer_products DROP COLUMN IF EXISTS shelf_name`);
     })().catch((error) => {
       ensureManufacturerProductTablesPromise = null;
       throw error;
@@ -425,6 +445,7 @@ const ensureProductManufacturerProductColumn = async (): Promise<void> => {
         `CREATE INDEX IF NOT EXISTS idx_product_entries_manufacturer_product
          ON product_entries(manufacturer_product_id)`
       );
+      await db.query(`ALTER TABLE product_entries DROP COLUMN IF EXISTS shelf_name`);
     })().catch((error) => {
       ensureProductManufacturerProductColumnPromise = null;
       throw error;
@@ -543,7 +564,6 @@ const rowsToSheet = (
     return {
       id: p.id,
       manufacturerProductId: p.manufacturer_product_id || undefined,
-      shelfName: p.shelf_name,
       manufacturerName: p.manufacturer_name,
       janCode: p.jan_code,
       productName: p.product_name,
@@ -575,6 +595,7 @@ const rowsToSheet = (
     creatorId: sheetRow.creator_id || '',
     creatorName: sheetRow.creator_name,
     manufacturerName: sheetRow.manufacturer_name,
+    shelfName: sheetRow.shelf_name || '',
     email: sheetRow.creator_email,
     phoneNumber: sheetRow.creator_phone,
     title: sheetRow.title,
@@ -685,7 +706,6 @@ const toUniqueTrimmedIngredients = (ingredients: string[] | undefined): string[]
   [...new Set((ingredients || []).map((value) => value.trim()).filter(Boolean))];
 
 const productToMasterPayload = (product: ProductEntry) => ({
-  shelfName: String(product.shelfName || '').trim(),
   janCode: String(product.janCode || '').trim(),
   productName: String(product.productName || '').trim(),
   productImage: product.productImage || null,
@@ -766,24 +786,23 @@ const syncManufacturerProducts = async (
     await db.query(
       `
       INSERT INTO manufacturer_products (
-        id, manufacturer_id, jan_code, shelf_name, product_name,
+        id, manufacturer_id, jan_code, product_name,
         product_image_url, risk_classification, catch_copy, product_message,
         product_notes, width, height, depth, facing_count, arrival_date,
         has_promo_material, promo_sample, special_fixture,
-        promo_width, promo_height, promo_depth, promo_image_url,
+        promo_width, promo_height, promo_depth, promo_image_url, last_used_at,
         created_at, updated_at
       ) VALUES (
-        $1, $2, $3, $4, $5,
-        $6, $7, $8, $9,
-        $10, $11, $12, $13, $14, $15,
-        $16, $17, $18,
-        $19, $20, $21, $22,
+        $1, $2, $3, $4,
+        $5, $6, $7, $8,
+        $9, $10, $11, $12, $13, $14,
+        $15, $16, $17,
+        $18, $19, $20, $21, NOW(),
         NOW(), NOW()
       )
       ON CONFLICT (id) DO UPDATE SET
         manufacturer_id = EXCLUDED.manufacturer_id,
         jan_code = EXCLUDED.jan_code,
-        shelf_name = EXCLUDED.shelf_name,
         product_name = EXCLUDED.product_name,
         product_image_url = EXCLUDED.product_image_url,
         risk_classification = EXCLUDED.risk_classification,
@@ -802,13 +821,13 @@ const syncManufacturerProducts = async (
         promo_height = EXCLUDED.promo_height,
         promo_depth = EXCLUDED.promo_depth,
         promo_image_url = EXCLUDED.promo_image_url,
+        last_used_at = NOW(),
         updated_at = NOW()
       `,
       [
         targetMasterId,
         manufacturerId,
         master.janCode,
-        master.shelfName,
         master.productName,
         master.productImage,
         master.riskClassification,
@@ -869,7 +888,7 @@ export const findAll = async (limit?: number, offset: number = 0): Promise<Entry
   const sheetQuery = `
     SELECT
       s.id, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
-      s.deployment_start_month, s.deployment_end_month,
+      s.shelf_name, s.deployment_start_month, s.deployment_end_month,
       s.created_at, s.updated_at,
       COALESCE(s.creator_name_snapshot, u.display_name, '') as creator_name,
       COALESCE(s.creator_email_snapshot, u.email, '') as creator_email,
@@ -968,7 +987,7 @@ export const findByManufacturerId = async (
   const sheetQuery = `
     SELECT
       s.id, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
-      s.deployment_start_month, s.deployment_end_month,
+      s.shelf_name, s.deployment_start_month, s.deployment_end_month,
       s.created_at, s.updated_at,
       COALESCE(s.creator_name_snapshot, u.display_name, '') as creator_name,
       COALESCE(s.creator_email_snapshot, u.email, '') as creator_email,
@@ -1079,7 +1098,7 @@ export const findById = async (sheetId: string): Promise<EntrySheet | null> => {
     `
     SELECT
       s.id, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
-      s.deployment_start_month, s.deployment_end_month,
+      s.shelf_name, s.deployment_start_month, s.deployment_end_month,
       s.created_at, s.updated_at,
       COALESCE(s.creator_name_snapshot, u.display_name, '') as creator_name,
       COALESCE(s.creator_email_snapshot, u.email, '') as creator_email,
@@ -1265,9 +1284,9 @@ export const upsert = async (
       INSERT INTO entry_sheets (
         id, version, creator_id, manufacturer_id,
         creator_name_snapshot, creator_email_snapshot, creator_phone_snapshot,
-        title, notes, deployment_start_month, deployment_end_month,
+        title, notes, shelf_name, deployment_start_month, deployment_end_month,
         status, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       ON CONFLICT (id) DO UPDATE SET
         version = EXCLUDED.version,
         creator_name_snapshot = EXCLUDED.creator_name_snapshot,
@@ -1275,6 +1294,7 @@ export const upsert = async (
         creator_phone_snapshot = EXCLUDED.creator_phone_snapshot,
         title = EXCLUDED.title,
         notes = EXCLUDED.notes,
+        shelf_name = EXCLUDED.shelf_name,
         deployment_start_month = EXCLUDED.deployment_start_month,
         deployment_end_month = EXCLUDED.deployment_end_month,
         status = EXCLUDED.status,
@@ -1290,6 +1310,7 @@ export const upsert = async (
         normalizedSheet.phoneNumber || null,
         normalizedSheet.title,
         normalizedSheet.notes || null,
+        normalizedSheet.shelfName || null,
         normalizedSheet.deploymentStartMonth ?? null,
         normalizedSheet.deploymentEndMonth ?? null,
         normalizedSheet.status,
@@ -1357,19 +1378,18 @@ export const upsert = async (
       await db.query(
         `
         INSERT INTO product_entries (
-          id, sheet_id, manufacturer_product_id, shelf_name, manufacturer_id, jan_code, product_name,
+          id, sheet_id, manufacturer_product_id, manufacturer_id, jan_code, product_name,
           product_image_url, risk_classification, catch_copy, product_message,
           product_notes, width, height, depth, facing_count, arrival_date,
           has_promo_material, promo_sample, special_fixture,
           promo_width, promo_height, promo_depth, promo_image_url
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
-          $18, $19, $20, $21, $22, $23, $24
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+          $17, $18, $19, $20, $21, $22, $23
         )
         ON CONFLICT (id) DO UPDATE SET
           sheet_id = EXCLUDED.sheet_id,
           manufacturer_product_id = EXCLUDED.manufacturer_product_id,
-          shelf_name = EXCLUDED.shelf_name,
           manufacturer_id = EXCLUDED.manufacturer_id,
           jan_code = EXCLUDED.jan_code,
           product_name = EXCLUDED.product_name,
@@ -1395,7 +1415,6 @@ export const upsert = async (
           productId,
           normalizedSheet.id,
           manufacturerProductId,
-          String(product.shelfName || '').trim(),
           productManufacturerId,
           String(product.janCode || '').trim(),
           String(product.productName || '').trim(),
@@ -1825,7 +1844,6 @@ export const searchProductsByManufacturerId = async (
       p.manufacturer_id,
       m.name as manufacturer_name,
       p.jan_code,
-      p.shelf_name,
       p.product_name,
       p.product_image_url,
       p.risk_classification,
@@ -1879,7 +1897,6 @@ export const searchProductsByManufacturerId = async (
   return result.rows.map((row) => ({
     id: row.id,
     manufacturerProductId: row.id,
-    shelfName: row.shelf_name,
     manufacturerName: row.manufacturer_name,
     janCode: row.jan_code,
     productName: row.product_name,
@@ -1910,10 +1927,43 @@ export const searchProductsByManufacturerId = async (
  */
 export const pruneByRetention = async (cutoffDate: Date): Promise<number> => {
   const result = await db.query(
-    `DELETE FROM entry_sheets WHERE created_at < $1`,
+    `DELETE FROM entry_sheets WHERE updated_at < $1`,
     [cutoffDate.toISOString()]
   );
   return result.rowCount;
+};
+
+export const pruneManufacturerProductsByRetention = async (cutoffDate: Date): Promise<number> => {
+  await ensureManufacturerProductTables();
+  const result = await db.query(
+    `DELETE FROM manufacturer_products WHERE last_used_at < $1`,
+    [cutoffDate.toISOString()]
+  );
+  return result.rowCount;
+};
+
+export const pruneRetentionIfDue = async (): Promise<{
+  deletedSheets: number;
+  deletedManufacturerProducts: number;
+}> => {
+  if (!shouldRunRetention()) {
+    return { deletedSheets: 0, deletedManufacturerProducts: 0 };
+  }
+  if (!pruneRetentionIfDuePromise) {
+    pruneRetentionIfDuePromise = db
+      .transaction(async () => {
+        const deletedSheets = await pruneByRetention(getSheetRetentionCutoff());
+        const deletedManufacturerProducts = await pruneManufacturerProductsByRetention(
+          getManufacturerProductRetentionCutoff()
+        );
+        markRetentionRun();
+        return { deletedSheets, deletedManufacturerProducts };
+      })
+      .finally(() => {
+        pruneRetentionIfDuePromise = null;
+      });
+  }
+  return pruneRetentionIfDuePromise;
 };
 
 export default {
@@ -1929,4 +1979,6 @@ export default {
   updateAdminMemoOnly,
   deleteById,
   pruneByRetention,
+  pruneManufacturerProductsByRetention,
+  pruneRetentionIfDue,
 };

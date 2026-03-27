@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS entry_sheets (
   creator_name_snapshot VARCHAR(200),
   creator_email_snapshot VARCHAR(255),
   creator_phone_snapshot VARCHAR(50),
+  shelf_name VARCHAR(200),
   title VARCHAR(500) NOT NULL,
   notes TEXT,
   deployment_start_month SMALLINT,
@@ -55,6 +56,9 @@ ALTER TABLE entry_sheets
 
 ALTER TABLE entry_sheets
   ADD COLUMN IF NOT EXISTS creator_phone_snapshot VARCHAR(50);
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS shelf_name VARCHAR(200);
 
 ALTER TABLE entry_sheets
   ADD COLUMN IF NOT EXISTS deployment_start_month SMALLINT;
@@ -111,7 +115,6 @@ CREATE TABLE IF NOT EXISTS manufacturer_products (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   manufacturer_id UUID NOT NULL REFERENCES manufacturers(id) ON DELETE CASCADE,
   jan_code VARCHAR(50) NOT NULL,
-  shelf_name VARCHAR(200) NOT NULL,
   product_name VARCHAR(500) NOT NULL,
   product_image_url TEXT,
   risk_classification VARCHAR(100),
@@ -130,6 +133,7 @@ CREATE TABLE IF NOT EXISTS manufacturer_products (
   promo_height NUMERIC(10, 2),
   promo_depth NUMERIC(10, 2),
   promo_image_url TEXT,
+  last_used_at TIMESTAMP NOT NULL DEFAULT NOW(),
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
   UNIQUE (manufacturer_id, jan_code)
@@ -139,6 +143,8 @@ CREATE INDEX IF NOT EXISTS idx_manufacturer_products_manufacturer
   ON manufacturer_products(manufacturer_id);
 CREATE INDEX IF NOT EXISTS idx_manufacturer_products_updated_at
   ON manufacturer_products(manufacturer_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_manufacturer_products_last_used_at
+  ON manufacturer_products(last_used_at);
 
 CREATE TABLE IF NOT EXISTS manufacturer_product_ingredients (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -155,7 +161,6 @@ CREATE TABLE IF NOT EXISTS product_entries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sheet_id UUID NOT NULL REFERENCES entry_sheets(id) ON DELETE CASCADE,
   manufacturer_product_id UUID REFERENCES manufacturer_products(id) ON DELETE SET NULL,
-  shelf_name VARCHAR(200) NOT NULL,
   manufacturer_id UUID NOT NULL REFERENCES manufacturers(id) ON DELETE RESTRICT,
   jan_code VARCHAR(50) NOT NULL,
   product_name VARCHAR(500) NOT NULL,
@@ -183,6 +188,12 @@ CREATE TABLE IF NOT EXISTS product_entries (
 CREATE INDEX IF NOT EXISTS idx_products_sheet ON product_entries(sheet_id);
 CREATE INDEX IF NOT EXISTS idx_products_jan_code ON product_entries(jan_code);
 CREATE INDEX IF NOT EXISTS idx_products_manufacturer ON product_entries(manufacturer_id);
+
+ALTER TABLE manufacturer_products
+  DROP COLUMN IF EXISTS shelf_name;
+
+ALTER TABLE product_entries
+  DROP COLUMN IF EXISTS shelf_name;
 
 -- 商品特定成分（多対多）
 CREATE TABLE IF NOT EXISTS product_ingredients (

@@ -35,6 +35,7 @@
 - 主項目:
   - `title`: シートタイトル
   - `notes`: 補足情報
+  - `shelf_name`: シート単位の棚割名
   - `deployment_start_month`: 展開スタート月（1〜12）
   - `admin_*`: 管理者メモ項目
   - `status`: `draft` / `completed` / `completed_no_image`
@@ -47,7 +48,7 @@
 - 外部キー:
   - `manufacturer_id -> manufacturers.id`
 - 主項目:
-  - `jan_code`, `shelf_name`, `product_name`
+  - `jan_code`, `product_name`
   - `product_image_url`
   - `risk_classification`
   - `catch_copy`, `product_message`, `product_notes`
@@ -55,9 +56,11 @@
   - `arrival_date`
   - `has_promo_material`
   - `promo_*`
-  - `created_at`, `updated_at`
+  - `last_used_at`, `created_at`, `updated_at`
 - 制約:
   - `UNIQUE (manufacturer_id, jan_code)`
+- 保持:
+  - `last_used_at` から2年で削除対象
 
 ## 5. `manufacturer_product_ingredients`
 
@@ -79,7 +82,7 @@
   - `manufacturer_product_id -> manufacturer_products.id`
   - `manufacturer_id -> manufacturers.id`
 - 主項目:
-  - `shelf_name`, `jan_code`, `product_name`
+  - `jan_code`, `product_name`
   - `product_image_url`
   - `risk_classification`
   - `catch_copy`, `product_message`, `product_notes`
@@ -236,15 +239,16 @@
 - DB制約:
   - `manufacturer_id`: `NOT NULL`, `FK`
   - `jan_code`: `NOT NULL`, `VARCHAR(50)`
-  - `shelf_name`: `NOT NULL`, `VARCHAR(200)`
   - `product_name`: `NOT NULL`, `VARCHAR(500)`
   - `has_promo_material`: `NOT NULL`, `BOOLEAN`
   - `UNIQUE (manufacturer_id, jan_code)`（メーカー内で JAN 一意）
 - 運用方針:
   - 過去商品検索の検索元として利用する
   - 保存時に `product_entries` と同一トランザクションで upsert する
+  - 利用時（シート保存で同期された時）に `last_used_at` を更新する
   - 途中失敗時はロールバックし、中途半端なマスタ更新を残さない
   - 一時移行用の補助カラムは追加しない
+  - `last_used_at` から2年経過した商品マスタは削除する
 
 ### 13.4 `product_entries`
 
@@ -252,7 +256,6 @@
   - `sheet_id`: `NOT NULL`, `FK`
   - `manufacturer_product_id`: `NULL許容`, `FK`
   - `manufacturer_id`: `NOT NULL`, `FK`
-  - `shelf_name`: `NOT NULL`, `VARCHAR(200)`
   - `jan_code`: `NOT NULL`, `VARCHAR(50)`
   - `product_name`: `NOT NULL`, `VARCHAR(500)`
   - `has_promo_material`: `NOT NULL`, `BOOLEAN`
@@ -261,7 +264,7 @@
     - 全角数字は半角へ正規化
     - `completed` 保存時は 8/13/16 桁のみ許可
   - テキスト系項目は最大4000文字
-    - `shelf_name`, `product_name`, `jan_code`, `catch_copy`, `product_message`, `product_notes`, `promo_sample`, `special_fixture`
+    - `product_name`, `jan_code`, `catch_copy`, `product_message`, `product_notes`, `promo_sample`, `special_fixture`
   - `completed` 保存時:
     - `product_name` / `jan_code` は必須
     - `product_image` が不足している場合は `completed_no_image` で保存

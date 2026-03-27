@@ -462,7 +462,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   };
 
   const toComparableProduct = (product: ProductEntry) => ({
-    shelfName: product.shelfName,
     manufacturerName: product.manufacturerName,
     janCode: product.janCode,
     productName: normalizeProductName(product.productName || ''),
@@ -570,10 +569,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   };
 
   const addProduct = () => {
-    const shelfOptions = getShelfOptions();
     const newProduct: ProductEntry = {
       id: uuidv4(),
-      shelfName: shelfOptions[0] || '',
       manufacturerName: formData.manufacturerName,
       janCode: '',
       productName: '',
@@ -851,6 +848,16 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <div className="col-span-1 md:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">棚割名 <span className="text-danger">*</span></label>
+                    <select
+                        className="w-full border-slate-300 rounded-lg py-3 px-3 bg-white"
+                        value={formData.shelfName || ''}
+                        onChange={(e) => handleHeaderChange('shelfName', e.target.value)}
+                    >
+                        {getShelfOptions().map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                </div>
+                <div className="col-span-1 md:col-span-2">
                     <label className="block text-sm font-bold text-slate-700 mb-2">タイトル <span className="text-danger">*</span></label>
                     <input 
                         type="text" 
@@ -1114,7 +1121,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                           {item.productName}
                         </div>
                         <div className="text-[11px] text-slate-500 truncate">
-                          JAN: {item.janCode} / 棚割名: {item.shelfName}
+                          JAN: {item.janCode}
                         </div>
                       </div>
                     </button>
@@ -1132,20 +1139,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                 商品情報
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">棚割名 <span className="text-danger">*</span></label>
-                    <select 
-                        className="w-full border-slate-300 rounded-lg py-3 px-3 bg-white"
-                        value={activeProduct.shelfName}
-                        onChange={(e) => handleProductChange(activeTab, 'shelfName', e.target.value)}
-                    >
-                        {getShelfOptions().map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
-                </div>
-                <div>
-                     <label className="block text-sm font-bold text-slate-700 mb-2">メーカー名 <span className="text-danger">*</span></label>
-                     {renderAutoValue(activeProduct.manufacturerName)}
-                </div>
                  <div>
                      <label className="block text-sm font-bold text-slate-700 mb-2">JANコード <span className="text-danger">*</span> <span className="text-xs font-normal text-slate-500">(8, 13, 16桁)</span></label>
                      <input 

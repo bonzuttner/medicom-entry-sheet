@@ -126,14 +126,7 @@ export const EntryList: React.FC<EntryListProps> = ({
     if (!period.start || !period.end) return '未設定';
     return `${period.start}~${period.end}`;
   };
-  const getSheetShelfNames = (sheet: EntrySheet): string =>
-    Array.from(
-      new Set(
-        sheet.products
-          .map((product) => (product.shelfName || '').trim())
-          .filter((name) => name.length > 0)
-      )
-    ).join(' / ') || '未設定';
+  const getSheetShelfNames = (sheet: EntrySheet): string => sheet.shelfName?.trim() || '未設定';
 
   const getSheetTimestampBy = (
     sheet: EntrySheet,
@@ -320,7 +313,7 @@ export const EntryList: React.FC<EntryListProps> = ({
           toSafeCsvCell(sheetAttachmentTypes),
           toSafeCsvCell(sheetAttachmentUrls),
           toSafeCsvCell(prod.id),
-          toSafeCsvCell(prod.shelfName),
+          toSafeCsvCell(sheet.shelfName || ''),
           toSafeCsvCell(prod.manufacturerName),
           toSafeCsvCell(prod.janCode),
           toSafeCsvCell(prod.productName),
@@ -544,7 +537,7 @@ export const EntryList: React.FC<EntryListProps> = ({
                     </div>
                     <div className="min-w-0 flex-1">
                         <div className="flex justify-between items-start">
-                            <div className="text-xs text-primary font-bold mb-0.5">{prod.shelfName}</div>
+                            <div className="text-xs text-primary font-bold mb-0.5">{sheet.shelfName || '未設定'}</div>
                             {status.icon && <div title={status.statusText}>{status.icon}</div>}
                         </div>
                         <div className="text-sm font-bold text-slate-800 truncate" title={prod.productName}>{prod.productName || '(名称未設定)'}</div>

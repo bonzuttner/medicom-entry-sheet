@@ -43,7 +43,6 @@ export interface EntrySheetAdminMemo {
 export interface ProductEntry {
   id: string;
   manufacturerProductId?: string;
-  shelfName: string; // Master: Pull-down
   manufacturerName: string; // Server-side normalized to sheet manufacturer
   janCode: string; // 8, 13, or 16 digits
   productName: string;
@@ -85,6 +84,7 @@ export interface EntrySheet {
   manufacturerName: string; // Auto
   email: string; // Auto (Editable)
   phoneNumber: string; // Auto (Editable)
+  shelfName: string;
   title: string;
   notes?: string;
   deploymentStartMonth?: number;

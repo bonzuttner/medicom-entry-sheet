@@ -39,7 +39,6 @@ export interface EntrySheetAdminMemo {
 export interface ProductEntry {
   id: string;
   manufacturerProductId?: string;
-  shelfName: string;
   manufacturerName: string;
   janCode: string;
   productName: string;
@@ -74,6 +73,7 @@ export interface EntrySheet {
   manufacturerName: string;
   email: string;
   phoneNumber: string;
+  shelfName: string;
   title: string;
   notes?: string;
   deploymentStartMonth?: number;

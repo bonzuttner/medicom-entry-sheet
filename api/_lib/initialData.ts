@@ -66,6 +66,7 @@ const buildInitialSheets = (): EntrySheet[] => {
       creatorId: 'user1',
       creatorName: '佐藤 健太',
       manufacturerName: '大江戸製薬',
+      shelfName: '胃腸薬',
       email: 'k.satou@oedo-pharma.com',
       phoneNumber: '090-1234-5678',
       title: '【テスト】春の売場強化施策',
@@ -73,7 +74,6 @@ const buildInitialSheets = (): EntrySheet[] => {
       products: [
         {
           id: 'prod-1',
-          shelfName: '胃腸薬',
           manufacturerName: '大江戸製薬',
           janCode: '4900000000001',
           productName: '大江戸胃腸薬A',
@@ -97,6 +97,7 @@ const buildInitialSheets = (): EntrySheet[] => {
       creatorId: 'user2',
       creatorName: '田中 美咲',
       manufacturerName: '富士ファーマ',
+      shelfName: '目薬',
       email: 'm.tanaka@fuji-pharma.com',
       phoneNumber: '080-9876-5432',
       title: '【テスト】夏季キャンペーン',
@@ -104,7 +105,6 @@ const buildInitialSheets = (): EntrySheet[] => {
       products: [
         {
           id: 'prod-2',
-          shelfName: '目薬',
           manufacturerName: '富士ファーマ',
           janCode: '4900000000002',
           productName: 'スッキリ目薬クール',
