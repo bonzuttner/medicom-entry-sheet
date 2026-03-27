@@ -943,7 +943,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                         value={formData.notes || ''}
                         onChange={(e) => handleHeaderChange('notes', e.target.value)}
                         className="w-full border-slate-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary p-3"
-                        placeholder="自由入力"
+                        placeholder="エントリーシートのコンセプトをご記載ください"
                     />
                 </div>
                 <div className="col-span-1 md:col-span-2">
