@@ -109,6 +109,14 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     );
   };
 
+  const getCaseOptions = (): string[] => {
+    return (
+      masterData.manufacturerCaseNames?.[formData.manufacturerName] ||
+      masterData.caseNames ||
+      []
+    );
+  };
+
   const runProductSearch = async () => {
     setIsSearchingProducts(true);
     try {
@@ -866,6 +874,17 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                         className="w-full border-slate-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary py-3 px-4 text-base sm:text-lg" 
                         placeholder="例：2024年秋の新商品プロモーション"
                     />
+                </div>
+                <div className="col-span-1 md:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">案件</label>
+                    <select
+                        className="w-full border-slate-300 rounded-lg py-3 px-3 bg-white"
+                        value={formData.caseName || ''}
+                        onChange={(e) => handleHeaderChange('caseName', e.target.value)}
+                    >
+                        <option value="">未設定</option>
+                        {getCaseOptions().map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
                 </div>
                 <div className="col-span-1 md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6 items-start">

@@ -14,6 +14,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [selectedManufacturer, setSelectedManufacturer] = useState('');
   const [shelfInput, setShelfInput] = useState('');
+  const [caseInput, setCaseInput] = useState('');
 
   useEffect(() => {
     setLocalData(data);
@@ -69,6 +70,20 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
     );
   };
 
+  const getCaseNamesForSelectedManufacturer = (): string[] => {
+    if (!selectedManufacturer || selectedManufacturer === ALL_MANUFACTURERS) return [];
+    return localData.manufacturerCaseNames?.[selectedManufacturer] || [];
+  };
+
+  const getAllCaseNames = (): Array<{ manufacturer: string; caseName: string }> => {
+    return localData.manufacturerNames.flatMap((manufacturer) =>
+      (localData.manufacturerCaseNames?.[manufacturer] || []).map((caseName) => ({
+        manufacturer,
+        caseName,
+      }))
+    );
+  };
+
   const addShelfName = async (rawValue: string) => {
     const value = normalizeItem(rawValue);
     if (!value || !selectedManufacturer || selectedManufacturer === ALL_MANUFACTURERS) return;
@@ -102,6 +117,41 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
       [manufacturer]: current.filter((v) => v !== value),
     };
     await persist({ ...localData, manufacturerShelfNames });
+  };
+
+  const addCaseName = async (rawValue: string) => {
+    const value = normalizeItem(rawValue);
+    if (!value || !selectedManufacturer || selectedManufacturer === ALL_MANUFACTURERS) return;
+    const current = getCaseNamesForSelectedManufacturer();
+    if (current.some((existing) => existing.trim() === value)) {
+      return;
+    }
+    const manufacturerCaseNames = {
+      ...(localData.manufacturerCaseNames || {}),
+      [selectedManufacturer]: [...current, value],
+    };
+    await persist({ ...localData, manufacturerCaseNames });
+  };
+
+  const removeCaseName = async (value: string) => {
+    if (!selectedManufacturer || selectedManufacturer === ALL_MANUFACTURERS) return;
+    if (!window.confirm(`「${value}」を削除しますか？`)) return;
+    const current = getCaseNamesForSelectedManufacturer();
+    const manufacturerCaseNames = {
+      ...(localData.manufacturerCaseNames || {}),
+      [selectedManufacturer]: current.filter((v) => v !== value),
+    };
+    await persist({ ...localData, manufacturerCaseNames });
+  };
+
+  const removeCaseNameByManufacturer = async (manufacturer: string, value: string) => {
+    if (!window.confirm(`「${manufacturer} / ${value}」を削除しますか？`)) return;
+    const current = localData.manufacturerCaseNames?.[manufacturer] || [];
+    const manufacturerCaseNames = {
+      ...(localData.manufacturerCaseNames || {}),
+      [manufacturer]: current.filter((v) => v !== value),
+    };
+    await persist({ ...localData, manufacturerCaseNames });
   };
 
   const monthLabels = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
@@ -153,7 +203,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
               </select>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
               <div className="rounded-lg border border-slate-200 p-3">
                 <h4 className="font-semibold text-slate-800 mb-2">棚割名</h4>
                 {selectedManufacturer === ALL_MANUFACTURERS ? (
@@ -211,6 +261,74 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
                         onClick={async () => {
                           await addShelfName(shelfInput);
                           setShelfInput('');
+                        }}
+                        disabled={isSaving}
+                        className="bg-secondary text-white px-3 py-1.5 rounded-md hover:bg-slate-600 text-sm flex items-center gap-1"
+                      >
+                        <Plus size={14} /> 追加
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="rounded-lg border border-slate-200 p-3">
+                <h4 className="font-semibold text-slate-800 mb-2">案件</h4>
+                {selectedManufacturer === ALL_MANUFACTURERS ? (
+                  <div className="space-y-2 max-h-64 overflow-auto">
+                    {getAllCaseNames().length === 0 ? (
+                      <p className="text-xs text-slate-500">案件はまだありません。</p>
+                    ) : (
+                      getAllCaseNames().map((item, index) => (
+                        <div
+                          key={`${item.manufacturer}-${item.caseName}-${index}`}
+                          className="px-2.5 py-1.5 rounded-md bg-slate-50 border border-slate-200 text-xs flex items-center justify-between gap-2"
+                        >
+                          <div className="min-w-0">
+                            <span className="font-semibold text-slate-700">{item.manufacturer}</span>
+                            <span className="text-slate-400 mx-1.5">/</span>
+                            <span className="text-slate-700">{item.caseName}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void removeCaseNameByManufacturer(item.manufacturer, item.caseName);
+                            }}
+                            className="text-slate-400 hover:text-danger shrink-0"
+                            title="削除"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {getCaseNamesForSelectedManufacturer().map((item) => (
+                        <span
+                          key={item}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-full text-slate-700 text-xs"
+                        >
+                          {item}
+                          <button onClick={() => void removeCaseName(item)} className="hover:text-danger">
+                            <X size={12} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        className="flex-1 border border-slate-300 rounded-md px-3 py-1.5 text-sm"
+                        placeholder="案件を追加"
+                        value={caseInput}
+                        onChange={(e) => setCaseInput(e.target.value)}
+                      />
+                      <button
+                        onClick={async () => {
+                          await addCaseName(caseInput);
+                          setCaseInput('');
                         }}
                         disabled={isSaving}
                         className="bg-secondary text-white px-3 py-1.5 rounded-md hover:bg-slate-600 text-sm flex items-center gap-1"

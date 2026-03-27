@@ -50,6 +50,7 @@ const isTooLong = (value: string | undefined): boolean =>
 
 const findTooLongField = (sheet: EntrySheet): string | null => {
   if (isTooLong(sheet.title)) return 'タイトル';
+  if (isTooLong(sheet.caseName)) return '案件';
   if (isTooLong(sheet.notes)) return 'エントリシート補足情報';
   if (isTooLong(sheet.shelfName)) return '棚割名';
   if (isTooLong(sheet.email)) return '担当者メール';
@@ -207,6 +208,7 @@ const toComparableSheetCore = (sheet: EntrySheet) => ({
   email: normalizeOptionalString(sheet.email),
   phoneNumber: normalizeOptionalString(sheet.phoneNumber),
   title: normalizeOptionalString(sheet.title),
+  caseName: normalizeOptionalString(sheet.caseName),
   notes: normalizeOptionalString(sheet.notes),
   shelfName: normalizeOptionalString(sheet.shelfName),
   deploymentStartMonth: normalizeOptionalNumberForCompare(sheet.deploymentStartMonth),
@@ -245,6 +247,7 @@ const buildRevisionSummary = (before: EntrySheet | null, after: EntrySheet): str
   };
 
   pushChange('タイトル', before.title, after.title);
+  pushChange('案件', before.caseName || '', after.caseName || '');
   pushChange('補足', before.notes || '', after.notes || '');
   pushChange('棚割名', before.shelfName || '', after.shelfName || '');
   pushChange('担当者名', before.creatorName, after.creatorName);
@@ -413,6 +416,7 @@ export default async function handler(req: any, res: any) {
       email: String(sheet.email || existingSheet?.email || currentUser.email || '').trim(),
       phoneNumber: String(sheet.phoneNumber || existingSheet?.phoneNumber || currentUser.phoneNumber || '').trim(),
       title: String(sheet.title || '').trim(),
+      caseName: String(sheet.caseName || existingSheet?.caseName || '').trim(),
       notes: sheet.notes ? String(sheet.notes).trim() : '',
       shelfName: String(sheet.shelfName || existingSheet?.shelfName || '').trim(),
       deploymentStartMonth: resolvedStartMonth,

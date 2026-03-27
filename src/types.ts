@@ -17,9 +17,11 @@ export interface User {
 export interface MasterData {
   manufacturerNames: string[];
   shelfNames: string[];
+  caseNames: string[];
   riskClassifications: string[];
   specificIngredients: string[];
   manufacturerShelfNames?: Record<string, string[]>;
+  manufacturerCaseNames?: Record<string, string[]>;
   manufacturerDefaultStartMonths?: Record<string, number[]>;
 }
 
@@ -86,6 +88,7 @@ export interface EntrySheet {
   phoneNumber: string; // Auto (Editable)
   shelfName: string;
   title: string;
+  caseName: string;
   notes?: string;
   deploymentStartMonth?: number;
   deploymentEndMonth?: number;

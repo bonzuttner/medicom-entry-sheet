@@ -37,6 +37,7 @@ const INITIAL_USERS: User[] = [
 const INITIAL_MASTER: MasterData = {
   manufacturerNames: ['メディコム', '大江戸製薬', '富士ファーマ'],
   shelfNames: ['胃腸薬', '風邪薬', '鎮痛剤', 'ビタミン剤', '目薬', '皮膚用薬'],
+  caseNames: [],
   riskClassifications: [
     '第1類医薬品',
     '指定第2類医薬品',
@@ -67,6 +68,7 @@ const buildInitialSheets = (): EntrySheet[] => {
       creatorName: '佐藤 健太',
       manufacturerName: '大江戸製薬',
       shelfName: '胃腸薬',
+      caseName: '',
       email: 'k.satou@oedo-pharma.com',
       phoneNumber: '090-1234-5678',
       title: '【テスト】春の売場強化施策',
@@ -98,6 +100,7 @@ const buildInitialSheets = (): EntrySheet[] => {
       creatorName: '田中 美咲',
       manufacturerName: '富士ファーマ',
       shelfName: '目薬',
+      caseName: '',
       email: 'm.tanaka@fuji-pharma.com',
       phoneNumber: '080-9876-5432',
       title: '【テスト】夏季キャンペーン',

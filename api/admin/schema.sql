@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS entry_sheets (
   creator_phone_snapshot VARCHAR(50),
   shelf_name VARCHAR(200),
   title VARCHAR(500) NOT NULL,
+  case_name VARCHAR(200),
   notes TEXT,
   deployment_start_month SMALLINT,
   deployment_end_month SMALLINT,
@@ -59,6 +60,9 @@ ALTER TABLE entry_sheets
 
 ALTER TABLE entry_sheets
   ADD COLUMN IF NOT EXISTS shelf_name VARCHAR(200);
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS case_name VARCHAR(200);
 
 ALTER TABLE entry_sheets
   ADD COLUMN IF NOT EXISTS deployment_start_month SMALLINT;
@@ -246,6 +250,19 @@ CREATE TABLE IF NOT EXISTS manufacturer_shelf_names (
 
 CREATE INDEX IF NOT EXISTS idx_manufacturer_shelf_names_manufacturer
   ON manufacturer_shelf_names(manufacturer_id, display_order);
+
+-- メーカー別案件マスタ
+CREATE TABLE IF NOT EXISTS manufacturer_case_names (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  manufacturer_id UUID NOT NULL REFERENCES manufacturers(id) ON DELETE CASCADE,
+  case_name VARCHAR(200) NOT NULL,
+  display_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE (manufacturer_id, case_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_manufacturer_case_names_manufacturer
+  ON manufacturer_case_names(manufacturer_id, display_order);
 
 -- メーカー別デフォルト展開スタート月
 CREATE TABLE IF NOT EXISTS manufacturer_default_start_months (

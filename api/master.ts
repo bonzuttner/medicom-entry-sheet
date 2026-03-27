@@ -13,6 +13,7 @@ const findTooLongMasterValue = (data: MasterData): string | null => {
   const categories: Array<{ label: string; values: string[] }> = [
     { label: 'メーカー名', values: data.manufacturerNames || [] },
     { label: '棚割名', values: data.shelfNames || [] },
+    { label: '案件', values: data.caseNames || [] },
     { label: 'リスク分類', values: data.riskClassifications || [] },
     { label: '特定成分', values: data.specificIngredients || [] },
   ];
@@ -49,6 +50,18 @@ const findTooLongMasterValue = (data: MasterData): string | null => {
     }
   }
 
+  const caseMap = data.manufacturerCaseNames || {};
+  for (const [manufacturerName, caseNames] of Object.entries(caseMap)) {
+    if (manufacturerName.length > MAX_MASTER_VALUE_LENGTH) {
+      return 'メーカー名';
+    }
+    for (const value of caseNames) {
+      if (typeof value === 'string' && value.length > MAX_MASTER_VALUE_LENGTH) {
+        return '案件';
+      }
+    }
+  }
+
   return null;
 };
 
@@ -63,22 +76,29 @@ export default async function handler(req: any, res: any) {
     const shelfNamesForCurrentUser = await MasterRepository.getShelfNamesByManufacturerName(
       currentUser.manufacturerName
     );
+    const caseNamesForCurrentUser = await MasterRepository.getCaseNamesByManufacturerName(
+      currentUser.manufacturerName
+    );
     if (!isAdmin(currentUser)) {
       sendJson(res, 200, {
         manufacturerNames: [],
         shelfNames: shelfNamesForCurrentUser,
+        caseNames: caseNamesForCurrentUser,
         riskClassifications: masterData.riskClassifications,
         specificIngredients: masterData.specificIngredients,
       });
       return;
     }
     const manufacturerShelfNames = await MasterRepository.getManufacturerShelfNamesMap();
+    const manufacturerCaseNames = await MasterRepository.getManufacturerCaseNamesMap();
     const manufacturerDefaultStartMonths =
       await MasterRepository.getManufacturerDefaultStartMonthsMap();
     sendJson(res, 200, {
       ...masterData,
       shelfNames: shelfNamesForCurrentUser,
+      caseNames: caseNamesForCurrentUser,
       manufacturerShelfNames,
+      manufacturerCaseNames,
       manufacturerDefaultStartMonths,
     });
     return;
@@ -112,6 +132,13 @@ export default async function handler(req: any, res: any) {
       );
       await MasterRepository.updateManufacturerShelfNamesMap(normalizedShelfMap);
     }
+    if (Object.prototype.hasOwnProperty.call(body.data, 'manufacturerCaseNames')) {
+      const caseMap = body.data.manufacturerCaseNames || {};
+      const normalizedCaseMap = Object.fromEntries(
+        (body.data.manufacturerNames || []).map((name) => [name, caseMap[name] || []])
+      );
+      await MasterRepository.updateManufacturerCaseNamesMap(normalizedCaseMap);
+    }
     if (Object.prototype.hasOwnProperty.call(body.data, 'manufacturerDefaultStartMonths')) {
       const monthMap = body.data.manufacturerDefaultStartMonths || {};
       const normalizedMonthMap = Object.fromEntries(
@@ -125,13 +152,19 @@ export default async function handler(req: any, res: any) {
     const shelfNamesForCurrentUser = await MasterRepository.getShelfNamesByManufacturerName(
       currentUser.manufacturerName
     );
+    const caseNamesForCurrentUser = await MasterRepository.getCaseNamesByManufacturerName(
+      currentUser.manufacturerName
+    );
     const manufacturerShelfNames = await MasterRepository.getManufacturerShelfNamesMap();
+    const manufacturerCaseNames = await MasterRepository.getManufacturerCaseNamesMap();
     const manufacturerDefaultStartMonths =
       await MasterRepository.getManufacturerDefaultStartMonthsMap();
     sendJson(res, 200, {
       ...updated,
       shelfNames: shelfNamesForCurrentUser,
+      caseNames: caseNamesForCurrentUser,
       manufacturerShelfNames,
+      manufacturerCaseNames,
       manufacturerDefaultStartMonths,
     });
     return;

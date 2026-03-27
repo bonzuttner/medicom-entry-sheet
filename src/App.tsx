@@ -21,9 +21,11 @@ import { v4 as uuidv4 } from 'uuid';
 const EMPTY_MASTER_DATA: MasterData = {
   manufacturerNames: [],
   shelfNames: [],
+  caseNames: [],
   riskClassifications: [],
   specificIngredients: [],
   manufacturerShelfNames: {},
+  manufacturerCaseNames: {},
   manufacturerDefaultStartMonths: {},
 };
 
@@ -100,6 +102,7 @@ const toComparableSheetCore = (sheet: EntrySheet) => ({
   email: normalizeOptionalString(sheet.email),
   phoneNumber: normalizeOptionalString(sheet.phoneNumber),
   title: normalizeOptionalString(sheet.title),
+  caseName: normalizeOptionalString(sheet.caseName),
   notes: normalizeOptionalString(sheet.notes),
   shelfName: normalizeOptionalString(sheet.shelfName),
   deploymentStartMonth: normalizeOptionalNumber(sheet.deploymentStartMonth),
@@ -371,6 +374,8 @@ const App: React.FC = () => {
     if (!currentUser) return;
     const shelfOptions =
       masterData.manufacturerShelfNames?.[currentUser.manufacturerName] || masterData.shelfNames;
+    const caseOptions =
+      masterData.manufacturerCaseNames?.[currentUser.manufacturerName] || masterData.caseNames;
     const newSheet: EntrySheet = {
       id: uuidv4(),
       version: 1,
@@ -380,6 +385,7 @@ const App: React.FC = () => {
       creatorName: currentUser.displayName,
       manufacturerName: currentUser.manufacturerName,
       shelfName: shelfOptions[0] || '',
+      caseName: caseOptions[0] || '',
       email: currentUser.email,
       phoneNumber: currentUser.phoneNumber,
       title: '',

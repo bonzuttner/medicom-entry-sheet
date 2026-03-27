@@ -25,6 +25,7 @@ interface SheetRow {
   creator_email: string;
   creator_phone: string;
   shelf_name: string | null;
+  case_name: string | null;
   title: string;
   notes: string | null;
   deployment_start_month: number | null;
@@ -352,6 +353,10 @@ const ensureDeploymentColumns = async (): Promise<void> => {
         `ALTER TABLE entry_sheets
          ADD COLUMN IF NOT EXISTS shelf_name VARCHAR(200)`
       );
+      await db.query(
+        `ALTER TABLE entry_sheets
+         ADD COLUMN IF NOT EXISTS case_name VARCHAR(200)`
+      );
     })().catch((error) => {
       ensureDeploymentColumnsPromise = null;
       throw error;
@@ -596,6 +601,7 @@ const rowsToSheet = (
     creatorName: sheetRow.creator_name,
     manufacturerName: sheetRow.manufacturer_name,
     shelfName: sheetRow.shelf_name || '',
+    caseName: sheetRow.case_name || '',
     email: sheetRow.creator_email,
     phoneNumber: sheetRow.creator_phone,
     title: sheetRow.title,
@@ -888,7 +894,7 @@ export const findAll = async (limit?: number, offset: number = 0): Promise<Entry
   const sheetQuery = `
     SELECT
       s.id, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
-      s.shelf_name, s.deployment_start_month, s.deployment_end_month,
+      s.shelf_name, s.case_name, s.deployment_start_month, s.deployment_end_month,
       s.created_at, s.updated_at,
       COALESCE(s.creator_name_snapshot, u.display_name, '') as creator_name,
       COALESCE(s.creator_email_snapshot, u.email, '') as creator_email,
@@ -987,7 +993,7 @@ export const findByManufacturerId = async (
   const sheetQuery = `
     SELECT
       s.id, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
-      s.shelf_name, s.deployment_start_month, s.deployment_end_month,
+      s.shelf_name, s.case_name, s.deployment_start_month, s.deployment_end_month,
       s.created_at, s.updated_at,
       COALESCE(s.creator_name_snapshot, u.display_name, '') as creator_name,
       COALESCE(s.creator_email_snapshot, u.email, '') as creator_email,
@@ -1098,7 +1104,7 @@ export const findById = async (sheetId: string): Promise<EntrySheet | null> => {
     `
     SELECT
       s.id, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
-      s.shelf_name, s.deployment_start_month, s.deployment_end_month,
+      s.shelf_name, s.case_name, s.deployment_start_month, s.deployment_end_month,
       s.created_at, s.updated_at,
       COALESCE(s.creator_name_snapshot, u.display_name, '') as creator_name,
       COALESCE(s.creator_email_snapshot, u.email, '') as creator_email,
@@ -1197,6 +1203,7 @@ export const upsert = async (
           : 1,
       creatorName: String(sheet.creatorName || '').trim(),
       title: String(sheet.title || '').trim(),
+      caseName: String(sheet.caseName || '').trim(),
       notes: sheet.notes ? String(sheet.notes).trim() : '',
       deploymentStartMonth:
         Number.isInteger(Number(sheet.deploymentStartMonth)) &&
@@ -1284,15 +1291,16 @@ export const upsert = async (
       INSERT INTO entry_sheets (
         id, version, creator_id, manufacturer_id,
         creator_name_snapshot, creator_email_snapshot, creator_phone_snapshot,
-        title, notes, shelf_name, deployment_start_month, deployment_end_month,
+        title, case_name, notes, shelf_name, deployment_start_month, deployment_end_month,
         status, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       ON CONFLICT (id) DO UPDATE SET
         version = EXCLUDED.version,
         creator_name_snapshot = EXCLUDED.creator_name_snapshot,
         creator_email_snapshot = EXCLUDED.creator_email_snapshot,
         creator_phone_snapshot = EXCLUDED.creator_phone_snapshot,
         title = EXCLUDED.title,
+        case_name = EXCLUDED.case_name,
         notes = EXCLUDED.notes,
         shelf_name = EXCLUDED.shelf_name,
         deployment_start_month = EXCLUDED.deployment_start_month,
@@ -1309,6 +1317,7 @@ export const upsert = async (
         normalizedSheet.email || null,
         normalizedSheet.phoneNumber || null,
         normalizedSheet.title,
+        normalizedSheet.caseName || null,
         normalizedSheet.notes || null,
         normalizedSheet.shelfName || null,
         normalizedSheet.deploymentStartMonth ?? null,

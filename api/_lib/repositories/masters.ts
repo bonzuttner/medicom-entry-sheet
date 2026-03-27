@@ -20,6 +20,12 @@ interface ManufacturerShelfNameRow {
   display_order: number;
 }
 
+interface ManufacturerCaseNameRow {
+  manufacturer_name: string;
+  case_name: string;
+  display_order: number;
+}
+
 interface ManufacturerDefaultStartMonthRow {
   manufacturer_name: string;
   month: number;
@@ -27,6 +33,7 @@ interface ManufacturerDefaultStartMonthRow {
 }
 
 let ensureManufacturerShelfTablePromise: Promise<void> | null = null;
+let ensureManufacturerCaseTablePromise: Promise<void> | null = null;
 let ensureManufacturerDefaultStartMonthsTablePromise: Promise<void> | null = null;
 
 const ensureManufacturerShelfTable = async (): Promise<void> => {
@@ -56,6 +63,35 @@ const ensureManufacturerShelfTable = async (): Promise<void> => {
     });
   }
   await ensureManufacturerShelfTablePromise;
+};
+
+const ensureManufacturerCaseTable = async (): Promise<void> => {
+  if (!ensureManufacturerCaseTablePromise) {
+    ensureManufacturerCaseTablePromise = (async () => {
+      await db.query(
+        `
+        CREATE TABLE IF NOT EXISTS manufacturer_case_names (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          manufacturer_id UUID NOT NULL REFERENCES manufacturers(id) ON DELETE CASCADE,
+          case_name VARCHAR(200) NOT NULL,
+          display_order INTEGER NOT NULL DEFAULT 0,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          UNIQUE (manufacturer_id, case_name)
+        )
+        `
+      );
+      await db.query(
+        `
+        CREATE INDEX IF NOT EXISTS idx_manufacturer_case_names_manufacturer
+        ON manufacturer_case_names(manufacturer_id, display_order)
+        `
+      );
+    })().catch((error) => {
+      ensureManufacturerCaseTablePromise = null;
+      throw error;
+    });
+  }
+  await ensureManufacturerCaseTablePromise;
 };
 
 const ensureManufacturerDefaultStartMonthsTable = async (): Promise<void> => {
@@ -156,6 +192,7 @@ export const getAll = async (): Promise<MasterData> => {
   return {
     manufacturerNames,
     shelfNames,
+    caseNames: [],
     riskClassifications,
     specificIngredients,
   };
@@ -178,6 +215,27 @@ export const getManufacturerShelfNamesMap = async (): Promise<Record<string, str
       map[row.manufacturer_name] = [];
     }
     map[row.manufacturer_name].push(row.shelf_name);
+  }
+  return map;
+};
+
+export const getManufacturerCaseNamesMap = async (): Promise<Record<string, string[]>> => {
+  await ensureManufacturerCaseTable();
+  const result = await db.query<ManufacturerCaseNameRow>(
+    `
+    SELECT m.name as manufacturer_name, mcn.case_name, mcn.display_order
+    FROM manufacturer_case_names mcn
+    JOIN manufacturers m ON mcn.manufacturer_id = m.id
+    ORDER BY m.name, mcn.display_order
+    `
+  );
+
+  const map: Record<string, string[]> = {};
+  for (const row of result.rows) {
+    if (!map[row.manufacturer_name]) {
+      map[row.manufacturer_name] = [];
+    }
+    map[row.manufacturer_name].push(row.case_name);
   }
   return map;
 };
@@ -220,6 +278,23 @@ export const getShelfNamesByManufacturerName = async (
   return result.rows.map((row) => row.shelf_name);
 };
 
+export const getCaseNamesByManufacturerName = async (
+  manufacturerName: string
+): Promise<string[]> => {
+  await ensureManufacturerCaseTable();
+  const result = await db.query<{ case_name: string; display_order: number }>(
+    `
+    SELECT mcn.case_name, mcn.display_order
+    FROM manufacturer_case_names mcn
+    JOIN manufacturers m ON mcn.manufacturer_id = m.id
+    WHERE m.name = $1
+    ORDER BY mcn.display_order
+    `,
+    [manufacturerName]
+  );
+  return result.rows.map((row) => row.case_name);
+};
+
 export const updateManufacturerShelfNamesMap = async (
   nextMap: Record<string, string[]>
 ): Promise<void> => {
@@ -241,6 +316,39 @@ export const updateManufacturerShelfNamesMap = async (
         await db.query(
           `
           INSERT INTO manufacturer_shelf_names (manufacturer_id, shelf_name, display_order)
+          SELECT
+            $1,
+            items.value,
+            (items.ord - 1)::int
+          FROM unnest($2::text[]) WITH ORDINALITY AS items(value, ord)
+          `,
+          [manufacturerId, desired]
+        );
+      }
+    }
+  });
+};
+
+export const updateManufacturerCaseNamesMap = async (
+  nextMap: Record<string, string[]>
+): Promise<void> => {
+  await ensureManufacturerCaseTable();
+  await db.transaction(async () => {
+    for (const [manufacturerName, values] of Object.entries(nextMap)) {
+      const normalizedManufacturerName = String(manufacturerName || '').trim();
+      if (!normalizedManufacturerName) continue;
+
+      const manufacturerId = await ensureManufacturer(normalizedManufacturerName);
+      const desired = [...new Set(values.map((v) => String(v || '').trim()).filter(Boolean))];
+
+      await db.query(`DELETE FROM manufacturer_case_names WHERE manufacturer_id = $1`, [
+        manufacturerId,
+      ]);
+
+      if (desired.length > 0) {
+        await db.query(
+          `
+          INSERT INTO manufacturer_case_names (manufacturer_id, case_name, display_order)
           SELECT
             $1,
             items.value,
@@ -299,6 +407,7 @@ export const updateAll = async (masterData: MasterData): Promise<MasterData> => 
   const normalizedData: MasterData = {
     manufacturerNames: [...new Set(masterData.manufacturerNames.map((v) => v.trim()).filter(Boolean))],
     shelfNames: [...new Set(masterData.shelfNames.map((v) => v.trim()).filter(Boolean))],
+    caseNames: [...new Set((masterData.caseNames || []).map((v) => v.trim()).filter(Boolean))],
     riskClassifications: [
       ...new Set(masterData.riskClassifications.map((v) => v.trim()).filter(Boolean)),
     ],
@@ -404,9 +513,12 @@ export const removeValue = async (category: string, value: string): Promise<void
 export default {
   getAll,
   getManufacturerShelfNamesMap,
+  getManufacturerCaseNamesMap,
   getManufacturerDefaultStartMonthsMap,
   getShelfNamesByManufacturerName,
+  getCaseNamesByManufacturerName,
   updateManufacturerShelfNamesMap,
+  updateManufacturerCaseNamesMap,
   updateManufacturerDefaultStartMonthsMap,
   updateAll,
   addValue,
