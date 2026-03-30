@@ -482,7 +482,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
         <table className="min-w-[1380px] w-full divide-y divide-slate-200 table-fixed">
           <thead className="bg-slate-50 [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-slate-50">
             <tr>
-              <th className="sticky left-0 top-0 z-40 w-[52px] px-2 py-3 text-center text-xs font-bold text-slate-500 bg-slate-50 shadow-[1px_0_0_0_rgba(226,232,240,1)]">
+              <th className="sticky left-0 top-0 z-50 w-[52px] px-2 py-3 text-center text-xs font-bold text-slate-500 bg-slate-50 shadow-[1px_0_0_0_rgba(226,232,240,1)]">
                 <button onClick={toggleSelectAll} className="inline-flex items-center justify-center text-slate-500 hover:text-slate-700">
                   {filteredSheets.length > 0 && selectedCount === filteredSheets.length ? (
                     <CheckSquare size={15} />
@@ -491,7 +491,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                   )}
                 </button>
               </th>
-              <th className="w-[62px] px-1 py-3 text-left text-[10px] font-bold text-slate-400">ID</th>
+              <th className="sticky left-[52px] top-0 z-40 w-[96px] px-1 py-3 text-left text-[10px] font-bold text-slate-400 bg-slate-50 shadow-[1px_0_0_0_rgba(226,232,240,1)]">ID</th>
               <th className="w-[42px] px-1 py-3 text-center" aria-label="詳細編集"></th>
               <th className="w-[82px] px-2 py-3 text-left text-xs font-bold text-slate-500">状態</th>
               <th className="w-[180px] px-2 py-3 text-left text-xs font-bold text-slate-500">タイトル</th>
@@ -525,7 +525,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                         {selectedSheets.has(sheet.id) ? <CheckSquare size={15} /> : <Square size={15} />}
                       </button>
                     </td>
-                    <td className="px-1 py-3 text-[10px] text-slate-400 font-mono whitespace-nowrap">
+                    <td className="sticky left-[52px] z-20 w-[96px] px-1 py-3 text-[10px] text-slate-400 font-mono whitespace-nowrap bg-white shadow-[1px_0_0_0_rgba(241,245,249,1)]">
                       {getDisplaySheetId(sheet)}
                     </td>
                     <td className="px-1 py-3 text-center">

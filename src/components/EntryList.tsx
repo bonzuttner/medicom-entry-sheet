@@ -772,13 +772,18 @@ export const EntryList: React.FC<EntryListProps> = ({
                   <tr>
                     <th
                       scope="col"
-                      className="sticky left-0 z-40 w-12 px-4 py-3 text-center bg-slate-50 shadow-[1px_0_0_0_rgba(226,232,240,1)]"
+                      className="sticky left-0 z-50 w-12 px-4 py-3 text-center bg-slate-50 shadow-[1px_0_0_0_rgba(226,232,240,1)]"
                     >
                       <button onClick={toggleSelectAll} className="text-slate-400 hover:text-slate-600">
                         {selectedSheets.size === filteredSheets.length && filteredSheets.length > 0 ? <CheckSquare size={20} /> : <Square size={20} />}
                       </button>
                     </th>
-                    <th scope="col" className="px-2 py-3 w-20 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">ID</th>
+                    <th
+                      scope="col"
+                      className="sticky left-12 z-40 w-24 px-2 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 shadow-[1px_0_0_0_rgba(226,232,240,1)]"
+                    >
+                      ID
+                    </th>
                     <th scope="col" className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-20">状態</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-[440px]">タイトル</th>
                     <th scope="col" className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-28">展開期間</th>
@@ -823,14 +828,14 @@ export const EntryList: React.FC<EntryListProps> = ({
                           onClick={() => toggleExpand(sheet.id)}
                         >
                           <td
-                            className="sticky left-0 z-30 px-4 py-4 text-center bg-white shadow-[1px_0_0_0_rgba(241,245,249,1)]"
+                            className="sticky left-0 z-30 w-12 px-4 py-4 text-center bg-white shadow-[1px_0_0_0_rgba(241,245,249,1)]"
                             onClick={(e) => toggleSelect(sheet.id, e)}
                           >
                              <div className="text-primary cursor-pointer inline-block">
                                {isSelected ? <CheckSquare size={20} /> : <Square size={20} className="text-slate-300" />}
                              </div>
                           </td>
-                          <td className="px-2 py-4 text-[10px] text-slate-400 font-mono whitespace-nowrap">
+                          <td className="sticky left-12 z-20 w-24 px-2 py-4 text-[10px] text-slate-400 font-mono whitespace-nowrap bg-white shadow-[1px_0_0_0_rgba(241,245,249,1)]">
                             {getDisplaySheetId(sheet)}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap">
