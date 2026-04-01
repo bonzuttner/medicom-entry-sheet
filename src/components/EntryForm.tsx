@@ -117,6 +117,22 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
   const normalizeJanCodeInput = (value: string): string =>
     normalizeDigitsInput(value);
+  const hasText = (value: unknown): boolean =>
+    typeof value === 'string' ? value.trim().length > 0 : Boolean(value);
+  const getRequiredFieldClass = (filled: boolean): string =>
+    `w-full rounded-lg shadow-sm p-3 transition-colors ${
+      filled
+        ? 'border-slate-300 focus:border-primary focus:ring-primary'
+        : 'border-amber-300 bg-amber-50/60 focus:border-amber-400 focus:ring-amber-200'
+    }`;
+  const getRequiredSelectClass = (filled: boolean): string =>
+    `w-full rounded-lg py-3 px-3 bg-white transition-colors ${
+      filled
+        ? 'border-slate-300'
+        : 'border-amber-300 bg-amber-50/60'
+    }`;
+  const getRequiredLabelMeta = (filled: boolean): string =>
+    filled ? '入力済み' : '未入力';
 
   const getShelfOptions = (): string[] => {
     return (
@@ -831,13 +847,72 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     return sum + width * facing;
   }, 0);
   const isShelfWidthOver = selectedFaceMaxWidth ? shelfWidthTotal > selectedFaceMaxWidth : false;
+  const sheetRequiredChecks = [
+    { label: '作成者', filled: hasText(formData.creatorName) },
+    { label: '担当者メール', filled: hasText(formData.email) },
+    { label: '担当者電話番号', filled: hasText(formData.phoneNumber) },
+    { label: '棚割名', filled: hasText(formData.shelfName) },
+    { label: 'タイトル', filled: hasText(formData.title) },
+  ];
+  const sheetRequiredDone = sheetRequiredChecks.filter((item) => item.filled).length;
+  const activeProductRequiredChecks = [
+    { label: 'JANコード', filled: hasText(activeProduct.janCode) },
+    { label: '商品名', filled: hasText(activeProduct.productName) },
+    { label: '商品画像', filled: hasText(activeProduct.productImage) },
+    { label: '幅', filled: Number(activeProduct.width) > 0 },
+    { label: '高さ', filled: Number(activeProduct.height) > 0 },
+    { label: '奥行', filled: Number(activeProduct.depth) > 0 },
+    { label: 'フェイシング数', filled: Number(activeProduct.facingCount) > 0 },
+  ];
+  const activePromoRequiredChecks =
+    activeProduct.hasPromoMaterial === 'yes'
+      ? [
+          { label: '販促物幅', filled: Number(activeProduct.promoWidth) > 0 },
+          { label: '販促物画像', filled: hasText(activeProduct.promoImage) },
+        ]
+      : [];
+  const activeProductRequiredDone = activeProductRequiredChecks.filter((item) => item.filled).length;
+  const activePromoRequiredDone = activePromoRequiredChecks.filter((item) => item.filled).length;
+  const totalRequiredDone = sheetRequiredDone + activeProductRequiredDone + activePromoRequiredDone;
+  const totalRequiredCount =
+    sheetRequiredChecks.length + activeProductRequiredChecks.length + activePromoRequiredChecks.length;
+  const getProductTabState = (product: ProductEntry): { label: string; tone: string } => {
+    const coreChecks = [
+      hasText(product.janCode),
+      hasText(product.productName),
+      hasText(product.productImage),
+      Number(product.width) > 0,
+      Number(product.height) > 0,
+      Number(product.depth) > 0,
+      Number(product.facingCount) > 0,
+    ];
+    const promoChecks =
+      product.hasPromoMaterial === 'yes'
+        ? [Number(product.promoWidth) > 0, hasText(product.promoImage)]
+        : [];
+    const allFilled = [...coreChecks, ...promoChecks].every(Boolean);
+    if (allFilled) {
+      return { label: '完了', tone: 'bg-emerald-100 text-emerald-700' };
+    }
+    const anyFilled = [...coreChecks, ...promoChecks].some(Boolean);
+    if (anyFilled) {
+      return { label: '入力中', tone: 'bg-amber-100 text-amber-700' };
+    }
+    return { label: '未入力', tone: 'bg-slate-100 text-slate-600' };
+  };
 
   return (
     <div className="pb-24 sm:pb-20">
       {/* Sticky Action Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-3 sm:p-4 z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="w-full sm:w-auto flex gap-3 order-2 sm:order-1">
+            <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-3 order-2 sm:order-1">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                  必須入力 {totalRequiredDone}/{totalRequiredCount}
+                  <span className="ml-2 inline-flex items-center rounded-full bg-white px-2 py-0.5 font-semibold text-slate-700">
+                    商品{activeTab + 1}: {getProductTabState(activeProduct).label}
+                  </span>
+                </div>
                 <button
                   onClick={onCancel}
                   disabled={isSaving}
@@ -866,14 +941,43 @@ export const EntryForm: React.FC<EntryFormProps> = ({
          </div>
       </div>
 
+      <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h3 className="text-base font-bold text-slate-800">入力状況</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              入力順は変えずに、必須項目のみ状態を見やすくしています。
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs">
+            <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">
+              シート基本必須 {sheetRequiredDone}/{sheetRequiredChecks.length}
+            </span>
+            <span className="rounded-full bg-sky-50 px-3 py-1 font-semibold text-sky-700">
+              商品必須 {activeProductRequiredDone}/{activeProductRequiredChecks.length}
+            </span>
+            {activePromoRequiredChecks.length > 0 && (
+              <span className="rounded-full bg-orange-50 px-3 py-1 font-semibold text-orange-700">
+                販促物必須 {activePromoRequiredDone}/{activePromoRequiredChecks.length}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Sheet Info (Header) */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 mb-4 sm:mb-6">
         <h3 className="text-lg font-bold text-slate-800 border-b pb-4 mb-4">シート基本情報</h3>
         <div className="mb-6">
-            <h4 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <h4 className="text-base font-bold text-slate-800 flex items-center gap-2">
                 <span className="w-1 h-5 bg-amber-500 rounded-full"></span>
                 作成情報
             </h4>
+            <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+              必須 {sheetRequiredDone}/{sheetRequiredChecks.length}
+            </span>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <div>
                     <label className="block text-sm font-medium text-slate-500 mb-1">更新日 (自動入力)</label>
@@ -888,30 +992,30 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     <div className="p-3 bg-slate-100 rounded-lg text-slate-700">{formData.manufacturerName}</div>
                 </div>
                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">作成者 <span className="text-danger">*</span></label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">作成者 <span className="text-danger">*</span><span className={`ml-2 text-xs ${hasText(formData.creatorName) ? 'text-emerald-600' : 'text-amber-600'}`}>{getRequiredLabelMeta(hasText(formData.creatorName))}</span></label>
                     <input 
                         type="text" 
                         value={formData.creatorName} 
                         onChange={(e) => handleHeaderChange('creatorName', e.target.value)}
-                        className="w-full border-slate-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary p-3" 
+                        className={getRequiredFieldClass(hasText(formData.creatorName))} 
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">担当者メール <span className="text-danger">*</span></label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">担当者メール <span className="text-danger">*</span><span className={`ml-2 text-xs ${hasText(formData.email) ? 'text-emerald-600' : 'text-amber-600'}`}>{getRequiredLabelMeta(hasText(formData.email))}</span></label>
                     <input 
                         type="email" 
                         value={formData.email} 
                         onChange={(e) => handleHeaderChange('email', e.target.value)}
-                        className="w-full border-slate-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary p-3" 
+                        className={getRequiredFieldClass(hasText(formData.email))} 
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">担当者電話番号 <span className="text-danger">*</span></label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">担当者電話番号 <span className="text-danger">*</span><span className={`ml-2 text-xs ${hasText(formData.phoneNumber) ? 'text-emerald-600' : 'text-amber-600'}`}>{getRequiredLabelMeta(hasText(formData.phoneNumber))}</span></label>
                     <input 
                         type="tel" 
                         value={formData.phoneNumber} 
                         onChange={(e) => handleHeaderChange('phoneNumber', e.target.value)}
-                        className="w-full border-slate-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary p-3" 
+                        className={getRequiredFieldClass(hasText(formData.phoneNumber))} 
                     />
                 </div>
             </div>
@@ -924,9 +1028,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <div className="col-span-1 md:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-2">棚割名 <span className="text-danger">*</span></label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">棚割名 <span className="text-danger">*</span><span className={`ml-2 text-xs ${hasText(formData.shelfName) ? 'text-emerald-600' : 'text-amber-600'}`}>{getRequiredLabelMeta(hasText(formData.shelfName))}</span></label>
                     <select
-                        className="w-full border-slate-300 rounded-lg py-3 px-3 bg-white"
+                        className={getRequiredSelectClass(hasText(formData.shelfName))}
                         value={formData.shelfName || ''}
                         onChange={(e) => handleHeaderChange('shelfName', e.target.value)}
                     >
@@ -934,12 +1038,12 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     </select>
                 </div>
                 <div className="col-span-1 md:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-2">タイトル <span className="text-danger">*</span></label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">タイトル <span className="text-danger">*</span><span className={`ml-2 text-xs ${hasText(formData.title) ? 'text-emerald-600' : 'text-amber-600'}`}>{getRequiredLabelMeta(hasText(formData.title))}</span></label>
                     <input 
                         type="text" 
                         value={formData.title} 
                         onChange={(e) => handleHeaderChange('title', e.target.value)}
-                        className="w-full border-slate-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary py-3 px-4 text-base sm:text-lg" 
+                        className={`${getRequiredFieldClass(hasText(formData.title))} text-base sm:text-lg`} 
                         placeholder="例：2024年秋の新商品プロモーション"
                     />
                 </div>
@@ -1158,7 +1262,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({
           >
               <Plus size={16} /> <span className="hidden sm:inline">商品追加</span><span className="sm:hidden">追加</span>
           </button>
-          {formData.products.map((prod, idx) => (
+          {formData.products.map((prod, idx) => {
+              const tabState = getProductTabState(prod);
+              return (
               <button
                   key={prod.id}
                   onClick={() => setActiveTab(idx)}
@@ -1170,10 +1276,13 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                   `}
                   title={prod.productName || `商品 ${idx + 1}`}
               >
-                  {prod.productName || `商品 ${idx + 1}`}
-                  {!prod.productName && <span className="ml-1 sm:ml-2 text-warning">●</span>}
+                  <span>{prod.productName || `商品 ${idx + 1}`}</span>
+                  <span className={`ml-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${tabState.tone}`}>
+                    {tabState.label}
+                  </span>
               </button>
-          ))}
+              );
+          })}
         </div>
         {/* Scroll hint for mobile when there are multiple products */}
         {formData.products.length > 2 && (
@@ -1255,16 +1364,21 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
         {/* Product: Basic Info */}
         <section className="mb-8 sm:mb-10">
-            <h4 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+            <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <h4 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                 <span className="w-1 h-6 bg-primary rounded-full"></span>
                 商品情報
             </h4>
+            <span className="inline-flex items-center rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
+              必須 {activeProductRequiredDone}/{activeProductRequiredChecks.length}
+            </span>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                  <div>
-                     <label className="block text-sm font-bold text-slate-700 mb-2">JANコード <span className="text-danger">*</span> <span className="text-xs font-normal text-slate-500">(8, 13, 16桁)</span></label>
+                     <label className="block text-sm font-bold text-slate-700 mb-2">JANコード <span className="text-danger">*</span> <span className="text-xs font-normal text-slate-500">(8, 13, 16桁)</span><span className={`ml-2 text-xs ${hasText(activeProduct.janCode) ? 'text-emerald-600' : 'text-amber-600'}`}>{getRequiredLabelMeta(hasText(activeProduct.janCode))}</span></label>
                      <input 
                         type="text" 
-                        className="w-full border-slate-300 rounded-lg py-3 px-3 focus:ring-primary focus:border-primary font-mono"
+                        className={`${getRequiredFieldClass(hasText(activeProduct.janCode))} font-mono`}
                         placeholder="1234567890123"
                         value={activeProduct.janCode}
                         onChange={(e) => handleProductChange(activeTab, 'janCode', normalizeJanCodeInput(e.target.value))}
@@ -1272,10 +1386,10 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      />
                 </div>
                  <div className="md:col-span-2">
-                     <label className="block text-sm font-bold text-slate-700 mb-2">商品名 <span className="text-danger">*</span></label>
+                     <label className="block text-sm font-bold text-slate-700 mb-2">商品名 <span className="text-danger">*</span><span className={`ml-2 text-xs ${hasText(activeProduct.productName) ? 'text-emerald-600' : 'text-amber-600'}`}>{getRequiredLabelMeta(hasText(activeProduct.productName))}</span></label>
                      <input 
                         type="text" 
-                        className="w-full border-slate-300 rounded-lg py-3 px-3 focus:ring-primary focus:border-primary"
+                        className={getRequiredFieldClass(hasText(activeProduct.productName))}
                         placeholder="例：〇〇胃薬 A 30錠"
                         value={activeProduct.productName}
                         onChange={(e) => handleProductNameChange(activeTab, e.target.value)}
@@ -1283,9 +1397,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      />
                 </div>
                  {/* Product Image - Prominent */}
-                 <div className="md:col-span-2 bg-slate-50 p-4 sm:p-6 rounded-xl border border-slate-200 mb-2">
+                 <div className={`md:col-span-2 p-4 sm:p-6 rounded-xl border mb-2 ${hasText(activeProduct.productImage) ? 'bg-slate-50 border-slate-200' : 'bg-amber-50/70 border-amber-200'}`}>
                     <label className="block text-base font-bold text-slate-700 mb-3">
-                        商品画像 <span className="text-danger">*</span>
+                        商品画像 <span className="text-danger">*</span><span className={`ml-2 text-xs ${hasText(activeProduct.productImage) ? 'text-emerald-600' : 'text-amber-600'}`}>{getRequiredLabelMeta(hasText(activeProduct.productImage))}</span>
                     </label>
                     <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start">
                         <div 
@@ -1333,7 +1447,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      <label className="block text-xs font-bold text-slate-500 mb-1">幅 (mm) <span className="text-danger">*</span></label>
                      <input 
                         type="number" 
-                        className="w-full border-slate-300 rounded-lg p-3"
+                        className={getRequiredFieldClass(Number(activeProduct.width) > 0)}
                         value={activeProduct.width || ''}
                         onChange={(e) => handleProductChange(activeTab, 'width', parseRequiredNumber(e.target.value))}
                      />
@@ -1342,7 +1456,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      <label className="block text-xs font-bold text-slate-500 mb-1">高さ (mm) <span className="text-danger">*</span></label>
                      <input 
                         type="number" 
-                        className="w-full border-slate-300 rounded-lg p-3"
+                        className={getRequiredFieldClass(Number(activeProduct.height) > 0)}
                         value={activeProduct.height || ''}
                         onChange={(e) => handleProductChange(activeTab, 'height', parseRequiredNumber(e.target.value))}
                      />
@@ -1351,7 +1465,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      <label className="block text-xs font-bold text-slate-500 mb-1">奥行 (mm) <span className="text-danger">*</span></label>
                      <input 
                         type="number" 
-                        className="w-full border-slate-300 rounded-lg p-3"
+                        className={getRequiredFieldClass(Number(activeProduct.depth) > 0)}
                         value={activeProduct.depth || ''}
                         onChange={(e) => handleProductChange(activeTab, 'depth', parseRequiredNumber(e.target.value))}
                      />
@@ -1360,7 +1474,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">フェイシング数 <span className="text-danger">*</span></label>
                      <input 
                         type="number" 
-                        className="w-full border-slate-300 rounded-lg p-3 bg-slate-50 font-bold"
+                        className={getRequiredFieldClass(Number(activeProduct.facingCount) > 0)}
                         value={activeProduct.facingCount || ''}
                         onChange={(e) => handleProductChange(activeTab, 'facingCount', parseRequiredNumber(e.target.value))}
                      />
@@ -1480,6 +1594,11 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                         <AlertTriangle size={18} />
                         販促物詳細入力
                     </h5>
+                    <div className="mb-4 text-xs">
+                      <span className="inline-flex items-center rounded-full bg-white px-3 py-1 font-semibold text-orange-700">
+                        必須 {activePromoRequiredDone}/{activePromoRequiredChecks.length}
+                      </span>
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                          <div>
                             <label className="block text-sm font-bold text-slate-700 mb-2">香り・色見本</label>

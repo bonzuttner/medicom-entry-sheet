@@ -465,6 +465,22 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
         </div>
       </div>
 
+      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm text-slate-600">
+            横スクロールの一覧構成は維持しつつ、未保存行を見つけやすくしています。
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs">
+            <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">
+              表示中 {filteredSheets.length}件
+            </span>
+            <span className="rounded-full bg-amber-50 px-3 py-1 font-semibold text-amber-700">
+              未保存 {filteredSheets.filter((sheet) => isDraftDirty(sheet)).length}件
+            </span>
+          </div>
+        </div>
+      </div>
+
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div className="overflow-auto max-h-[calc(100vh-260px)]">
         <table className="min-w-[1380px] w-full divide-y divide-slate-200 table-fixed">
@@ -502,7 +518,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
               const dirty = isDraftDirty(sheet);
               return (
                 <React.Fragment key={sheet.id}>
-                  <tr className="hover:bg-slate-50">
+                  <tr className={`${dirty ? 'bg-amber-50/40 hover:bg-amber-50/70' : 'hover:bg-slate-50'}`}>
                     <td className="sticky left-0 z-30 w-[52px] px-2 py-3 text-center bg-white shadow-[1px_0_0_0_rgba(241,245,249,1)]">
                       <button
                         type="button"
@@ -674,7 +690,12 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                       </div>
                     </td>
                     <td className="px-3 py-3 text-left">
-                      <div className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 p-1 whitespace-nowrap">
+                      <div className={`inline-flex items-center gap-1.5 rounded-lg p-1 whitespace-nowrap ${dirty ? 'bg-amber-100/70' : 'bg-slate-50'}`}>
+                        {dirty && (
+                          <span className="inline-flex items-center rounded-md bg-white px-2 py-1 text-[10px] font-semibold text-amber-700">
+                            未保存
+                          </span>
+                        )}
                         <button
                           onClick={() => {
                             void handleSave(sheet.id);

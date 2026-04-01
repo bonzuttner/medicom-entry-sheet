@@ -57,9 +57,9 @@ export const EntryList: React.FC<EntryListProps> = ({
   };
   const getStatusPillClass = (status: EntrySheet['status'] | string): string => {
     const normalized = normalizeSheetStatus(status);
-    if (normalized === 'completed') return 'bg-green-100 text-green-800';
-    if (normalized === 'completed_no_image') return 'bg-amber-100 text-amber-800';
-    return 'bg-slate-100 text-slate-700';
+    if (normalized === 'completed') return 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200';
+    if (normalized === 'completed_no_image') return 'bg-amber-100 text-amber-800 ring-1 ring-amber-200';
+    return 'bg-slate-100 text-slate-700 ring-1 ring-slate-200';
   };
   const normalizeManufacturerKey = (value: string): string => value.trim();
 
@@ -196,6 +196,13 @@ export const EntryList: React.FC<EntryListProps> = ({
   const safeTotalCount = totalCount > 0 ? totalCount : loadedCount;
   const remainingCount = Math.max(safeTotalCount - loadedCount, 0);
   const remainingPages = Math.ceil(remainingCount / 30);
+  const draftCount = filteredSheets.filter((sheet) => normalizeSheetStatus(sheet.status) === 'draft').length;
+  const completedCount = filteredSheets.filter(
+    (sheet) => normalizeSheetStatus(sheet.status) === 'completed'
+  ).length;
+  const completedNoImageCount = filteredSheets.filter(
+    (sheet) => normalizeSheetStatus(sheet.status) === 'completed_no_image'
+  ).length;
 
   // Toggle Expansion
   const toggleExpand = (id: string) => {
@@ -547,7 +554,7 @@ export const EntryList: React.FC<EntryListProps> = ({
         <div className="w-full sm:w-auto flex flex-row gap-3">
             <button
               onClick={() => setShowExportModal(true)}
-              className="flex-1 sm:flex-none justify-center bg-sky-50 border border-sky-200 text-primary hover:bg-sky-100 hover:border-sky-300 px-4 py-3 rounded-lg flex items-center gap-2 font-bold shadow-sm transition-all"
+              className="flex-1 sm:flex-none justify-center bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-3 rounded-lg flex items-center gap-2 font-semibold shadow-sm transition-all"
             >
               <Download size={20} />
               CSV出力
@@ -556,7 +563,7 @@ export const EntryList: React.FC<EntryListProps> = ({
               onClick={downloadSelectedProductImages}
               disabled={isDownloadingImages}
               className={`flex-1 sm:flex-none justify-center px-4 py-3 rounded-lg flex items-center gap-2 font-bold shadow-sm transition-all
-                ${isDownloadingImages ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-sky-50 border border-sky-200 text-primary hover:bg-sky-100 hover:border-sky-300'}
+                ${isDownloadingImages ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'}
               `}
             >
               <ImageIcon size={20} />
@@ -572,22 +579,45 @@ export const EntryList: React.FC<EntryListProps> = ({
         </div>
       </div>
 
-      <div className="flex flex-col gap-3">
-        {/* Search Bar */}
-        <div className="relative w-full">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="h-4 w-4 text-slate-400" />
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h3 className="text-base font-bold text-slate-800">検索・絞り込み</h3>
+              <p className="mt-1 text-sm text-slate-500">
+                新規作成を主操作にしつつ、検索と状態確認をすぐ行える構成に整理しています。
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs">
+              <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">
+                表示中 {filteredSheets.length}件
+              </span>
+              <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">
+                下書き {draftCount}件
+              </span>
+              <span className="rounded-full bg-emerald-50 px-3 py-1 font-semibold text-emerald-700">
+                完了 {completedCount}件
+              </span>
+              <span className="rounded-full bg-amber-50 px-3 py-1 font-semibold text-amber-700">
+                画像未完了 {completedNoImageCount}件
+              </span>
+            </div>
           </div>
-          <input
-            type="text"
-            className="block w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-lg leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary text-sm shadow-sm"
-            placeholder="シート名、メーカー名、商品名で検索..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+
+          <div className="relative w-full">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-4 w-4 text-slate-400" />
+            </div>
+            <input
+              type="text"
+              className="block w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-lg leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary text-sm shadow-sm"
+              placeholder="シート名、メーカー名、商品名で検索..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </div>
 
-        {/* Filter Controls */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
           <span className="text-[11px] font-bold text-slate-600 shrink-0">絞り込み</span>
           <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 flex-1">
