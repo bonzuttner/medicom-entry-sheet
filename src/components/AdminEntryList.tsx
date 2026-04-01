@@ -115,9 +115,9 @@ const getStatusLabel = (status: EntrySheet['status'] | string): string => {
 };
 const getStatusPillClass = (status: EntrySheet['status'] | string): string => {
   const normalized = normalizeSheetStatus(status);
-  if (normalized === 'completed') return 'bg-green-100 text-green-800';
-  if (normalized === 'completed_no_image') return 'bg-amber-100 text-amber-800';
-  return 'bg-slate-100 text-slate-700';
+  if (normalized === 'completed') return 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200';
+  if (normalized === 'completed_no_image') return 'bg-amber-100 text-amber-800 ring-1 ring-amber-200';
+  return 'bg-slate-100 text-slate-700 ring-1 ring-slate-200';
 };
 
 export const AdminEntryList: React.FC<AdminEntryListProps> = ({
@@ -129,6 +129,14 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
   onEdit,
   onSaveAdminMemo,
 }) => {
+  const pageTitleClass = 'text-2xl font-bold tracking-tight text-slate-800';
+  const pageSubtitleClass = 'mt-1 text-sm text-slate-500';
+  const toolbarSecondaryButtonClass =
+    'flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50';
+  const searchInputClass =
+    'w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary';
+  const filterControlClass =
+    'rounded-md border border-slate-300 bg-white px-2 py-2 text-xs text-slate-700';
   const getLegacyShortSheetId = (id: string): string => id.slice(0, 8);
   const getDisplaySheetId = (sheet: EntrySheet): string =>
     sheet.sheetCode?.trim() || getLegacyShortSheetId(sheet.id);
@@ -402,14 +410,14 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">エントリー履歴（Admin）</h2>
-          <p className="text-sm text-slate-500 mt-1">
+          <h2 className={pageTitleClass}>エントリー履歴（Admin）</h2>
+          <p className={pageSubtitleClass}>
             {selectedCount > 0 ? `${selectedCount}件 選択中` : 'Adminメモを一覧上で編集できます。'}
           </p>
         </div>
         <button
           onClick={() => setShowExportModal(true)}
-          className="bg-sky-50 border border-sky-200 text-primary hover:bg-sky-100 hover:border-sky-300 px-4 py-2.5 rounded-lg flex items-center gap-2 font-bold shadow-sm transition-all"
+          className={toolbarSecondaryButtonClass}
         >
           <Download size={18} />
           Admin CSV出力
@@ -422,14 +430,14 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
           <input
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
-            className="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-lg bg-white text-sm"
+            className={searchInputClass}
             placeholder="タイトル / メーカー名 / 棚割名で検索"
           />
         </div>
         <select
           value={manufacturerFilter}
           onChange={(e) => setManufacturerFilter(e.target.value)}
-          className="border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white min-w-52"
+          className="min-w-52 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm"
         >
           <option value="">メーカー: すべて</option>
           {manufacturerOptions.map((name) => (
@@ -444,12 +452,12 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
             type="date"
             value={deploymentDate}
             onChange={(e) => setDeploymentDate(e.target.value)}
-            className="border border-slate-300 rounded-md px-2 py-2 text-xs bg-white"
+            className={filterControlClass}
           />
           <select
             value={deploymentFilterMode}
             onChange={(e) => setDeploymentFilterMode(e.target.value as 'since' | 'until')}
-            className="border border-slate-300 rounded-md px-2 py-2 text-xs bg-white"
+            className={filterControlClass}
           >
             <option value="since">以降</option>
             <option value="until">以前</option>
@@ -462,22 +470,6 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
               解除
             </button>
           )}
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-sm text-slate-600">
-            横スクロールの一覧構成は維持しつつ、未保存行を見つけやすくしています。
-          </div>
-          <div className="flex flex-wrap gap-2 text-xs">
-            <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">
-              表示中 {filteredSheets.length}件
-            </span>
-            <span className="rounded-full bg-amber-50 px-3 py-1 font-semibold text-amber-700">
-              未保存 {filteredSheets.filter((sheet) => isDraftDirty(sheet)).length}件
-            </span>
-          </div>
         </div>
       </div>
 

@@ -33,6 +33,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   onSave,
   onCancel,
 }) => {
+  const sectionTitleClass = 'text-base font-bold text-slate-800';
+  const pageBlockTitleClass = 'text-lg font-bold text-slate-800';
+  const helpTextClass = 'mt-1 text-xs text-slate-500';
   const [formData, setFormData] = useState<EntrySheet>(initialData);
   const [activeTab, setActiveTab] = useState<number>(initialActiveTab); // Index of the product being edited
   const [isSaving, setIsSaving] = useState(false);
@@ -117,22 +120,12 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
   const normalizeJanCodeInput = (value: string): string =>
     normalizeDigitsInput(value);
-  const hasText = (value: unknown): boolean =>
-    typeof value === 'string' ? value.trim().length > 0 : Boolean(value);
-  const getRequiredFieldClass = (filled: boolean): string =>
-    `w-full rounded-lg shadow-sm p-3 transition-colors ${
-      filled
-        ? 'border-slate-300 focus:border-primary focus:ring-primary'
-        : 'border-amber-300 bg-amber-50/60 focus:border-amber-400 focus:ring-amber-200'
-    }`;
-  const getRequiredSelectClass = (filled: boolean): string =>
-    `w-full rounded-lg py-3 px-3 bg-white transition-colors ${
-      filled
-        ? 'border-slate-300'
-        : 'border-amber-300 bg-amber-50/60'
-    }`;
-  const getRequiredLabelMeta = (filled: boolean): string =>
-    filled ? '入力済み' : '未入力';
+  const formFieldClass =
+    'w-full rounded-lg border border-slate-300 bg-white p-3 shadow-sm focus:border-primary focus:ring-primary';
+  const formTextareaClass =
+    'w-full rounded-lg border border-slate-300 bg-white px-3 py-3 shadow-sm focus:border-primary focus:ring-primary';
+  const formSelectClass =
+    "w-full rounded-lg border border-slate-300 bg-white py-3 pl-3 pr-10 shadow-sm focus:border-primary focus:ring-primary appearance-none bg-[url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23475569' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 7 5 6 5-6'/%3E%3C/svg%3E\")] bg-no-repeat bg-[length:16px_16px] bg-[position:right_0.875rem_center]";
 
   const getShelfOptions = (): string[] => {
     return (
@@ -847,72 +840,12 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     return sum + width * facing;
   }, 0);
   const isShelfWidthOver = selectedFaceMaxWidth ? shelfWidthTotal > selectedFaceMaxWidth : false;
-  const sheetRequiredChecks = [
-    { label: '作成者', filled: hasText(formData.creatorName) },
-    { label: '担当者メール', filled: hasText(formData.email) },
-    { label: '担当者電話番号', filled: hasText(formData.phoneNumber) },
-    { label: '棚割名', filled: hasText(formData.shelfName) },
-    { label: 'タイトル', filled: hasText(formData.title) },
-  ];
-  const sheetRequiredDone = sheetRequiredChecks.filter((item) => item.filled).length;
-  const activeProductRequiredChecks = [
-    { label: 'JANコード', filled: hasText(activeProduct.janCode) },
-    { label: '商品名', filled: hasText(activeProduct.productName) },
-    { label: '商品画像', filled: hasText(activeProduct.productImage) },
-    { label: '幅', filled: Number(activeProduct.width) > 0 },
-    { label: '高さ', filled: Number(activeProduct.height) > 0 },
-    { label: '奥行', filled: Number(activeProduct.depth) > 0 },
-    { label: 'フェイシング数', filled: Number(activeProduct.facingCount) > 0 },
-  ];
-  const activePromoRequiredChecks =
-    activeProduct.hasPromoMaterial === 'yes'
-      ? [
-          { label: '販促物幅', filled: Number(activeProduct.promoWidth) > 0 },
-          { label: '販促物画像', filled: hasText(activeProduct.promoImage) },
-        ]
-      : [];
-  const activeProductRequiredDone = activeProductRequiredChecks.filter((item) => item.filled).length;
-  const activePromoRequiredDone = activePromoRequiredChecks.filter((item) => item.filled).length;
-  const totalRequiredDone = sheetRequiredDone + activeProductRequiredDone + activePromoRequiredDone;
-  const totalRequiredCount =
-    sheetRequiredChecks.length + activeProductRequiredChecks.length + activePromoRequiredChecks.length;
-  const getProductTabState = (product: ProductEntry): { label: string; tone: string } => {
-    const coreChecks = [
-      hasText(product.janCode),
-      hasText(product.productName),
-      hasText(product.productImage),
-      Number(product.width) > 0,
-      Number(product.height) > 0,
-      Number(product.depth) > 0,
-      Number(product.facingCount) > 0,
-    ];
-    const promoChecks =
-      product.hasPromoMaterial === 'yes'
-        ? [Number(product.promoWidth) > 0, hasText(product.promoImage)]
-        : [];
-    const allFilled = [...coreChecks, ...promoChecks].every(Boolean);
-    if (allFilled) {
-      return { label: '完了', tone: 'bg-emerald-100 text-emerald-700' };
-    }
-    const anyFilled = [...coreChecks, ...promoChecks].some(Boolean);
-    if (anyFilled) {
-      return { label: '入力中', tone: 'bg-amber-100 text-amber-700' };
-    }
-    return { label: '未入力', tone: 'bg-slate-100 text-slate-600' };
-  };
-
   return (
     <div className="pb-24 sm:pb-20">
       {/* Sticky Action Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-3 sm:p-4 z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-3 order-2 sm:order-1">
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                  必須入力 {totalRequiredDone}/{totalRequiredCount}
-                  <span className="ml-2 inline-flex items-center rounded-full bg-white px-2 py-0.5 font-semibold text-slate-700">
-                    商品{activeTab + 1}: {getProductTabState(activeProduct).label}
-                  </span>
-                </div>
+            <div className="w-full sm:w-auto flex gap-3 order-2 sm:order-1">
                 <button
                   onClick={onCancel}
                   disabled={isSaving}
@@ -941,43 +874,14 @@ export const EntryForm: React.FC<EntryFormProps> = ({
          </div>
       </div>
 
-      <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h3 className="text-base font-bold text-slate-800">入力状況</h3>
-            <p className="mt-1 text-sm text-slate-500">
-              入力順は変えずに、必須項目のみ状態を見やすくしています。
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2 text-xs">
-            <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">
-              シート基本必須 {sheetRequiredDone}/{sheetRequiredChecks.length}
-            </span>
-            <span className="rounded-full bg-sky-50 px-3 py-1 font-semibold text-sky-700">
-              商品必須 {activeProductRequiredDone}/{activeProductRequiredChecks.length}
-            </span>
-            {activePromoRequiredChecks.length > 0 && (
-              <span className="rounded-full bg-orange-50 px-3 py-1 font-semibold text-orange-700">
-                販促物必須 {activePromoRequiredDone}/{activePromoRequiredChecks.length}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Sheet Info (Header) */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 mb-4 sm:mb-6">
-        <h3 className="text-lg font-bold text-slate-800 border-b pb-4 mb-4">シート基本情報</h3>
+        <h3 className={`${pageBlockTitleClass} mb-4 border-b pb-4`}>シート基本情報</h3>
         <div className="mb-6">
-            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h4 className="text-base font-bold text-slate-800 flex items-center gap-2">
+            <h4 className={`${sectionTitleClass} mb-4 flex items-center gap-2`}>
                 <span className="w-1 h-5 bg-amber-500 rounded-full"></span>
                 作成情報
             </h4>
-            <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-              必須 {sheetRequiredDone}/{sheetRequiredChecks.length}
-            </span>
-            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <div>
                     <label className="block text-sm font-medium text-slate-500 mb-1">更新日 (自動入力)</label>
@@ -992,45 +896,45 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     <div className="p-3 bg-slate-100 rounded-lg text-slate-700">{formData.manufacturerName}</div>
                 </div>
                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">作成者 <span className="text-danger">*</span><span className={`ml-2 text-xs ${hasText(formData.creatorName) ? 'text-emerald-600' : 'text-amber-600'}`}>{getRequiredLabelMeta(hasText(formData.creatorName))}</span></label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">作成者 <span className="text-danger">*</span></label>
                     <input 
                         type="text" 
                         value={formData.creatorName} 
                         onChange={(e) => handleHeaderChange('creatorName', e.target.value)}
-                        className={getRequiredFieldClass(hasText(formData.creatorName))} 
+                        className={formFieldClass} 
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">担当者メール <span className="text-danger">*</span><span className={`ml-2 text-xs ${hasText(formData.email) ? 'text-emerald-600' : 'text-amber-600'}`}>{getRequiredLabelMeta(hasText(formData.email))}</span></label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">担当者メール <span className="text-danger">*</span></label>
                     <input 
                         type="email" 
                         value={formData.email} 
                         onChange={(e) => handleHeaderChange('email', e.target.value)}
-                        className={getRequiredFieldClass(hasText(formData.email))} 
+                        className={formFieldClass} 
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">担当者電話番号 <span className="text-danger">*</span><span className={`ml-2 text-xs ${hasText(formData.phoneNumber) ? 'text-emerald-600' : 'text-amber-600'}`}>{getRequiredLabelMeta(hasText(formData.phoneNumber))}</span></label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">担当者電話番号 <span className="text-danger">*</span></label>
                     <input 
                         type="tel" 
                         value={formData.phoneNumber} 
                         onChange={(e) => handleHeaderChange('phoneNumber', e.target.value)}
-                        className={getRequiredFieldClass(hasText(formData.phoneNumber))} 
+                        className={formFieldClass} 
                     />
                 </div>
             </div>
         </div>
 
         <div>
-            <h4 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+            <h4 className={`${sectionTitleClass} mb-4 flex items-center gap-2`}>
                 <span className="w-1 h-5 bg-sky-500 rounded-full"></span>
                 詳細情報
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <div className="col-span-1 md:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-2">棚割名 <span className="text-danger">*</span><span className={`ml-2 text-xs ${hasText(formData.shelfName) ? 'text-emerald-600' : 'text-amber-600'}`}>{getRequiredLabelMeta(hasText(formData.shelfName))}</span></label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">棚割名 <span className="text-danger">*</span></label>
                     <select
-                        className={getRequiredSelectClass(hasText(formData.shelfName))}
+                        className={formSelectClass}
                         value={formData.shelfName || ''}
                         onChange={(e) => handleHeaderChange('shelfName', e.target.value)}
                     >
@@ -1038,19 +942,19 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     </select>
                 </div>
                 <div className="col-span-1 md:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-2">タイトル <span className="text-danger">*</span><span className={`ml-2 text-xs ${hasText(formData.title) ? 'text-emerald-600' : 'text-amber-600'}`}>{getRequiredLabelMeta(hasText(formData.title))}</span></label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">タイトル <span className="text-danger">*</span></label>
                     <input 
                         type="text" 
                         value={formData.title} 
                         onChange={(e) => handleHeaderChange('title', e.target.value)}
-                        className={`${getRequiredFieldClass(hasText(formData.title))} text-base sm:text-lg`} 
+                        className={`${formFieldClass} text-base sm:text-lg`} 
                         placeholder="例：2024年秋の新商品プロモーション"
                     />
                 </div>
                 <div className="col-span-1 md:col-span-2">
                     <label className="block text-sm font-bold text-slate-700 mb-2">案件</label>
                     <select
-                        className="w-full border-slate-300 rounded-lg py-3 px-3 bg-white"
+                        className={formSelectClass}
                         value={formData.caseName || ''}
                         onChange={(e) => handleHeaderChange('caseName', e.target.value)}
                     >
@@ -1107,7 +1011,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                                   deploymentEndMonth: Number(e.target.value) || undefined,
                                 }))
                               }
-                              className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 min-w-[110px] text-center font-semibold"
+                              className={`${formSelectClass} min-w-[140px] text-center font-semibold`}
                             >
                               {[...Array(12)].map((_, idx) => (
                                 <option key={idx + 1} value={idx + 1}>
@@ -1133,7 +1037,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                         rows={3}
                         value={formData.notes || ''}
                         onChange={(e) => handleHeaderChange('notes', e.target.value)}
-                        className="w-full border-slate-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary p-3"
+                        className={formTextareaClass}
                         placeholder="エントリーシートのコンセプトをご記載ください"
                     />
                 </div>
@@ -1192,7 +1096,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                             faceMaxWidth: nextOption?.maxWidth,
                           }));
                         }}
-                        className="w-full border-slate-300 rounded-lg py-3 px-3 bg-white"
+                        className={formSelectClass}
                       >
                         <option value="">選択してください</option>
                         {faceOptions.map((option) => (
@@ -1263,7 +1167,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
               <Plus size={16} /> <span className="hidden sm:inline">商品追加</span><span className="sm:hidden">追加</span>
           </button>
           {formData.products.map((prod, idx) => {
-              const tabState = getProductTabState(prod);
               return (
               <button
                   key={prod.id}
@@ -1277,9 +1180,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                   title={prod.productName || `商品 ${idx + 1}`}
               >
                   <span>{prod.productName || `商品 ${idx + 1}`}</span>
-                  <span className={`ml-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${tabState.tone}`}>
-                    {tabState.label}
-                  </span>
               </button>
               );
           })}
@@ -1364,21 +1264,16 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
         {/* Product: Basic Info */}
         <section className="mb-8 sm:mb-10">
-            <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h4 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <h4 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
                 <span className="w-1 h-6 bg-primary rounded-full"></span>
                 商品情報
             </h4>
-            <span className="inline-flex items-center rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
-              必須 {activeProductRequiredDone}/{activeProductRequiredChecks.length}
-            </span>
-            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                  <div>
-                     <label className="block text-sm font-bold text-slate-700 mb-2">JANコード <span className="text-danger">*</span> <span className="text-xs font-normal text-slate-500">(8, 13, 16桁)</span><span className={`ml-2 text-xs ${hasText(activeProduct.janCode) ? 'text-emerald-600' : 'text-amber-600'}`}>{getRequiredLabelMeta(hasText(activeProduct.janCode))}</span></label>
+                     <label className="block text-sm font-bold text-slate-700 mb-2">JANコード <span className="text-danger">*</span> <span className="text-xs font-normal text-slate-500">(8, 13, 16桁)</span></label>
                      <input 
                         type="text" 
-                        className={`${getRequiredFieldClass(hasText(activeProduct.janCode))} font-mono`}
+                        className={`${formFieldClass} font-mono`}
                         placeholder="1234567890123"
                         value={activeProduct.janCode}
                         onChange={(e) => handleProductChange(activeTab, 'janCode', normalizeJanCodeInput(e.target.value))}
@@ -1386,10 +1281,10 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      />
                 </div>
                  <div className="md:col-span-2">
-                     <label className="block text-sm font-bold text-slate-700 mb-2">商品名 <span className="text-danger">*</span><span className={`ml-2 text-xs ${hasText(activeProduct.productName) ? 'text-emerald-600' : 'text-amber-600'}`}>{getRequiredLabelMeta(hasText(activeProduct.productName))}</span></label>
+                     <label className="block text-sm font-bold text-slate-700 mb-2">商品名 <span className="text-danger">*</span></label>
                      <input 
                         type="text" 
-                        className={getRequiredFieldClass(hasText(activeProduct.productName))}
+                        className={formFieldClass}
                         placeholder="例：〇〇胃薬 A 30錠"
                         value={activeProduct.productName}
                         onChange={(e) => handleProductNameChange(activeTab, e.target.value)}
@@ -1397,9 +1292,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      />
                 </div>
                  {/* Product Image - Prominent */}
-                 <div className={`md:col-span-2 p-4 sm:p-6 rounded-xl border mb-2 ${hasText(activeProduct.productImage) ? 'bg-slate-50 border-slate-200' : 'bg-amber-50/70 border-amber-200'}`}>
+                 <div className="md:col-span-2 bg-slate-50 p-4 sm:p-6 rounded-xl border border-slate-200 mb-2">
                     <label className="block text-base font-bold text-slate-700 mb-3">
-                        商品画像 <span className="text-danger">*</span><span className={`ml-2 text-xs ${hasText(activeProduct.productImage) ? 'text-emerald-600' : 'text-amber-600'}`}>{getRequiredLabelMeta(hasText(activeProduct.productImage))}</span>
+                        商品画像 <span className="text-danger">*</span>
                     </label>
                     <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start">
                         <div 
@@ -1447,7 +1342,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      <label className="block text-xs font-bold text-slate-500 mb-1">幅 (mm) <span className="text-danger">*</span></label>
                      <input 
                         type="number" 
-                        className={getRequiredFieldClass(Number(activeProduct.width) > 0)}
+                        className={formFieldClass}
                         value={activeProduct.width || ''}
                         onChange={(e) => handleProductChange(activeTab, 'width', parseRequiredNumber(e.target.value))}
                      />
@@ -1456,7 +1351,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      <label className="block text-xs font-bold text-slate-500 mb-1">高さ (mm) <span className="text-danger">*</span></label>
                      <input 
                         type="number" 
-                        className={getRequiredFieldClass(Number(activeProduct.height) > 0)}
+                        className={formFieldClass}
                         value={activeProduct.height || ''}
                         onChange={(e) => handleProductChange(activeTab, 'height', parseRequiredNumber(e.target.value))}
                      />
@@ -1465,7 +1360,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      <label className="block text-xs font-bold text-slate-500 mb-1">奥行 (mm) <span className="text-danger">*</span></label>
                      <input 
                         type="number" 
-                        className={getRequiredFieldClass(Number(activeProduct.depth) > 0)}
+                        className={formFieldClass}
                         value={activeProduct.depth || ''}
                         onChange={(e) => handleProductChange(activeTab, 'depth', parseRequiredNumber(e.target.value))}
                      />
@@ -1474,7 +1369,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">フェイシング数 <span className="text-danger">*</span></label>
                      <input 
                         type="number" 
-                        className={getRequiredFieldClass(Number(activeProduct.facingCount) > 0)}
+                        className={formFieldClass}
                         value={activeProduct.facingCount || ''}
                         onChange={(e) => handleProductChange(activeTab, 'facingCount', parseRequiredNumber(e.target.value))}
                      />
@@ -1493,8 +1388,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                      <label className="block text-sm font-bold text-slate-700 mb-2">リスク分類 <span className="text-danger">*</span></label>
-                     <select 
-                        className="w-full border-slate-300 rounded-lg py-3 px-3 bg-white"
+                    <select 
+                        className={formSelectClass}
                         value={activeProduct.riskClassification}
                         onChange={(e) => handleProductChange(activeTab, 'riskClassification', e.target.value)}
                     >
@@ -1533,7 +1428,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      <label className="block text-sm font-bold text-slate-700 mb-2">送込み店舗着日要望</label>
                      <input 
                         type="date" 
-                        className="w-full border-slate-300 rounded-lg py-3 px-3"
+                        className={formFieldClass}
                         value={activeProduct.arrivalDate || ''}
                         onChange={(e) => handleProductChange(activeTab, 'arrivalDate', e.target.value)}
                      />
@@ -1555,7 +1450,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      <label className="block text-sm font-bold text-slate-700 mb-2">キャッチコピー</label>
                      <textarea 
                         rows={3}
-                        className="w-full border-slate-300 rounded-lg py-3 px-3 focus:ring-primary focus:border-primary"
+                        className={formTextareaClass}
                         placeholder="例：胃のもたれには〇〇胃薬"
                         value={activeProduct.catchCopy}
                         onChange={(e) => handleProductChange(activeTab, 'catchCopy', e.target.value)}
@@ -1576,8 +1471,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                  <div>
                      <label className="block text-sm font-bold text-slate-700 mb-2">販促物の有無 <span className="text-danger">*</span></label>
-                     <select 
-                        className="w-full border-slate-300 rounded-lg py-3 px-3"
+                    <select 
+                        className={formSelectClass}
                         value={activeProduct.hasPromoMaterial}
                         onChange={(e) => handleProductChange(activeTab, 'hasPromoMaterial', e.target.value)}
                     >
@@ -1594,16 +1489,11 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                         <AlertTriangle size={18} />
                         販促物詳細入力
                     </h5>
-                    <div className="mb-4 text-xs">
-                      <span className="inline-flex items-center rounded-full bg-white px-3 py-1 font-semibold text-orange-700">
-                        必須 {activePromoRequiredDone}/{activePromoRequiredChecks.length}
-                      </span>
-                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                          <div>
                             <label className="block text-sm font-bold text-slate-700 mb-2">香り・色見本</label>
                             <select 
-                                className="w-full border-slate-300 rounded-lg p-3 bg-white"
+                                className={formSelectClass}
                                 value={activeProduct.promoSample || '無し'}
                                 onChange={(e) => handleProductChange(activeTab, 'promoSample', e.target.value)}
                             >
@@ -1615,7 +1505,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                             <label className="block text-sm font-bold text-slate-700 mb-2">特殊な陳列什器</label>
                             <input 
                                 type="text" 
-                                className="w-full border-slate-300 rounded-lg p-3"
+                                className={formFieldClass}
                                 placeholder="例：前後陳列用什器"
                                 value={activeProduct.specialFixture || ''}
                                 onChange={(e) => handleProductChange(activeTab, 'specialFixture', e.target.value)}
@@ -1684,7 +1574,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     <label className="block text-sm font-bold text-slate-700 mb-2">補足事項</label>
                     <textarea
                         rows={3}
-                        className="w-full border-slate-300 rounded-lg py-3 px-3 focus:ring-primary focus:border-primary"
+                        className={formTextareaClass}
                         placeholder="商品ブランドのURL等"
                         value={activeProduct.productNotes || ''}
                         onChange={(e) => handleProductChange(activeTab, 'productNotes', e.target.value)}
@@ -1749,7 +1639,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             {isAdminUser ? (
               <input
                 type="text"
-                className="w-full border-slate-300 rounded-lg shadow-sm p-3 font-mono"
+                className={`${formFieldClass} font-mono`}
                 value={formData.adminMemo?.promoCode || ''}
                 onChange={(e) => handleAdminMemoChange('promoCode', normalizePromoCodeInput(e.target.value))}
                 placeholder="X000000"
@@ -1763,7 +1653,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             {isAdminUser ? (
               <input
                 type="text"
-                className="w-full border-slate-300 rounded-lg shadow-sm p-3 font-mono"
+                className={`${formFieldClass} font-mono`}
                 value={formData.adminMemo?.boardPickingJan || ''}
                 onChange={(e) =>
                   handleAdminMemoChange(
@@ -1782,7 +1672,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             {isAdminUser ? (
               <input
                 type="url"
-                className="w-full border-slate-300 rounded-lg shadow-sm p-3"
+                className={formFieldClass}
                 value={formData.adminMemo?.deadlineTableUrl || ''}
                 onChange={(e) => handleAdminMemoChange('deadlineTableUrl', e.target.value)}
                 placeholder="https://drive.google.com/..."
@@ -1799,7 +1689,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
-                  className="w-24 border-slate-300 rounded-lg shadow-sm p-2.5"
+                  className="w-24 rounded-lg border border-slate-300 bg-white p-2.5 shadow-sm focus:border-primary focus:ring-primary"
                   value={formData.adminMemo?.bandPattern || ''}
                   onChange={(e) =>
                     handleAdminMemoChange(
@@ -1823,7 +1713,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
-                  className="w-24 border-slate-300 rounded-lg shadow-sm p-2.5"
+                  className="w-24 rounded-lg border border-slate-300 bg-white p-2.5 shadow-sm focus:border-primary focus:ring-primary"
                   value={formData.adminMemo?.targetStoreCount ?? ''}
                   onChange={(e) =>
                     handleAdminMemoChange('targetStoreCount', parseOptionalNumber(e.target.value))
@@ -1844,7 +1734,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
-                  className="w-24 border-slate-300 rounded-lg shadow-sm p-2.5"
+                  className="w-24 rounded-lg border border-slate-300 bg-white p-2.5 shadow-sm focus:border-primary focus:ring-primary"
                   value={formData.adminMemo?.printBoard1Count ?? ''}
                   onChange={(e) =>
                     handleAdminMemoChange('printBoard1Count', parseOptionalNumber(e.target.value))
@@ -1865,7 +1755,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
-                  className="w-24 border-slate-300 rounded-lg shadow-sm p-2.5"
+                  className="w-24 rounded-lg border border-slate-300 bg-white p-2.5 shadow-sm focus:border-primary focus:ring-primary"
                   value={formData.adminMemo?.printBoard2Count ?? ''}
                   onChange={(e) =>
                     handleAdminMemoChange('printBoard2Count', parseOptionalNumber(e.target.value))
@@ -1886,7 +1776,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
-                  className="w-24 border-slate-300 rounded-lg shadow-sm p-2.5"
+                  className="w-24 rounded-lg border border-slate-300 bg-white p-2.5 shadow-sm focus:border-primary focus:ring-primary"
                   value={formData.adminMemo?.printBand1Count ?? ''}
                   onChange={(e) =>
                     handleAdminMemoChange('printBand1Count', parseOptionalNumber(e.target.value))
@@ -1907,7 +1797,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
-                  className="w-24 border-slate-300 rounded-lg shadow-sm p-2.5"
+                  className="w-24 rounded-lg border border-slate-300 bg-white p-2.5 shadow-sm focus:border-primary focus:ring-primary"
                   value={formData.adminMemo?.printBand2Count ?? ''}
                   onChange={(e) =>
                     handleAdminMemoChange('printBand2Count', parseOptionalNumber(e.target.value))
@@ -1925,7 +1815,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             {isAdminUser ? (
               <textarea
                 rows={2}
-                className="w-full border-slate-300 rounded-lg shadow-sm p-3"
+                className={formTextareaClass}
                 value={formData.adminMemo?.printOther || ''}
                 onChange={(e) => handleAdminMemoChange('printOther', e.target.value)}
               />
@@ -1938,7 +1828,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             {isAdminUser ? (
               <textarea
                 rows={2}
-                className="w-full border-slate-300 rounded-lg shadow-sm p-3"
+                className={formTextareaClass}
                 value={formData.adminMemo?.equipmentNote || ''}
                 onChange={(e) => handleAdminMemoChange('equipmentNote', e.target.value)}
               />
@@ -1951,7 +1841,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             {isAdminUser ? (
               <textarea
                 rows={3}
-                className="w-full border-slate-300 rounded-lg shadow-sm p-3"
+                className={formTextareaClass}
                 value={formData.adminMemo?.adminNote || ''}
                 onChange={(e) => handleAdminMemoChange('adminNote', e.target.value)}
               />

@@ -28,6 +28,16 @@ export const EntryList: React.FC<EntryListProps> = ({
   isLoadingMore = false,
   totalCount = 0,
 }) => {
+  const pageTitleClass = 'text-2xl font-bold tracking-tight text-slate-800';
+  const pageSubtitleClass = 'mt-1 text-sm text-slate-500';
+  const toolbarSecondaryButtonClass =
+    'flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50';
+  const toolbarPrimaryButtonClass =
+    'flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 font-bold text-white shadow-lg shadow-sky-200 transition-all hover:bg-sky-600 hover:-translate-y-0.5';
+  const searchInputClass =
+    'block w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm leading-5 shadow-sm placeholder-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary';
+  const filterControlClass =
+    'rounded-md border border-slate-300 bg-white px-2 py-2 text-xs text-slate-700';
   const getLegacyShortSheetId = (id: string): string => id.slice(0, 8);
   const getDisplaySheetId = (sheet: EntrySheet): string =>
     sheet.sheetCode?.trim() || getLegacyShortSheetId(sheet.id);
@@ -196,14 +206,6 @@ export const EntryList: React.FC<EntryListProps> = ({
   const safeTotalCount = totalCount > 0 ? totalCount : loadedCount;
   const remainingCount = Math.max(safeTotalCount - loadedCount, 0);
   const remainingPages = Math.ceil(remainingCount / 30);
-  const draftCount = filteredSheets.filter((sheet) => normalizeSheetStatus(sheet.status) === 'draft').length;
-  const completedCount = filteredSheets.filter(
-    (sheet) => normalizeSheetStatus(sheet.status) === 'completed'
-  ).length;
-  const completedNoImageCount = filteredSheets.filter(
-    (sheet) => normalizeSheetStatus(sheet.status) === 'completed_no_image'
-  ).length;
-
   // Toggle Expansion
   const toggleExpand = (id: string) => {
     const newExpanded = new Set(expandedSheets);
@@ -544,8 +546,8 @@ export const EntryList: React.FC<EntryListProps> = ({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="w-full sm:w-auto">
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-800">エントリーシート履歴</h2>
-            <p className="text-slate-500 text-sm mt-1">
+            <h2 className={pageTitleClass}>エントリーシート履歴</h2>
+            <p className={pageSubtitleClass}>
               {selectedSheets.size > 0 
                 ? `${selectedSheets.size}件 選択中` 
                 : "過去に作成したPOP情報の確認・編集ができます"}
@@ -554,7 +556,7 @@ export const EntryList: React.FC<EntryListProps> = ({
         <div className="w-full sm:w-auto flex flex-row gap-3">
             <button
               onClick={() => setShowExportModal(true)}
-              className="flex-1 sm:flex-none justify-center bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-3 rounded-lg flex items-center gap-2 font-semibold shadow-sm transition-all"
+              className={`flex-1 sm:flex-none ${toolbarSecondaryButtonClass}`}
             >
               <Download size={20} />
               CSV出力
@@ -563,7 +565,7 @@ export const EntryList: React.FC<EntryListProps> = ({
               onClick={downloadSelectedProductImages}
               disabled={isDownloadingImages}
               className={`flex-1 sm:flex-none justify-center px-4 py-3 rounded-lg flex items-center gap-2 font-bold shadow-sm transition-all
-                ${isDownloadingImages ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'}
+                ${isDownloadingImages ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : toolbarSecondaryButtonClass}
               `}
             >
               <ImageIcon size={20} />
@@ -571,7 +573,7 @@ export const EntryList: React.FC<EntryListProps> = ({
             </button>
             <button
               onClick={onCreate}
-              className="flex-1 sm:flex-none justify-center bg-primary hover:bg-sky-600 text-white px-6 py-3 rounded-lg shadow-lg shadow-sky-200 flex items-center gap-2 font-bold transition-all transform hover:-translate-y-0.5"
+              className={`flex-1 sm:flex-none ${toolbarPrimaryButtonClass}`}
             >
               <Plus size={20} />
               新規作成
@@ -581,36 +583,13 @@ export const EntryList: React.FC<EntryListProps> = ({
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h3 className="text-base font-bold text-slate-800">検索・絞り込み</h3>
-              <p className="mt-1 text-sm text-slate-500">
-                新規作成を主操作にしつつ、検索と状態確認をすぐ行える構成に整理しています。
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2 text-xs">
-              <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">
-                表示中 {filteredSheets.length}件
-              </span>
-              <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">
-                下書き {draftCount}件
-              </span>
-              <span className="rounded-full bg-emerald-50 px-3 py-1 font-semibold text-emerald-700">
-                完了 {completedCount}件
-              </span>
-              <span className="rounded-full bg-amber-50 px-3 py-1 font-semibold text-amber-700">
-                画像未完了 {completedNoImageCount}件
-              </span>
-            </div>
-          </div>
-
           <div className="relative w-full">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-4 w-4 text-slate-400" />
             </div>
             <input
               type="text"
-              className="block w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-lg leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary text-sm shadow-sm"
+              className={searchInputClass}
               placeholder="シート名、メーカー名、商品名で検索..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -624,7 +603,7 @@ export const EntryList: React.FC<EntryListProps> = ({
             <select
               value={dateFilterBy}
               onChange={(e) => setDateFilterBy(e.target.value as 'createdAt' | 'updatedAt' | 'deploymentPeriod')}
-              className="border border-slate-300 rounded-md px-2 py-2 sm:py-1.5 text-xs bg-white"
+              className={filterControlClass}
             >
               <option value="createdAt">作成日</option>
               <option value="updatedAt">更新日</option>
@@ -633,7 +612,7 @@ export const EntryList: React.FC<EntryListProps> = ({
             <select
               value={dateFilterMode}
               onChange={(e) => setDateFilterMode(e.target.value as 'since' | 'until')}
-              className="border border-slate-300 rounded-md px-2 py-2 sm:py-1.5 text-xs bg-white"
+              className={filterControlClass}
             >
               <option value="since">以降</option>
               <option value="until">以前</option>
@@ -642,7 +621,7 @@ export const EntryList: React.FC<EntryListProps> = ({
               type="date"
               value={dateSince}
               onChange={(e) => setDateSince(e.target.value)}
-              className="border border-slate-300 rounded-md px-2 py-2 sm:py-1.5 text-xs bg-white col-span-2 sm:col-span-1"
+              className={`${filterControlClass} col-span-2 sm:col-span-1`}
             />
             {dateSince && (
               <button
@@ -777,12 +756,12 @@ export const EntryList: React.FC<EntryListProps> = ({
           {/* DESKTOP VIEW: Table (Hidden on mobile) */}
           <div className="hidden md:block bg-white rounded-xl border border-slate-200 overflow-hidden">
             <div className="overflow-auto max-h-[calc(100vh-260px)]">
-              <table className="min-w-full divide-y divide-slate-200 table-fixed">
-                <thead className="bg-slate-50 [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-slate-50">
+              <table className="min-w-full table-fixed border-separate border-spacing-0">
+                <thead className="bg-slate-50">
                   <tr>
                     <th
                       scope="col"
-                      className="sticky left-0 z-50 w-12 px-4 py-3 text-center bg-slate-50 shadow-[1px_0_0_0_rgba(226,232,240,1)]"
+                      className="sticky left-0 top-0 z-50 w-12 border-b border-slate-200 px-4 py-3 text-center bg-slate-50 shadow-[1px_0_0_0_rgba(226,232,240,1)]"
                     >
                       <button onClick={toggleSelectAll} className="text-slate-400 hover:text-slate-600">
                         {selectedSheets.size === filteredSheets.length && filteredSheets.length > 0 ? <CheckSquare size={20} /> : <Square size={20} />}
@@ -790,15 +769,15 @@ export const EntryList: React.FC<EntryListProps> = ({
                     </th>
                     <th
                       scope="col"
-                      className="sticky left-12 z-40 w-24 px-2 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 shadow-[1px_0_0_0_rgba(226,232,240,1)]"
+                      className="sticky top-0 z-10 w-24 border-b border-slate-200 px-2 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50"
                     >
                       ID
                     </th>
-                    <th scope="col" className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-20">状態</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-[440px]">タイトル</th>
-                    <th scope="col" className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-28">展開期間</th>
-                    <th scope="col" className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-32">棚割り</th>
-                    <th scope="col" className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-36">
+                    <th scope="col" className="sticky top-0 z-10 w-20 border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">状態</th>
+                    <th scope="col" className="sticky top-0 z-10 w-[440px] border-b border-slate-200 bg-slate-50 px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">タイトル</th>
+                    <th scope="col" className="sticky top-0 z-10 w-28 border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">展開期間</th>
+                    <th scope="col" className="sticky top-0 z-10 w-32 border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">棚割り</th>
+                    <th scope="col" className="sticky top-0 z-10 w-36 border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                       <button
                         onClick={() => toggleSort('manufacturer')}
                         className={`inline-flex items-center gap-1 hover:text-slate-700 ${
@@ -810,7 +789,7 @@ export const EntryList: React.FC<EntryListProps> = ({
                         <ArrowUpDown size={14} />
                       </button>
                     </th>
-                    <th scope="col" className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-24">
+                    <th scope="col" className="sticky top-0 z-10 w-24 border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                       <button
                         onClick={() => toggleSort('updatedAt')}
                         className={`inline-flex items-center gap-1 hover:text-slate-700 ${
@@ -822,11 +801,11 @@ export const EntryList: React.FC<EntryListProps> = ({
                         <ArrowUpDown size={14} />
                       </button>
                     </th>
-                    <th scope="col" className="px-4 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider w-32">操作</th>
-                    <th scope="col" className="w-10"></th>
+                    <th scope="col" className="sticky top-0 z-10 w-32 border-b border-slate-200 bg-slate-50 px-4 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider">操作</th>
+                    <th scope="col" className="sticky top-0 z-10 w-10 border-b border-slate-200 bg-slate-50"></th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-slate-200">
+                <tbody className="bg-white">
                   {filteredSheets.map((sheet) => {
                      const isExpanded = expandedSheets.has(sheet.id);
                      const isSelected = selectedSheets.has(sheet.id);
@@ -845,7 +824,7 @@ export const EntryList: React.FC<EntryListProps> = ({
                                {isSelected ? <CheckSquare size={20} /> : <Square size={20} className="text-slate-300" />}
                              </div>
                           </td>
-                          <td className="sticky left-12 z-20 w-24 px-2 py-4 text-[10px] text-slate-400 font-mono whitespace-nowrap bg-white shadow-[1px_0_0_0_rgba(241,245,249,1)]">
+                          <td className="w-24 px-2 py-4 text-[10px] text-slate-400 font-mono whitespace-nowrap bg-white">
                             {getDisplaySheetId(sheet)}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap">
