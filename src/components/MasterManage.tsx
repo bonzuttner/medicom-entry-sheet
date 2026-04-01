@@ -259,7 +259,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-              <div className="rounded-lg border border-slate-200 p-3">
+              <div className="rounded-lg border border-slate-200 p-3 h-full">
                 <h4 className="font-semibold text-slate-800 mb-2">棚割名</h4>
                 {selectedManufacturer === ALL_MANUFACTURERS ? (
                   <div className="space-y-2 max-h-64 overflow-auto">
@@ -327,7 +327,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
                 )}
               </div>
 
-              <div className="rounded-lg border border-slate-200 p-3">
+              <div className="rounded-lg border border-slate-200 p-3 h-full">
                 <h4 className="font-semibold text-slate-800 mb-2">案件</h4>
                 {selectedManufacturer === ALL_MANUFACTURERS ? (
                   <div className="space-y-2 max-h-64 overflow-auto">
@@ -395,7 +395,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
                 )}
               </div>
 
-              <div className="rounded-lg border border-slate-200 p-3">
+              <div className="rounded-lg border border-slate-200 p-3 h-full">
                 <h4 className="font-semibold text-slate-800 mb-2">フェイス設定</h4>
                 {selectedManufacturer === ALL_MANUFACTURERS ? (
                   <div className="space-y-2 max-h-64 overflow-auto">
@@ -443,16 +443,16 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
                         </span>
                       ))}
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px_auto] gap-2">
+                    <div className="flex gap-2 items-stretch">
                       <input
-                        className="border border-slate-300 rounded-md px-3 py-1.5 text-sm"
-                        placeholder="フェイス数ラベル"
+                        className="min-w-0 flex-1 border border-slate-300 rounded-md px-3 py-1.5 text-sm"
+                        placeholder="フェイス(w)"
                         value={faceLabelInput}
                         onChange={(e) => setFaceLabelInput(e.target.value)}
                       />
                       <input
                         type="number"
-                        className="border border-slate-300 rounded-md px-3 py-1.5 text-sm"
+                        className="w-32 shrink-0 border border-slate-300 rounded-md px-3 py-1.5 text-sm"
                         placeholder="MAX値(mm)"
                         value={faceMaxWidthInput}
                         onChange={(e) => setFaceMaxWidthInput(e.target.value)}
@@ -462,7 +462,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
                           await addFaceOption();
                         }}
                         disabled={isSaving}
-                        className="bg-secondary text-white px-3 py-1.5 rounded-md hover:bg-slate-600 text-sm flex items-center gap-1 justify-center"
+                        className="w-20 shrink-0 bg-secondary text-white px-3 py-1.5 rounded-md hover:bg-slate-600 text-sm flex items-center gap-1 justify-center whitespace-nowrap"
                       >
                         <Plus size={14} /> 追加
                       </button>

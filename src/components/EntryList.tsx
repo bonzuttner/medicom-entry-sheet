@@ -30,8 +30,10 @@ export const EntryList: React.FC<EntryListProps> = ({
 }) => {
   const pageTitleClass = 'text-2xl font-bold tracking-tight text-slate-800';
   const pageSubtitleClass = 'mt-1 text-sm text-slate-500';
-  const toolbarSecondaryButtonClass =
+  const toolbarTertiaryButtonClass =
     'flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50';
+  const toolbarAccentButtonClass =
+    'flex items-center justify-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 font-semibold text-sky-700 shadow-sm transition-all hover:bg-sky-100';
   const toolbarPrimaryButtonClass =
     'flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 font-bold text-white shadow-lg shadow-sky-200 transition-all hover:bg-sky-600 hover:-translate-y-0.5';
   const searchInputClass =
@@ -556,7 +558,7 @@ export const EntryList: React.FC<EntryListProps> = ({
         <div className="w-full sm:w-auto flex flex-row gap-3">
             <button
               onClick={() => setShowExportModal(true)}
-              className={`flex-1 sm:flex-none ${toolbarSecondaryButtonClass}`}
+              className={`flex-1 sm:flex-none ${toolbarAccentButtonClass}`}
             >
               <Download size={20} />
               CSV出力
@@ -565,7 +567,7 @@ export const EntryList: React.FC<EntryListProps> = ({
               onClick={downloadSelectedProductImages}
               disabled={isDownloadingImages}
               className={`flex-1 sm:flex-none justify-center px-4 py-3 rounded-lg flex items-center gap-2 font-bold shadow-sm transition-all
-                ${isDownloadingImages ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : toolbarSecondaryButtonClass}
+                ${isDownloadingImages ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : toolbarTertiaryButtonClass}
               `}
             >
               <ImageIcon size={20} />
@@ -581,20 +583,18 @@ export const EntryList: React.FC<EntryListProps> = ({
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-4">
-          <div className="relative w-full">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-slate-400" />
-            </div>
-            <input
-              type="text"
-              className={searchInputClass}
-              placeholder="シート名、メーカー名、商品名で検索..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+      <div className="space-y-3">
+        <div className="relative w-full">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-4 w-4 text-slate-400" />
           </div>
+          <input
+            type="text"
+            className={searchInputClass}
+            placeholder="シート名、メーカー名、商品名で検索..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">

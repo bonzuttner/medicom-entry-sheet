@@ -131,8 +131,8 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
 }) => {
   const pageTitleClass = 'text-2xl font-bold tracking-tight text-slate-800';
   const pageSubtitleClass = 'mt-1 text-sm text-slate-500';
-  const toolbarSecondaryButtonClass =
-    'flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50';
+  const toolbarAccentButtonClass =
+    'flex items-center justify-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 font-semibold text-sky-700 shadow-sm transition-all hover:bg-sky-100';
   const searchInputClass =
     'w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary';
   const filterControlClass =
@@ -417,7 +417,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
         </div>
         <button
           onClick={() => setShowExportModal(true)}
-          className={toolbarSecondaryButtonClass}
+          className={toolbarAccentButtonClass}
         >
           <Download size={18} />
           Admin CSV出力

@@ -120,12 +120,23 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
   const normalizeJanCodeInput = (value: string): string =>
     normalizeDigitsInput(value);
-  const formFieldClass =
-    'w-full rounded-lg border border-slate-300 bg-white p-3 shadow-sm focus:border-primary focus:ring-primary';
-  const formTextareaClass =
-    'w-full rounded-lg border border-slate-300 bg-white px-3 py-3 shadow-sm focus:border-primary focus:ring-primary';
-  const formSelectClass =
-    "w-full rounded-lg border border-slate-300 bg-white py-3 pl-3 pr-10 shadow-sm focus:border-primary focus:ring-primary appearance-none bg-[url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23475569' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 7 5 6 5-6'/%3E%3C/svg%3E\")] bg-no-repeat bg-[length:16px_16px] bg-[position:right_0.875rem_center]";
+  const hasText = (value: unknown): boolean =>
+    typeof value === 'string' ? value.trim().length > 0 : Boolean(value);
+  const getFieldClass = (highlight = false): string =>
+    `w-full rounded-lg border-0 p-3 shadow-none outline-none transition-colors ${
+      highlight ? 'bg-amber-100/70 text-slate-900' : 'bg-slate-100 text-slate-800'
+    } focus:bg-white focus:ring-2 focus:ring-sky-200`;
+  const getTextareaClass = (highlight = false): string =>
+    `w-full rounded-lg border-0 px-3 py-3 shadow-none outline-none transition-colors ${
+      highlight ? 'bg-amber-100/70 text-slate-900' : 'bg-slate-100 text-slate-800'
+    } focus:bg-white focus:ring-2 focus:ring-sky-200`;
+  const getSelectClass = (highlight = false): string =>
+    `w-full rounded-lg border-0 py-3 pl-3 pr-12 shadow-none outline-none transition-colors appearance-none bg-no-repeat bg-[length:16px_16px] bg-[position:right_1rem_center] ${
+      highlight ? 'bg-amber-100/70 text-slate-900' : 'bg-slate-100 text-slate-800'
+    } focus:bg-white focus:ring-2 focus:ring-sky-200 bg-[url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 20 20%27 fill=%27none%27 stroke=%27%23475569%27 stroke-width=%271.8%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3E%3Cpath d=%27m5 7 5 6 5-6%27/%3E%3C/svg%3E")]`;
+  const compactSelectWrapperClass = 'w-full md:max-w-[420px]';
+  const compactSelectClass = (highlight = false): string =>
+    `${getSelectClass(highlight)} ring-1 ring-inset ${highlight ? 'ring-amber-200' : 'ring-slate-200'}`;
 
   const getShelfOptions = (): string[] => {
     return (
@@ -840,6 +851,40 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     return sum + width * facing;
   }, 0);
   const isShelfWidthOver = selectedFaceMaxWidth ? shelfWidthTotal > selectedFaceMaxWidth : false;
+  const getSheetStatusLabel = (status: EntrySheet['status'] | string): string => {
+    if (status === 'completed') return '完了';
+    if (status === 'completed_no_image') return '完了 -商品画像なし';
+    return '下書き';
+  };
+  const getSheetStatusPillClass = (status: EntrySheet['status'] | string): string => {
+    if (status === 'completed') return 'bg-emerald-100 text-emerald-800';
+    if (status === 'completed_no_image') return 'bg-amber-100 text-amber-800';
+    return 'bg-slate-100 text-slate-700';
+  };
+  const getProductTabState = (product: ProductEntry): { label: string; tone: string } => {
+    const coreChecks = [
+      hasText(product.janCode),
+      hasText(product.productName),
+      hasText(product.productImage),
+      Number(product.width) > 0,
+      Number(product.height) > 0,
+      Number(product.depth) > 0,
+      Number(product.facingCount) > 0,
+    ];
+    const promoChecks =
+      product.hasPromoMaterial === 'yes'
+        ? [Number(product.promoWidth) > 0, hasText(product.promoImage)]
+        : [];
+    const allFilled = [...coreChecks, ...promoChecks].every(Boolean);
+    if (allFilled) {
+      return { label: '完了', tone: 'bg-emerald-100 text-emerald-700' };
+    }
+    const anyFilled = [...coreChecks, ...promoChecks].some(Boolean);
+    if (anyFilled) {
+      return { label: '入力中', tone: 'bg-amber-100 text-amber-700' };
+    }
+    return { label: '未入力', tone: 'bg-slate-100 text-slate-600' };
+  };
   return (
     <div className="pb-24 sm:pb-20">
       {/* Sticky Action Bar */}
@@ -876,7 +921,12 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
       {/* Sheet Info (Header) */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 mb-4 sm:mb-6">
-        <h3 className={`${pageBlockTitleClass} mb-4 border-b pb-4`}>シート基本情報</h3>
+        <div className="mb-4 flex items-center justify-between border-b pb-4">
+          <h3 className={pageBlockTitleClass}>シート基本情報</h3>
+          <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${getSheetStatusPillClass(formData.status)}`}>
+            {getSheetStatusLabel(formData.status)}
+          </span>
+        </div>
         <div className="mb-6">
             <h4 className={`${sectionTitleClass} mb-4 flex items-center gap-2`}>
                 <span className="w-1 h-5 bg-amber-500 rounded-full"></span>
@@ -901,7 +951,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                         type="text" 
                         value={formData.creatorName} 
                         onChange={(e) => handleHeaderChange('creatorName', e.target.value)}
-                        className={formFieldClass} 
+                        className={getFieldClass(!hasText(formData.creatorName))} 
                     />
                 </div>
                 <div>
@@ -910,7 +960,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                         type="email" 
                         value={formData.email} 
                         onChange={(e) => handleHeaderChange('email', e.target.value)}
-                        className={formFieldClass} 
+                        className={getFieldClass(!hasText(formData.email))} 
                     />
                 </div>
                 <div>
@@ -919,7 +969,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                         type="tel" 
                         value={formData.phoneNumber} 
                         onChange={(e) => handleHeaderChange('phoneNumber', e.target.value)}
-                        className={formFieldClass} 
+                        className={getFieldClass(!hasText(formData.phoneNumber))} 
                     />
                 </div>
             </div>
@@ -933,13 +983,15 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <div className="col-span-1 md:col-span-2">
                     <label className="block text-sm font-bold text-slate-700 mb-2">棚割名 <span className="text-danger">*</span></label>
-                    <select
-                        className={formSelectClass}
-                        value={formData.shelfName || ''}
-                        onChange={(e) => handleHeaderChange('shelfName', e.target.value)}
-                    >
-                        {getShelfOptions().map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
+                    <div className={compactSelectWrapperClass}>
+                      <select
+                          className={compactSelectClass(!hasText(formData.shelfName))}
+                          value={formData.shelfName || ''}
+                          onChange={(e) => handleHeaderChange('shelfName', e.target.value)}
+                      >
+                          {getShelfOptions().map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    </div>
                 </div>
                 <div className="col-span-1 md:col-span-2">
                     <label className="block text-sm font-bold text-slate-700 mb-2">タイトル <span className="text-danger">*</span></label>
@@ -947,20 +999,22 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                         type="text" 
                         value={formData.title} 
                         onChange={(e) => handleHeaderChange('title', e.target.value)}
-                        className={`${formFieldClass} text-base sm:text-lg`} 
+                        className={`${getFieldClass(!hasText(formData.title))} text-base sm:text-lg`} 
                         placeholder="例：2024年秋の新商品プロモーション"
                     />
                 </div>
                 <div className="col-span-1 md:col-span-2">
                     <label className="block text-sm font-bold text-slate-700 mb-2">案件</label>
-                    <select
-                        className={formSelectClass}
-                        value={formData.caseName || ''}
-                        onChange={(e) => handleHeaderChange('caseName', e.target.value)}
-                    >
-                        <option value="">未設定</option>
-                        {getCaseOptions().map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
+                    <div className={compactSelectWrapperClass}>
+                      <select
+                          className={compactSelectClass()}
+                          value={formData.caseName || ''}
+                          onChange={(e) => handleHeaderChange('caseName', e.target.value)}
+                      >
+                          <option value="">未設定</option>
+                          {getCaseOptions().map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    </div>
                 </div>
                 <div className="col-span-1 md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6 items-start">
@@ -997,8 +1051,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                       </div>
                       <div>
                         <label className="block text-sm font-bold text-slate-700 mb-2">展開期間</label>
-                        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                          <div className="px-4 py-2 bg-slate-100 rounded-lg text-slate-700 min-w-[110px] text-center font-semibold">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className="min-w-[110px] rounded-lg bg-slate-100 px-4 py-3 text-center font-semibold text-slate-700">
                             {period.start || '-'}
                           </div>
                           <span className="text-slate-500">~</span>
@@ -1011,7 +1065,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                                   deploymentEndMonth: Number(e.target.value) || undefined,
                                 }))
                               }
-                              className={`${formSelectClass} min-w-[140px] text-center font-semibold`}
+                              className={`${getSelectClass()} min-w-[140px] w-auto text-center font-semibold`}
                             >
                               {[...Array(12)].map((_, idx) => (
                                 <option key={idx + 1} value={idx + 1}>
@@ -1020,7 +1074,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                               ))}
                             </select>
                           ) : (
-                            <div className="px-4 py-2 bg-slate-100 rounded-lg text-slate-700 min-w-[110px] text-center font-semibold">
+                            <div className="min-w-[140px] rounded-lg bg-slate-100 px-4 py-3 text-center font-semibold text-slate-700">
                               {period.end || '-'}
                             </div>
                           )}
@@ -1037,7 +1091,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                         rows={3}
                         value={formData.notes || ''}
                         onChange={(e) => handleHeaderChange('notes', e.target.value)}
-                        className={formTextareaClass}
+                        className={getTextareaClass()}
                         placeholder="エントリーシートのコンセプトをご記載ください"
                     />
                 </div>
@@ -1046,7 +1100,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     <input
                         type="file"
                         multiple
-                        className="block w-full text-transparent file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
+                        className="block w-full text-transparent file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-slate-700 hover:file:bg-slate-200"
                         onChange={(e) => {
                           const input = e.target;
                           void handleAddAttachments(input.files).finally(() => {
@@ -1058,73 +1112,79 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     {(formData.attachments ?? []).length > 0 && (
                         <ul className="mt-3 space-y-2">
                             {(formData.attachments ?? []).map((file, index) => (
-                                <li key={`${file.name}-${index}`} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                                <li key={`${file.name}-${index}`} className="rounded-lg bg-slate-50 px-4 py-3 text-sm">
+                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                     <span className="text-slate-700">
                                         {file.name} <span className="text-slate-400">({formatBytes(file.size)})</span>
                                     </span>
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-4 text-sm">
                                         <a
                                             href={getSafeDownloadUrl(file.url || file.dataUrl)}
                                             download={file.name}
-                                            className="text-primary hover:underline"
+                                            className="font-medium text-primary hover:underline"
                                         >
                                             ダウンロード
                                         </a>
                                         <button
                                             type="button"
                                             onClick={() => handleRemoveAttachment(index)}
-                                            className="text-danger hover:underline"
+                                            className="font-medium text-danger hover:underline"
                                         >
                                             削除
                                         </button>
+                                    </div>
                                     </div>
                                 </li>
                             ))}
                         </ul>
                     )}
                 </div>
-                <div className="col-span-1 md:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-2">フェイス数</label>
-                    {faceOptions.length > 0 ? (
-                      <select
-                        value={formData.faceLabel || ''}
-                        onChange={(e) => {
-                          const nextOption = faceOptions.find((option) => option.label === e.target.value);
-                          setFormData((prev) => ({
-                            ...prev,
-                            faceLabel: nextOption?.label || '',
-                            faceMaxWidth: nextOption?.maxWidth,
-                          }));
-                        }}
-                        className={formSelectClass}
-                      >
-                        <option value="">選択してください</option>
-                        {faceOptions.map((option) => (
-                          <option key={`${option.label}-${option.maxWidth}`} value={option.label}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <div className="w-full border border-slate-200 rounded-lg p-3 bg-slate-100 text-slate-500">
-                        マスタ未設定
+                <div className="col-span-1 md:col-span-2 rounded-xl bg-slate-50 p-4 sm:p-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 items-start">
+                      <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-2">フェイス数</label>
+                          {faceOptions.length > 0 ? (
+                            <select
+                              value={formData.faceLabel || ''}
+                              onChange={(e) => {
+                                const nextOption = faceOptions.find((option) => option.label === e.target.value);
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  faceLabel: nextOption?.label || '',
+                                  faceMaxWidth: nextOption?.maxWidth,
+                                }));
+                              }}
+                              className={getSelectClass()}
+                            >
+                              <option value="">選択してください</option>
+                              {faceOptions.map((option) => (
+                                <option key={`${option.label}-${option.maxWidth}`} value={option.label}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <div className="w-full rounded-lg bg-slate-100 p-3 text-slate-500">
+                              マスタ未設定
+                            </div>
+                          )}
+                          <p className="text-xs text-slate-500 mt-2">
+                            選択したフェイス数に紐づくMAX値で商品幅合計を判定します。
+                          </p>
                       </div>
-                    )}
-                    <p className="text-xs text-slate-500 mt-1">
-                      選択したフェイス数に紐づくMAX値で商品幅合計を判定します。
-                    </p>
-                </div>
-                <div className="col-span-1 md:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-2">棚割り幅合計 (mm) ＊自動計算</label>
-                    <div className={`p-3 rounded-lg ${isShelfWidthOver ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-slate-100 text-slate-700'}`}>
-                        {shelfWidthTotal.toLocaleString('ja-JP')} mm
+                      <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-2">棚割り幅合計 (mm) ＊自動計算</label>
+                          <div className={`rounded-lg p-3 ${isShelfWidthOver ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-700'}`}>
+                              {shelfWidthTotal.toLocaleString('ja-JP')} mm
+                          </div>
+                          <p className={`mt-2 text-xs ${isShelfWidthOver ? 'text-red-600' : 'text-slate-500'}`}>
+                          商品情報ごとの「個装サイズ(幅) × フェイシング数」の合計値。
+                          {selectedFaceMaxWidth
+                            ? ` 選択中のフェイスMAX値は ${selectedFaceMaxWidth}mm です。`
+                            : ' フェイス数を選択すると判定上限を表示します。'}
+                          </p>
+                      </div>
                     </div>
-                    <p className={`text-xs mt-1 ${isShelfWidthOver ? 'text-red-600' : 'text-slate-500'}`}>
-                    商品情報ごとの「個装サイズ(幅) × フェイシング数」の合計値。
-                    {selectedFaceMaxWidth
-                      ? ` 選択中のフェイスMAX値は ${selectedFaceMaxWidth}mm です。`
-                      : ' フェイス数を選択すると判定上限を表示します。'}
-                    </p>
                 </div>
             </div>
         </div>
@@ -1167,6 +1227,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
               <Plus size={16} /> <span className="hidden sm:inline">商品追加</span><span className="sm:hidden">追加</span>
           </button>
           {formData.products.map((prod, idx) => {
+              const tabState = getProductTabState(prod);
               return (
               <button
                   key={prod.id}
@@ -1180,6 +1241,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                   title={prod.productName || `商品 ${idx + 1}`}
               >
                   <span>{prod.productName || `商品 ${idx + 1}`}</span>
+                  <span className={`ml-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${tabState.tone}`}>
+                    {tabState.label}
+                  </span>
               </button>
               );
           })}
@@ -1273,7 +1337,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      <label className="block text-sm font-bold text-slate-700 mb-2">JANコード <span className="text-danger">*</span> <span className="text-xs font-normal text-slate-500">(8, 13, 16桁)</span></label>
                      <input 
                         type="text" 
-                        className={`${formFieldClass} font-mono`}
+                        className={`${getFieldClass(!hasText(activeProduct.janCode))} font-mono`}
                         placeholder="1234567890123"
                         value={activeProduct.janCode}
                         onChange={(e) => handleProductChange(activeTab, 'janCode', normalizeJanCodeInput(e.target.value))}
@@ -1284,7 +1348,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      <label className="block text-sm font-bold text-slate-700 mb-2">商品名 <span className="text-danger">*</span></label>
                      <input 
                         type="text" 
-                        className={formFieldClass}
+                        className={getFieldClass(!hasText(activeProduct.productName))}
                         placeholder="例：〇〇胃薬 A 30錠"
                         value={activeProduct.productName}
                         onChange={(e) => handleProductNameChange(activeTab, e.target.value)}
@@ -1299,8 +1363,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start">
                         <div 
                             className={`
-                                w-full sm:w-40 h-48 sm:h-40 flex-shrink-0 rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer bg-white overflow-hidden relative
-                                ${!activeProduct.productImage ? 'border-warning bg-yellow-50' : 'border-slate-300'}
+                                w-full sm:w-40 h-48 sm:h-40 flex-shrink-0 rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer overflow-hidden relative
+                                ${!activeProduct.productImage ? 'border-amber-200 bg-amber-100/70' : 'border-transparent bg-slate-100'}
                             `}
                             onClick={() => handleImageUpload(activeTab, 'productImage')}
                         >
@@ -1342,7 +1406,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      <label className="block text-xs font-bold text-slate-500 mb-1">幅 (mm) <span className="text-danger">*</span></label>
                      <input 
                         type="number" 
-                        className={formFieldClass}
+                        className={getFieldClass(!(Number(activeProduct.width) > 0))}
                         value={activeProduct.width || ''}
                         onChange={(e) => handleProductChange(activeTab, 'width', parseRequiredNumber(e.target.value))}
                      />
@@ -1351,7 +1415,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      <label className="block text-xs font-bold text-slate-500 mb-1">高さ (mm) <span className="text-danger">*</span></label>
                      <input 
                         type="number" 
-                        className={formFieldClass}
+                        className={getFieldClass(!(Number(activeProduct.height) > 0))}
                         value={activeProduct.height || ''}
                         onChange={(e) => handleProductChange(activeTab, 'height', parseRequiredNumber(e.target.value))}
                      />
@@ -1360,7 +1424,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      <label className="block text-xs font-bold text-slate-500 mb-1">奥行 (mm) <span className="text-danger">*</span></label>
                      <input 
                         type="number" 
-                        className={formFieldClass}
+                        className={getFieldClass(!(Number(activeProduct.depth) > 0))}
                         value={activeProduct.depth || ''}
                         onChange={(e) => handleProductChange(activeTab, 'depth', parseRequiredNumber(e.target.value))}
                      />
@@ -1369,7 +1433,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">フェイシング数 <span className="text-danger">*</span></label>
                      <input 
                         type="number" 
-                        className={formFieldClass}
+                        className={getFieldClass(!(Number(activeProduct.facingCount) > 0))}
                         value={activeProduct.facingCount || ''}
                         onChange={(e) => handleProductChange(activeTab, 'facingCount', parseRequiredNumber(e.target.value))}
                      />
@@ -1389,7 +1453,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                 <div>
                      <label className="block text-sm font-bold text-slate-700 mb-2">リスク分類 <span className="text-danger">*</span></label>
                     <select 
-                        className={formSelectClass}
+                        className={getSelectClass(!hasText(activeProduct.riskClassification))}
                         value={activeProduct.riskClassification}
                         onChange={(e) => handleProductChange(activeTab, 'riskClassification', e.target.value)}
                     >
@@ -1428,7 +1492,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      <label className="block text-sm font-bold text-slate-700 mb-2">送込み店舗着日要望</label>
                      <input 
                         type="date" 
-                        className={formFieldClass}
+                        className={getFieldClass()}
                         value={activeProduct.arrivalDate || ''}
                         onChange={(e) => handleProductChange(activeTab, 'arrivalDate', e.target.value)}
                      />
@@ -1450,7 +1514,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      <label className="block text-sm font-bold text-slate-700 mb-2">キャッチコピー</label>
                      <textarea 
                         rows={3}
-                        className={formTextareaClass}
+                        className={getTextareaClass()}
                         placeholder="例：胃のもたれには〇〇胃薬"
                         value={activeProduct.catchCopy}
                         onChange={(e) => handleProductChange(activeTab, 'catchCopy', e.target.value)}
@@ -1472,7 +1536,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                  <div>
                      <label className="block text-sm font-bold text-slate-700 mb-2">販促物の有無 <span className="text-danger">*</span></label>
                     <select 
-                        className={formSelectClass}
+                        className={getSelectClass()}
                         value={activeProduct.hasPromoMaterial}
                         onChange={(e) => handleProductChange(activeTab, 'hasPromoMaterial', e.target.value)}
                     >
@@ -1493,7 +1557,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                          <div>
                             <label className="block text-sm font-bold text-slate-700 mb-2">香り・色見本</label>
                             <select 
-                                className={formSelectClass}
+                                className={getSelectClass()}
                                 value={activeProduct.promoSample || '無し'}
                                 onChange={(e) => handleProductChange(activeTab, 'promoSample', e.target.value)}
                             >
@@ -1505,7 +1569,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                             <label className="block text-sm font-bold text-slate-700 mb-2">特殊な陳列什器</label>
                             <input 
                                 type="text" 
-                                className={formFieldClass}
+                                className={getFieldClass()}
                                 placeholder="例：前後陳列用什器"
                                 value={activeProduct.specialFixture || ''}
                                 onChange={(e) => handleProductChange(activeTab, 'specialFixture', e.target.value)}
@@ -1516,17 +1580,17 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                              <label className="block text-sm font-bold text-slate-700 mb-2">販促物サイズ (mm) <span className="text-danger">*</span></label>
                              <div className="grid grid-cols-3 gap-2 sm:gap-4">
                                 <input 
-                                    type="number" placeholder="幅" className="border-slate-300 rounded-lg p-3"
+                                    type="number" placeholder="幅" className={getFieldClass(!(Number(activeProduct.promoWidth) > 0))}
                                     value={activeProduct.promoWidth || ''}
                                     onChange={(e) => handleProductChange(activeTab, 'promoWidth', parseOptionalNumber(e.target.value))}
                                 />
                                 <input 
-                                    type="number" placeholder="高さ" className="border-slate-300 rounded-lg p-3"
+                                    type="number" placeholder="高さ" className={getFieldClass()}
                                     value={activeProduct.promoHeight || ''}
                                     onChange={(e) => handleProductChange(activeTab, 'promoHeight', parseOptionalNumber(e.target.value))}
                                 />
                                 <input 
-                                    type="number" placeholder="奥行" className="border-slate-300 rounded-lg p-3"
+                                    type="number" placeholder="奥行" className={getFieldClass()}
                                     value={activeProduct.promoDepth || ''}
                                     onChange={(e) => handleProductChange(activeTab, 'promoDepth', parseOptionalNumber(e.target.value))}
                                 />
@@ -1535,10 +1599,10 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
                          <div className="md:col-span-2">
                             <label className="block text-sm font-bold text-slate-700 mb-2">販促物画像 <span className="text-danger">*</span></label>
-                            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                            <div className={`flex flex-col sm:flex-row gap-4 items-start sm:items-center rounded-lg p-3 ${activeProduct.promoImage ? 'bg-slate-100' : 'bg-amber-100/70'}`}>
                                 <button 
                                     onClick={() => handleImageUpload(activeTab, 'promoImage')}
-                                    className="w-full sm:w-auto px-4 py-3 bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50"
+                                    className="w-full sm:w-auto rounded-lg bg-white px-4 py-3 text-slate-700 shadow-sm hover:bg-slate-50"
                                 >
                                     画像を選択...
                                 </button>
@@ -1574,7 +1638,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     <label className="block text-sm font-bold text-slate-700 mb-2">補足事項</label>
                     <textarea
                         rows={3}
-                        className={formTextareaClass}
+                        className={getTextareaClass()}
                         placeholder="商品ブランドのURL等"
                         value={activeProduct.productNotes || ''}
                         onChange={(e) => handleProductChange(activeTab, 'productNotes', e.target.value)}
@@ -1639,7 +1703,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             {isAdminUser ? (
               <input
                 type="text"
-                className={`${formFieldClass} font-mono`}
+                className={`${getFieldClass()} font-mono`}
                 value={formData.adminMemo?.promoCode || ''}
                 onChange={(e) => handleAdminMemoChange('promoCode', normalizePromoCodeInput(e.target.value))}
                 placeholder="X000000"
@@ -1653,7 +1717,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             {isAdminUser ? (
               <input
                 type="text"
-                className={`${formFieldClass} font-mono`}
+                className={`${getFieldClass()} font-mono`}
                 value={formData.adminMemo?.boardPickingJan || ''}
                 onChange={(e) =>
                   handleAdminMemoChange(
@@ -1672,7 +1736,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             {isAdminUser ? (
               <input
                 type="url"
-                className={formFieldClass}
+                className={getFieldClass()}
                 value={formData.adminMemo?.deadlineTableUrl || ''}
                 onChange={(e) => handleAdminMemoChange('deadlineTableUrl', e.target.value)}
                 placeholder="https://drive.google.com/..."
@@ -1815,7 +1879,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             {isAdminUser ? (
               <textarea
                 rows={2}
-                className={formTextareaClass}
+                className={getTextareaClass()}
                 value={formData.adminMemo?.printOther || ''}
                 onChange={(e) => handleAdminMemoChange('printOther', e.target.value)}
               />
@@ -1828,7 +1892,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             {isAdminUser ? (
               <textarea
                 rows={2}
-                className={formTextareaClass}
+                className={getTextareaClass()}
                 value={formData.adminMemo?.equipmentNote || ''}
                 onChange={(e) => handleAdminMemoChange('equipmentNote', e.target.value)}
               />
@@ -1841,7 +1905,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             {isAdminUser ? (
               <textarea
                 rows={3}
-                className={formTextareaClass}
+                className={getTextareaClass()}
                 value={formData.adminMemo?.adminNote || ''}
                 onChange={(e) => handleAdminMemoChange('adminNote', e.target.value)}
               />
