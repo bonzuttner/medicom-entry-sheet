@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { EntrySheet, EntrySheetRevision, MasterData, ProductEntry, User, UserRole } from '../types';
+import { EntrySheet, EntrySheetRevision, FaceOption, MasterData, ProductEntry, User, UserRole } from '../types';
 import { Save, ArrowLeft, Plus, Trash2, AlertTriangle, Image as ImageIcon, Search, ChevronRight } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -134,6 +134,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     );
   };
 
+  const getFaceOptions = (): FaceOption[] =>
+    masterData.manufacturerFaceOptions?.[formData.manufacturerName] || [];
+
   const runProductSearch = async () => {
     setIsSearchingProducts(true);
     try {
@@ -222,6 +225,21 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       };
     });
   }, [formData.caseName, selectedStartMonth]);
+
+  useEffect(() => {
+    const faceOptions = getFaceOptions();
+    if (faceOptions.length !== 1) return;
+    const [onlyOption] = faceOptions;
+    setFormData((prev) =>
+      prev.faceLabel || prev.faceMaxWidth
+        ? prev
+        : {
+            ...prev,
+            faceLabel: onlyOption.label,
+            faceMaxWidth: onlyOption.maxWidth,
+          }
+    );
+  }, [formData.manufacturerName, masterData.manufacturerFaceOptions]);
 
   const handleHeaderChange = (field: keyof EntrySheet, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -678,8 +696,12 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     
     let finalStatus: EntrySheet['status'] = status;
     if (status === 'completed') {
-        if (shelfWidthTotal >= 840) {
-            alert("棚割り幅合計が840mm以上のため完了できません。");
+        if (faceOptions.length > 0 && !selectedFaceMaxWidth) {
+            alert("フェイス数を選択してください");
+            return;
+        }
+        if (selectedFaceMaxWidth && shelfWidthTotal > selectedFaceMaxWidth) {
+            alert(`商品幅合計がフェイスMAX値（${selectedFaceMaxWidth}mm）を超えているため完了できません。`);
             return;
         }
         const hasMissingProductImage = formData.products.some((product) => !product.productImage);
@@ -796,12 +818,19 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
   const activeProduct = formData.products[activeTab];
   const promoImageFileName = getDisplayFileNameFromUrl(activeProduct.promoImage);
+  const faceOptions = getFaceOptions();
+  const selectedFaceOption =
+    faceOptions.find((option) => option.label === formData.faceLabel) ||
+    (formData.faceLabel && formData.faceMaxWidth
+      ? { label: formData.faceLabel, maxWidth: formData.faceMaxWidth }
+      : undefined);
+  const selectedFaceMaxWidth = selectedFaceOption?.maxWidth;
   const shelfWidthTotal = formData.products.reduce((sum, product) => {
     const width = Number(product.width) || 0;
     const facing = Number(product.facingCount) || 0;
     return sum + width * facing;
   }, 0);
-  const isShelfWidthOver = shelfWidthTotal >= 840;
+  const isShelfWidthOver = selectedFaceMaxWidth ? shelfWidthTotal > selectedFaceMaxWidth : false;
 
   return (
     <div className="pb-24 sm:pb-20">
@@ -1047,12 +1076,46 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     )}
                 </div>
                 <div className="col-span-1 md:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">フェイス数</label>
+                    {faceOptions.length > 0 ? (
+                      <select
+                        value={formData.faceLabel || ''}
+                        onChange={(e) => {
+                          const nextOption = faceOptions.find((option) => option.label === e.target.value);
+                          setFormData((prev) => ({
+                            ...prev,
+                            faceLabel: nextOption?.label || '',
+                            faceMaxWidth: nextOption?.maxWidth,
+                          }));
+                        }}
+                        className="w-full border-slate-300 rounded-lg py-3 px-3 bg-white"
+                      >
+                        <option value="">選択してください</option>
+                        {faceOptions.map((option) => (
+                          <option key={`${option.label}-${option.maxWidth}`} value={option.label}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="w-full border border-slate-200 rounded-lg p-3 bg-slate-100 text-slate-500">
+                        マスタ未設定
+                      </div>
+                    )}
+                    <p className="text-xs text-slate-500 mt-1">
+                      選択したフェイス数に紐づくMAX値で商品幅合計を判定します。
+                    </p>
+                </div>
+                <div className="col-span-1 md:col-span-2">
                     <label className="block text-sm font-bold text-slate-700 mb-2">棚割り幅合計 (mm) ＊自動計算</label>
                     <div className={`p-3 rounded-lg ${isShelfWidthOver ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-slate-100 text-slate-700'}`}>
                         {shelfWidthTotal.toLocaleString('ja-JP')} mm
                     </div>
                     <p className={`text-xs mt-1 ${isShelfWidthOver ? 'text-red-600' : 'text-slate-500'}`}>
-                    商品情報ごとの「個装サイズ(幅) × フェイシング数」の合計値。840mm以下を推奨。
+                    商品情報ごとの「個装サイズ(幅) × フェイシング数」の合計値。
+                    {selectedFaceMaxWidth
+                      ? ` 選択中のフェイスMAX値は ${selectedFaceMaxWidth}mm です。`
+                      : ' フェイス数を選択すると判定上限を表示します。'}
                     </p>
                 </div>
             </div>

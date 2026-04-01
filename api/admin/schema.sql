@@ -57,6 +57,8 @@ CREATE TABLE IF NOT EXISTS entry_sheets (
   notes TEXT,
   deployment_start_month SMALLINT,
   deployment_end_month SMALLINT,
+  face_label VARCHAR(50),
+  face_max_width INTEGER,
   status VARCHAR(30) NOT NULL CHECK (status IN ('draft', 'completed', 'completed_no_image')),
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -88,6 +90,12 @@ ALTER TABLE entry_sheets
 
 ALTER TABLE entry_sheets
   ADD COLUMN IF NOT EXISTS deployment_end_month SMALLINT;
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS face_label VARCHAR(50);
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS face_max_width INTEGER;
 
 ALTER TABLE entry_sheets
   DROP COLUMN IF EXISTS admin_promo_code,
@@ -309,6 +317,19 @@ CREATE TABLE IF NOT EXISTS manufacturer_default_start_months (
 
 CREATE INDEX IF NOT EXISTS idx_manufacturer_default_start_months_manufacturer
   ON manufacturer_default_start_months(manufacturer_id, display_order);
+
+CREATE TABLE IF NOT EXISTS manufacturer_face_options (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  manufacturer_id UUID NOT NULL REFERENCES manufacturers(id) ON DELETE CASCADE,
+  face_label VARCHAR(50) NOT NULL,
+  max_width INTEGER NOT NULL CHECK (max_width > 0),
+  display_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE (manufacturer_id, face_label)
+);
+
+CREATE INDEX IF NOT EXISTS idx_manufacturer_face_options_manufacturer
+  ON manufacturer_face_options(manufacturer_id, display_order);
 
 -- エントリーシート変更履歴
 CREATE TABLE IF NOT EXISTS entry_sheet_revisions (

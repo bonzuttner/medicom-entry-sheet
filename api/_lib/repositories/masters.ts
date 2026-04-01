@@ -1,5 +1,5 @@
 import * as db from '../db.js';
-import { MasterData } from '../types.js';
+import { FaceOption, MasterData } from '../types.js';
 import { ensureManufacturer } from './users.js';
 
 /**
@@ -32,9 +32,17 @@ interface ManufacturerDefaultStartMonthRow {
   display_order: number;
 }
 
+interface ManufacturerFaceOptionRow {
+  manufacturer_name: string;
+  face_label: string;
+  max_width: number;
+  display_order: number;
+}
+
 let ensureManufacturerShelfTablePromise: Promise<void> | null = null;
 let ensureManufacturerCaseTablePromise: Promise<void> | null = null;
 let ensureManufacturerDefaultStartMonthsTablePromise: Promise<void> | null = null;
+let ensureManufacturerFaceOptionsTablePromise: Promise<void> | null = null;
 
 const ensureManufacturerShelfTable = async (): Promise<void> => {
   if (!ensureManufacturerShelfTablePromise) {
@@ -123,6 +131,36 @@ const ensureManufacturerDefaultStartMonthsTable = async (): Promise<void> => {
   await ensureManufacturerDefaultStartMonthsTablePromise;
 };
 
+const ensureManufacturerFaceOptionsTable = async (): Promise<void> => {
+  if (!ensureManufacturerFaceOptionsTablePromise) {
+    ensureManufacturerFaceOptionsTablePromise = (async () => {
+      await db.query(
+        `
+        CREATE TABLE IF NOT EXISTS manufacturer_face_options (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          manufacturer_id UUID NOT NULL REFERENCES manufacturers(id) ON DELETE CASCADE,
+          face_label VARCHAR(50) NOT NULL,
+          max_width INTEGER NOT NULL CHECK (max_width > 0),
+          display_order INTEGER NOT NULL DEFAULT 0,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          UNIQUE (manufacturer_id, face_label)
+        )
+        `
+      );
+      await db.query(
+        `
+        CREATE INDEX IF NOT EXISTS idx_manufacturer_face_options_manufacturer
+        ON manufacturer_face_options(manufacturer_id, display_order)
+        `
+      );
+    })().catch((error) => {
+      ensureManufacturerFaceOptionsTablePromise = null;
+      throw error;
+    });
+  }
+  await ensureManufacturerFaceOptionsTablePromise;
+};
+
 const MASTER_CATEGORY = {
   manufacturerNames: 'manufacturer_name',
   shelfNames: 'shelf_name',
@@ -195,6 +233,7 @@ export const getAll = async (): Promise<MasterData> => {
     caseNames: [],
     riskClassifications,
     specificIngredients,
+    manufacturerFaceOptions: {},
   };
 };
 
@@ -259,6 +298,50 @@ export const getManufacturerDefaultStartMonthsMap = async (): Promise<Record<str
     map[row.manufacturer_name].push(row.month);
   }
   return map;
+};
+
+export const getManufacturerFaceOptionsMap = async (): Promise<Record<string, FaceOption[]>> => {
+  await ensureManufacturerFaceOptionsTable();
+  const result = await db.query<ManufacturerFaceOptionRow>(
+    `
+    SELECT m.name as manufacturer_name, f.face_label, f.max_width, f.display_order
+    FROM manufacturer_face_options f
+    JOIN manufacturers m ON f.manufacturer_id = m.id
+    ORDER BY m.name, f.display_order
+    `
+  );
+
+  const map: Record<string, FaceOption[]> = {};
+  for (const row of result.rows) {
+    if (!map[row.manufacturer_name]) {
+      map[row.manufacturer_name] = [];
+    }
+    map[row.manufacturer_name].push({
+      label: row.face_label,
+      maxWidth: row.max_width,
+    });
+  }
+  return map;
+};
+
+export const getFaceOptionsByManufacturerName = async (
+  manufacturerName: string
+): Promise<FaceOption[]> => {
+  await ensureManufacturerFaceOptionsTable();
+  const result = await db.query<{ face_label: string; max_width: number; display_order: number }>(
+    `
+    SELECT f.face_label, f.max_width, f.display_order
+    FROM manufacturer_face_options f
+    JOIN manufacturers m ON f.manufacturer_id = m.id
+    WHERE m.name = $1
+    ORDER BY f.display_order
+    `,
+    [manufacturerName]
+  );
+  return result.rows.map((row) => ({
+    label: row.face_label,
+    maxWidth: row.max_width,
+  }));
 };
 
 export const getShelfNamesByManufacturerName = async (
@@ -400,6 +483,47 @@ export const updateManufacturerDefaultStartMonthsMap = async (
   });
 };
 
+export const updateManufacturerFaceOptionsMap = async (
+  nextMap: Record<string, FaceOption[]>
+): Promise<void> => {
+  await ensureManufacturerFaceOptionsTable();
+  await db.transaction(async () => {
+    for (const [manufacturerName, values] of Object.entries(nextMap)) {
+      const normalizedManufacturerName = String(manufacturerName || '').trim();
+      if (!normalizedManufacturerName) continue;
+
+      const manufacturerId = await ensureManufacturer(normalizedManufacturerName);
+      const desired = values
+        .map((item) => ({
+          label: String(item?.label || '').trim(),
+          maxWidth: Number(item?.maxWidth),
+        }))
+        .filter(
+          (item, index, source) =>
+            item.label &&
+            Number.isInteger(item.maxWidth) &&
+            item.maxWidth > 0 &&
+            source.findIndex((candidate) => candidate.label === item.label) === index
+        );
+
+      await db.query(`DELETE FROM manufacturer_face_options WHERE manufacturer_id = $1`, [
+        manufacturerId,
+      ]);
+
+      for (let index = 0; index < desired.length; index += 1) {
+        await db.query(
+          `
+          INSERT INTO manufacturer_face_options (
+            manufacturer_id, face_label, max_width, display_order
+          ) VALUES ($1, $2, $3, $4)
+          `,
+          [manufacturerId, desired[index].label, desired[index].maxWidth, index]
+        );
+      }
+    }
+  });
+};
+
 /**
  * Update all master data (diff strategy)
  */
@@ -414,6 +538,7 @@ export const updateAll = async (masterData: MasterData): Promise<MasterData> => 
     specificIngredients: [
       ...new Set(masterData.specificIngredients.map((v) => v.trim()).filter(Boolean)),
     ],
+    manufacturerFaceOptions: masterData.manufacturerFaceOptions || {},
   };
 
   const syncCategory = async (
@@ -515,11 +640,14 @@ export default {
   getManufacturerShelfNamesMap,
   getManufacturerCaseNamesMap,
   getManufacturerDefaultStartMonthsMap,
+  getManufacturerFaceOptionsMap,
   getShelfNamesByManufacturerName,
   getCaseNamesByManufacturerName,
+  getFaceOptionsByManufacturerName,
   updateManufacturerShelfNamesMap,
   updateManufacturerCaseNamesMap,
   updateManufacturerDefaultStartMonthsMap,
+  updateManufacturerFaceOptionsMap,
   updateAll,
   addValue,
   removeValue,

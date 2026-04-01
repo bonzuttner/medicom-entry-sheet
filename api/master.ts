@@ -50,6 +50,21 @@ const findTooLongMasterValue = (data: MasterData): string | null => {
     }
   }
 
+  const faceOptionsMap = data.manufacturerFaceOptions || {};
+  for (const [manufacturerName, options] of Object.entries(faceOptionsMap)) {
+    if (manufacturerName.length > MAX_MASTER_VALUE_LENGTH) {
+      return 'メーカー名';
+    }
+    for (const option of options) {
+      if (String(option?.label || '').length > MAX_MASTER_VALUE_LENGTH) {
+        return 'フェイス数';
+      }
+      if (!Number.isInteger(Number(option?.maxWidth)) || Number(option?.maxWidth) <= 0) {
+        return 'フェイスMAX値';
+      }
+    }
+  }
+
   const caseMap = data.manufacturerCaseNames || {};
   for (const [manufacturerName, caseNames] of Object.entries(caseMap)) {
     if (manufacturerName.length > MAX_MASTER_VALUE_LENGTH) {
@@ -79,6 +94,9 @@ export default async function handler(req: any, res: any) {
     const caseNamesForCurrentUser = await MasterRepository.getCaseNamesByManufacturerName(
       currentUser.manufacturerName
     );
+    const faceOptionsForCurrentUser = await MasterRepository.getFaceOptionsByManufacturerName(
+      currentUser.manufacturerName
+    );
     if (!isAdmin(currentUser)) {
       sendJson(res, 200, {
         manufacturerNames: [],
@@ -86,6 +104,9 @@ export default async function handler(req: any, res: any) {
         caseNames: caseNamesForCurrentUser,
         riskClassifications: masterData.riskClassifications,
         specificIngredients: masterData.specificIngredients,
+        manufacturerFaceOptions: {
+          [currentUser.manufacturerName]: faceOptionsForCurrentUser,
+        },
       });
       return;
     }
@@ -93,6 +114,7 @@ export default async function handler(req: any, res: any) {
     const manufacturerCaseNames = await MasterRepository.getManufacturerCaseNamesMap();
     const manufacturerDefaultStartMonths =
       await MasterRepository.getManufacturerDefaultStartMonthsMap();
+    const manufacturerFaceOptions = await MasterRepository.getManufacturerFaceOptionsMap();
     sendJson(res, 200, {
       ...masterData,
       shelfNames: shelfNamesForCurrentUser,
@@ -100,6 +122,7 @@ export default async function handler(req: any, res: any) {
       manufacturerShelfNames,
       manufacturerCaseNames,
       manufacturerDefaultStartMonths,
+      manufacturerFaceOptions,
     });
     return;
   }
@@ -149,24 +172,38 @@ export default async function handler(req: any, res: any) {
       );
       await MasterRepository.updateManufacturerDefaultStartMonthsMap(normalizedMonthMap);
     }
+    if (Object.prototype.hasOwnProperty.call(body.data, 'manufacturerFaceOptions')) {
+      const faceMap = body.data.manufacturerFaceOptions || {};
+      const normalizedFaceMap = Object.fromEntries(
+        (body.data.manufacturerNames || []).map((name) => [name, faceMap[name] || []])
+      );
+      await MasterRepository.updateManufacturerFaceOptionsMap(normalizedFaceMap);
+    }
     const shelfNamesForCurrentUser = await MasterRepository.getShelfNamesByManufacturerName(
       currentUser.manufacturerName
     );
     const caseNamesForCurrentUser = await MasterRepository.getCaseNamesByManufacturerName(
       currentUser.manufacturerName
     );
+    const faceOptionsForCurrentUser = await MasterRepository.getFaceOptionsByManufacturerName(
+      currentUser.manufacturerName
+    );
     const manufacturerShelfNames = await MasterRepository.getManufacturerShelfNamesMap();
     const manufacturerCaseNames = await MasterRepository.getManufacturerCaseNamesMap();
     const manufacturerDefaultStartMonths =
       await MasterRepository.getManufacturerDefaultStartMonthsMap();
+    const manufacturerFaceOptions = await MasterRepository.getManufacturerFaceOptionsMap();
     sendJson(res, 200, {
       ...updated,
       shelfNames: shelfNamesForCurrentUser,
       caseNames: caseNamesForCurrentUser,
+      manufacturerFaceOptions: isAdmin(currentUser)
+        ? manufacturerFaceOptions
+        : { [currentUser.manufacturerName]: faceOptionsForCurrentUser },
       manufacturerShelfNames,
       manufacturerCaseNames,
       manufacturerDefaultStartMonths,
-    });
+    }); 
     return;
   }
 

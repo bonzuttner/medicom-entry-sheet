@@ -27,6 +27,7 @@ const EMPTY_MASTER_DATA: MasterData = {
   manufacturerShelfNames: {},
   manufacturerCaseNames: {},
   manufacturerDefaultStartMonths: {},
+  manufacturerFaceOptions: {},
 };
 
 const SHEET_PAGE_SIZE = 30;
@@ -106,6 +107,8 @@ const toComparableSheetCore = (sheet: EntrySheet) => ({
   shelfName: normalizeOptionalString(sheet.shelfName),
   deploymentStartMonth: normalizeOptionalNumber(sheet.deploymentStartMonth),
   deploymentEndMonth: normalizeOptionalNumber(sheet.deploymentEndMonth),
+  faceLabel: normalizeOptionalString(sheet.faceLabel),
+  faceMaxWidth: normalizeOptionalNumber(sheet.faceMaxWidth),
   status: sheet.status,
   products: toComparableProducts(sheet.products),
   attachments: toComparableAttachments(sheet.attachments),
@@ -390,6 +393,8 @@ const App: React.FC = () => {
       phoneNumber: currentUser.phoneNumber,
       title: '',
       notes: '',
+      faceLabel: '',
+      faceMaxWidth: undefined,
       attachments: [],
       status: 'draft',
       products: [

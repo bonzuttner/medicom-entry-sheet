@@ -211,6 +211,8 @@ const toComparableSheetCore = (sheet: EntrySheet) => ({
   shelfName: normalizeOptionalString(sheet.shelfName),
   deploymentStartMonth: normalizeOptionalNumberForCompare(sheet.deploymentStartMonth),
   deploymentEndMonth: normalizeOptionalNumberForCompare(sheet.deploymentEndMonth),
+  faceLabel: normalizeOptionalString(sheet.faceLabel),
+  faceMaxWidth: normalizeOptionalNumberForCompare(sheet.faceMaxWidth),
   status: normalizeStatus(sheet.status),
   products: toComparableProducts(sheet.products),
   attachments: toComparableAttachments(sheet.attachments),
@@ -254,6 +256,8 @@ const buildRevisionSummary = (before: EntrySheet | null, after: EntrySheet): str
   pushChange('状態', before.status, after.status);
   pushChange('展開スタート月', before.deploymentStartMonth, after.deploymentStartMonth);
   pushChange('展開終了月', before.deploymentEndMonth, after.deploymentEndMonth);
+  pushChange('フェイス数', before.faceLabel || '', after.faceLabel || '');
+  pushChange('フェイスMAX値', before.faceMaxWidth, after.faceMaxWidth);
 
   if (before.products.length !== after.products.length) {
     changes.push(`商品件数: ${before.products.length} -> ${after.products.length}`);

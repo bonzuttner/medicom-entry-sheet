@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MasterData } from '../types';
+import { FaceOption, MasterData } from '../types';
 import { Plus, X } from 'lucide-react';
 
 const ALL_MANUFACTURERS = '__all__';
@@ -15,6 +15,8 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
   const [selectedManufacturer, setSelectedManufacturer] = useState('');
   const [shelfInput, setShelfInput] = useState('');
   const [caseInput, setCaseInput] = useState('');
+  const [faceLabelInput, setFaceLabelInput] = useState('');
+  const [faceMaxWidthInput, setFaceMaxWidthInput] = useState('');
 
   useEffect(() => {
     setLocalData(data);
@@ -155,6 +157,59 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
   };
 
   const monthLabels = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+  const getFaceOptionsForSelectedManufacturer = (): FaceOption[] => {
+    if (!selectedManufacturer || selectedManufacturer === ALL_MANUFACTURERS) return [];
+    return localData.manufacturerFaceOptions?.[selectedManufacturer] || [];
+  };
+
+  const getAllFaceOptions = (): Array<{ manufacturer: string; option: FaceOption }> => {
+    return localData.manufacturerNames.flatMap((manufacturer) =>
+      (localData.manufacturerFaceOptions?.[manufacturer] || []).map((option) => ({
+        manufacturer,
+        option,
+      }))
+    );
+  };
+
+  const addFaceOption = async () => {
+    if (!selectedManufacturer || selectedManufacturer === ALL_MANUFACTURERS) return;
+    const label = normalizeItem(faceLabelInput);
+    const maxWidth = Number(faceMaxWidthInput);
+    if (!label || !Number.isInteger(maxWidth) || maxWidth <= 0) return;
+    const current = getFaceOptionsForSelectedManufacturer();
+    if (current.some((option) => option.label.trim() === label)) {
+      return;
+    }
+    const manufacturerFaceOptions = {
+      ...(localData.manufacturerFaceOptions || {}),
+      [selectedManufacturer]: [...current, { label, maxWidth }],
+    };
+    await persist({ ...localData, manufacturerFaceOptions });
+    setFaceLabelInput('');
+    setFaceMaxWidthInput('');
+  };
+
+  const removeFaceOption = async (label: string) => {
+    if (!selectedManufacturer || selectedManufacturer === ALL_MANUFACTURERS) return;
+    if (!window.confirm(`「${label}」を削除しますか？`)) return;
+    const current = getFaceOptionsForSelectedManufacturer();
+    const manufacturerFaceOptions = {
+      ...(localData.manufacturerFaceOptions || {}),
+      [selectedManufacturer]: current.filter((option) => option.label !== label),
+    };
+    await persist({ ...localData, manufacturerFaceOptions });
+  };
+
+  const removeFaceOptionByManufacturer = async (manufacturer: string, label: string) => {
+    if (!window.confirm(`「${manufacturer} / ${label}」を削除しますか？`)) return;
+    const current = localData.manufacturerFaceOptions?.[manufacturer] || [];
+    const manufacturerFaceOptions = {
+      ...(localData.manufacturerFaceOptions || {}),
+      [manufacturer]: current.filter((option) => option.label !== label),
+    };
+    await persist({ ...localData, manufacturerFaceOptions });
+  };
+
   const getDefaultStartMonthsForSelectedManufacturer = (): number[] => {
     if (!selectedManufacturer) return [];
     return localData.manufacturerDefaultStartMonths?.[selectedManufacturer] || [];
@@ -341,35 +396,111 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
               </div>
 
               <div className="rounded-lg border border-slate-200 p-3">
-                <h4 className="font-semibold text-slate-800 mb-2">デフォルト展開スタート月</h4>
+                <h4 className="font-semibold text-slate-800 mb-2">フェイス設定</h4>
                 {selectedManufacturer === ALL_MANUFACTURERS ? (
-                  <p className="text-xs text-slate-500">「すべて」は閲覧専用です。編集するにはメーカーを選択してください。</p>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {monthLabels.map((label, index) => {
-                      const month = index + 1;
-                      const checked = getDefaultStartMonthsForSelectedManufacturer().includes(month);
-                      return (
-                        <button
-                          key={label}
-                          type="button"
-                          onClick={() => {
-                            void toggleDefaultStartMonth(month);
-                          }}
-                          disabled={isSaving}
-                          className={`px-2.5 py-1.5 rounded-md border text-xs ${
-                            checked
-                              ? 'bg-primary text-white border-primary'
-                              : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-                          }`}
+                  <div className="space-y-2 max-h-64 overflow-auto">
+                    {getAllFaceOptions().length === 0 ? (
+                      <p className="text-xs text-slate-500">フェイス設定はまだありません。</p>
+                    ) : (
+                      getAllFaceOptions().map((item, index) => (
+                        <div
+                          key={`${item.manufacturer}-${item.option.label}-${index}`}
+                          className="px-2.5 py-1.5 rounded-md bg-slate-50 border border-slate-200 text-xs flex items-center justify-between gap-2"
                         >
-                          {label}
-                        </button>
-                      );
-                    })}
+                          <div className="min-w-0">
+                            <span className="font-semibold text-slate-700">{item.manufacturer}</span>
+                            <span className="text-slate-400 mx-1.5">/</span>
+                            <span className="text-slate-700">{item.option.label}</span>
+                            <span className="text-slate-400 mx-1.5">/</span>
+                            <span className="text-slate-700">MAX {item.option.maxWidth}mm</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void removeFaceOptionByManufacturer(item.manufacturer, item.option.label);
+                            }}
+                            className="text-slate-400 hover:text-danger shrink-0"
+                            title="削除"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))
+                    )}
                   </div>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {getFaceOptionsForSelectedManufacturer().map((item) => (
+                        <span
+                          key={`${item.label}-${item.maxWidth}`}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-full text-slate-700 text-xs"
+                        >
+                          {item.label} / MAX {item.maxWidth}mm
+                          <button onClick={() => void removeFaceOption(item.label)} className="hover:text-danger">
+                            <X size={12} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px_auto] gap-2">
+                      <input
+                        className="border border-slate-300 rounded-md px-3 py-1.5 text-sm"
+                        placeholder="フェイス数ラベル"
+                        value={faceLabelInput}
+                        onChange={(e) => setFaceLabelInput(e.target.value)}
+                      />
+                      <input
+                        type="number"
+                        className="border border-slate-300 rounded-md px-3 py-1.5 text-sm"
+                        placeholder="MAX値(mm)"
+                        value={faceMaxWidthInput}
+                        onChange={(e) => setFaceMaxWidthInput(e.target.value)}
+                      />
+                      <button
+                        onClick={async () => {
+                          await addFaceOption();
+                        }}
+                        disabled={isSaving}
+                        className="bg-secondary text-white px-3 py-1.5 rounded-md hover:bg-slate-600 text-sm flex items-center gap-1 justify-center"
+                      >
+                        <Plus size={14} /> 追加
+                      </button>
+                    </div>
+                  </>
                 )}
               </div>
+            </div>
+
+            <div className="mt-4 rounded-lg border border-slate-200 p-3">
+              <h4 className="font-semibold text-slate-800 mb-2">デフォルト展開スタート月</h4>
+              {selectedManufacturer === ALL_MANUFACTURERS ? (
+                <p className="text-xs text-slate-500">「すべて」は閲覧専用です。編集するにはメーカーを選択してください。</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {monthLabels.map((label, index) => {
+                    const month = index + 1;
+                    const checked = getDefaultStartMonthsForSelectedManufacturer().includes(month);
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => {
+                          void toggleDefaultStartMonth(month);
+                        }}
+                        disabled={isSaving}
+                        className={`px-2.5 py-1.5 rounded-md border text-xs ${
+                          checked
+                            ? 'bg-primary text-white border-primary'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
         </div>
         

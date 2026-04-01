@@ -20,6 +20,12 @@ export interface MasterData {
   manufacturerShelfNames?: Record<string, string[]>;
   manufacturerCaseNames?: Record<string, string[]>;
   manufacturerDefaultStartMonths?: Record<string, number[]>;
+  manufacturerFaceOptions?: Record<string, FaceOption[]>;
+}
+
+export interface FaceOption {
+  label: string;
+  maxWidth: number;
 }
 
 export interface EntrySheetAdminMemo {
@@ -81,6 +87,8 @@ export interface EntrySheet {
   notes?: string;
   deploymentStartMonth?: number;
   deploymentEndMonth?: number;
+  faceLabel?: string;
+  faceMaxWidth?: number;
   attachments?: Attachment[];
   status: 'draft' | 'completed' | 'completed_no_image';
   adminMemo?: EntrySheetAdminMemo;
