@@ -424,61 +424,65 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
         </button>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            className={searchInputClass}
-            placeholder="タイトル / メーカー名 / 棚割名で検索"
-          />
-        </div>
-        <select
-          value={manufacturerFilter}
-          onChange={(e) => setManufacturerFilter(e.target.value)}
-          className="min-w-52 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm"
-        >
-          <option value="">メーカー: すべて</option>
-          {manufacturerOptions.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </select>
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-bold text-slate-600">展開期間</span>
-          <input
-            type="date"
-            value={deploymentDate}
-            onChange={(e) => setDeploymentDate(e.target.value)}
-            className={filterControlClass}
-          />
-          <select
-            value={deploymentFilterMode}
-            onChange={(e) => setDeploymentFilterMode(e.target.value as 'since' | 'until')}
-            className={filterControlClass}
-          >
-            <option value="since">以降</option>
-            <option value="until">以前</option>
-          </select>
-          {deploymentDate && (
-            <button
-              onClick={() => setDeploymentDate('')}
-              className="px-2 py-2 rounded-md border border-slate-300 text-xs text-slate-600 hover:bg-slate-50"
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-4">
+          <div className="relative w-full">
+            <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              className={searchInputClass}
+              placeholder="タイトル / メーカー名 / 棚割名で検索"
+            />
+          </div>
+          <div className="flex flex-col lg:flex-row gap-3">
+            <select
+              value={manufacturerFilter}
+              onChange={(e) => setManufacturerFilter(e.target.value)}
+              className="min-w-52 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm"
             >
-              解除
-            </button>
-          )}
+              <option value="">メーカー: すべて</option>
+              {manufacturerOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold text-slate-600">展開期間</span>
+              <input
+                type="date"
+                value={deploymentDate}
+                onChange={(e) => setDeploymentDate(e.target.value)}
+                className={filterControlClass}
+              />
+              <select
+                value={deploymentFilterMode}
+                onChange={(e) => setDeploymentFilterMode(e.target.value as 'since' | 'until')}
+                className={filterControlClass}
+              >
+                <option value="since">以降</option>
+                <option value="until">以前</option>
+              </select>
+              {deploymentDate && (
+                <button
+                  onClick={() => setDeploymentDate('')}
+                  className="px-2 py-2 rounded-md border border-slate-300 text-xs text-slate-600 hover:bg-slate-50"
+                >
+                  解除
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div className="overflow-auto max-h-[calc(100vh-260px)]">
-        <table className="min-w-[1380px] w-full divide-y divide-slate-200 table-fixed">
-          <thead className="bg-slate-50 [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-slate-50">
+        <table className="min-w-[1380px] w-full table-fixed border-separate border-spacing-0">
+          <thead className="bg-slate-50">
             <tr>
-              <th className="sticky left-0 top-0 z-50 w-[52px] px-2 py-3 text-center text-xs font-bold text-slate-500 bg-slate-50 shadow-[1px_0_0_0_rgba(226,232,240,1)]">
+              <th className="sticky left-0 top-0 z-50 w-[52px] border-b border-slate-200 px-2 py-3 text-center text-xs font-bold text-slate-500 bg-slate-50 shadow-[1px_0_0_0_rgba(226,232,240,1)]">
                 <button onClick={toggleSelectAll} className="inline-flex items-center justify-center text-slate-500 hover:text-slate-700">
                   {filteredSheets.length > 0 && selectedCount === filteredSheets.length ? (
                     <CheckSquare size={15} />
@@ -487,23 +491,23 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                   )}
                 </button>
               </th>
-              <th className="sticky left-[52px] top-0 z-40 w-[96px] px-1 py-3 text-left text-[10px] font-bold text-slate-400 bg-slate-50 shadow-[1px_0_0_0_rgba(226,232,240,1)]">ID</th>
-              <th className="w-[42px] px-1 py-3 text-center" aria-label="詳細編集"></th>
-              <th className="w-[82px] px-2 py-3 text-left text-xs font-bold text-slate-500">状態</th>
-              <th className="w-[180px] px-2 py-3 text-left text-xs font-bold text-slate-500">タイトル</th>
-              <th className="w-[104px] px-2 py-3 text-left text-xs font-bold text-slate-500">展開期間</th>
-              <th className="w-[110px] px-2 py-3 text-left text-xs font-bold text-slate-500">棚割り</th>
-              <th className="w-[116px] px-2 py-3 text-left text-xs font-bold text-slate-500">メーカー名</th>
-              <th className="w-[72px] px-3 py-3 text-center text-xs font-bold text-slate-500">期限表</th>
-              <th className="w-[120px] px-3 py-3 text-left text-xs font-bold text-slate-500">販促CD</th>
-              <th className="w-[150px] px-3 py-3 text-left text-xs font-bold text-slate-500">ボードピッキングJAN</th>
-              <th className="w-[120px] px-3 py-3 text-left text-xs font-bold text-slate-500">帯パターン</th>
-              <th className="w-[110px] px-3 py-3 text-left text-xs font-bold text-slate-500">対象店舗数</th>
-              <th className="hidden md:table-cell w-[260px] px-3 py-3 text-left text-xs font-bold text-slate-500">印刷依頼数量</th>
-              <th className="w-[100px] px-3 py-3 text-left text-xs font-bold text-slate-500">保存</th>
+              <th className="sticky top-0 z-10 w-[96px] border-b border-slate-200 px-1 py-3 text-left text-[10px] font-bold text-slate-400 bg-slate-50">ID</th>
+              <th className="sticky top-0 z-10 w-[42px] border-b border-slate-200 bg-slate-50 px-1 py-3 text-center" aria-label="詳細編集"></th>
+              <th className="sticky top-0 z-10 w-[82px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">状態</th>
+              <th className="sticky top-0 z-10 w-[180px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">タイトル</th>
+              <th className="sticky top-0 z-10 w-[104px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">展開期間</th>
+              <th className="sticky top-0 z-10 w-[110px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">棚割り</th>
+              <th className="sticky top-0 z-10 w-[116px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">メーカー名</th>
+              <th className="sticky top-0 z-10 w-[72px] border-b border-slate-200 bg-slate-50 px-3 py-3 text-center text-xs font-bold text-slate-500">期限表</th>
+              <th className="sticky top-0 z-10 w-[120px] border-b border-slate-200 bg-slate-50 px-3 py-3 text-left text-xs font-bold text-slate-500">販促CD</th>
+              <th className="sticky top-0 z-10 w-[150px] border-b border-slate-200 bg-slate-50 px-3 py-3 text-left text-xs font-bold text-slate-500">ボードピッキングJAN</th>
+              <th className="sticky top-0 z-10 w-[120px] border-b border-slate-200 bg-slate-50 px-3 py-3 text-left text-xs font-bold text-slate-500">帯パターン</th>
+              <th className="sticky top-0 z-10 w-[110px] border-b border-slate-200 bg-slate-50 px-3 py-3 text-left text-xs font-bold text-slate-500">対象店舗数</th>
+              <th className="sticky top-0 z-10 hidden md:table-cell w-[260px] border-b border-slate-200 bg-slate-50 px-3 py-3 text-left text-xs font-bold text-slate-500">印刷依頼数量</th>
+              <th className="sticky top-0 z-10 w-[100px] border-b border-slate-200 bg-slate-50 px-3 py-3 text-left text-xs font-bold text-slate-500">保存</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="bg-white divide-y divide-slate-100">
             {filteredSheets.map((sheet) => {
               const draft = drafts[sheet.id] || buildDraftFromSheet(sheet);
               const urlEnabled = isHttpUrl(draft.deadlineTableUrl);
@@ -521,7 +525,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                         {selectedSheets.has(sheet.id) ? <CheckSquare size={15} /> : <Square size={15} />}
                       </button>
                     </td>
-                    <td className="sticky left-[52px] z-20 w-[96px] px-1 py-3 text-[10px] text-slate-400 font-mono whitespace-nowrap bg-white shadow-[1px_0_0_0_rgba(241,245,249,1)]">
+                    <td className="w-[96px] px-1 py-3 text-[10px] text-slate-400 font-mono whitespace-nowrap bg-white">
                       {getDisplaySheetId(sheet)}
                     </td>
                     <td className="px-1 py-3 text-center">
