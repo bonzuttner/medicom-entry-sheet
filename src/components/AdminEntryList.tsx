@@ -323,17 +323,12 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
         'タイトル',
         'シート補足情報',
         'メーカー名',
-        '作成者ID',
         '作成者',
         '作成日',
         '更新日',
         '展開期間開始',
         '展開期間終了',
-        '担当者メール',
-        '担当者電話',
-        'シート添付ファイル数',
         'シート添付ファイル名一覧',
-        'シート添付ファイル種別一覧',
         'シート添付ファイルURL一覧',
         '展開期間',
         '棚割名',
@@ -356,9 +351,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
       const draft = drafts[sheet.id] || buildDraftFromSheet(sheet);
       const memo = sheet.adminMemo;
       const deploymentPeriod = getDeploymentPeriod(sheet);
-      const sheetAttachmentCount = sheet.attachments?.length ?? 0;
       const sheetAttachmentNames = (sheet.attachments || []).map((file) => file.name).join(' / ');
-      const sheetAttachmentTypes = (sheet.attachments || []).map((file) => file.type).join(' / ');
       const sheetAttachmentUrls = (sheet.attachments || []).map((file) => file.url).join(' / ');
       rows.push([
         toSafeCsvCell(getDisplaySheetId(sheet)),
@@ -367,17 +360,12 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
         toSafeCsvCell(sheet.title),
         toSafeCsvCell(sheet.notes || ''),
         toSafeCsvCell(sheet.manufacturerName),
-        toSafeCsvCell(sheet.creatorId),
         toSafeCsvCell(sheet.creatorName),
         toSafeCsvCell(new Date(sheet.createdAt).toLocaleDateString()),
         toSafeCsvCell(new Date(sheet.updatedAt).toLocaleDateString()),
         toSafeCsvCell(deploymentPeriod.start),
         toSafeCsvCell(deploymentPeriod.end),
-        toSafeCsvCell(sheet.email),
-        toSafeCsvCell(sheet.phoneNumber),
-        toSafeCsvCell(sheetAttachmentCount),
         toSafeCsvCell(sheetAttachmentNames),
-        toSafeCsvCell(sheetAttachmentTypes),
         toSafeCsvCell(sheetAttachmentUrls),
         toSafeCsvCell(getDeploymentPeriodLabel(sheet)),
         toSafeCsvCell(getShelfNames(sheet)),

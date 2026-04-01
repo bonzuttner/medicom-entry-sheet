@@ -244,19 +244,13 @@ export const EntryList: React.FC<EntryListProps> = ({
         'タイトル',
         'シート補足情報',
         'メーカー名',
-        '作成者ID',
         '作成者',
         '作成日',
         '更新日',
         '展開期間開始',
         '展開期間終了',
-        '担当者メール',
-        '担当者電話',
-        'シート添付ファイル数',
         'シート添付ファイル名一覧',
-        'シート添付ファイル種別一覧',
         'シート添付ファイルURL一覧',
-        '商品ID',
         '棚割名',
         '商品メーカー名',
         'JANコード',
@@ -266,9 +260,7 @@ export const EntryList: React.FC<EntryListProps> = ({
         '特定成分',
         'キャッチコピー',
         '補足事項',
-        '商品添付ファイル数',
         '商品添付ファイル名一覧',
-        '商品添付ファイル種別一覧',
         '商品添付ファイルURL一覧',
         '幅(mm)',
         '高さ(mm)',
@@ -287,14 +279,10 @@ export const EntryList: React.FC<EntryListProps> = ({
 
     targetSheets.forEach(sheet => {
       const deploymentPeriod = getDeploymentPeriod(sheet);
-      const sheetAttachmentCount = sheet.attachments?.length ?? 0;
       const sheetAttachmentNames = (sheet.attachments || []).map((file) => file.name).join(' / ');
-      const sheetAttachmentTypes = (sheet.attachments || []).map((file) => file.type).join(' / ');
       const sheetAttachmentUrls = (sheet.attachments || []).map((file) => file.url).join(' / ');
       sheet.products.forEach(prod => {
-        const productAttachmentCount = prod.productAttachments?.length ?? 0;
         const productAttachmentNames = (prod.productAttachments || []).map((file) => file.name).join(' / ');
-        const productAttachmentTypes = (prod.productAttachments || []).map((file) => file.type).join(' / ');
         const productAttachmentUrls = (prod.productAttachments || []).map((file) => file.url).join(' / ');
         csvRows.push([
           toSafeCsvCell(getDisplaySheetId(sheet)),
@@ -303,19 +291,13 @@ export const EntryList: React.FC<EntryListProps> = ({
           toSafeCsvCell(sheet.title),
           toSafeCsvCell(sheet.notes || ''),
           toSafeCsvCell(sheet.manufacturerName),
-          toSafeCsvCell(sheet.creatorId),
           toSafeCsvCell(sheet.creatorName),
           toSafeCsvCell(new Date(sheet.createdAt).toLocaleDateString()),
           toSafeCsvCell(new Date(sheet.updatedAt).toLocaleDateString()),
           toSafeCsvCell(deploymentPeriod.start),
           toSafeCsvCell(deploymentPeriod.end),
-          toSafeCsvCell(sheet.email),
-          toSafeCsvCell(sheet.phoneNumber),
-          toSafeCsvCell(sheetAttachmentCount),
           toSafeCsvCell(sheetAttachmentNames),
-          toSafeCsvCell(sheetAttachmentTypes),
           toSafeCsvCell(sheetAttachmentUrls),
-          toSafeCsvCell(prod.id),
           toSafeCsvCell(sheet.shelfName || ''),
           toSafeCsvCell(prod.manufacturerName),
           toSafeCsvCell(prod.janCode),
@@ -325,9 +307,7 @@ export const EntryList: React.FC<EntryListProps> = ({
           toSafeCsvCell((prod.specificIngredients || []).join(' / ')),
           toSafeCsvCell(prod.catchCopy || ''),
           toSafeCsvCell(prod.productNotes || ''),
-          toSafeCsvCell(productAttachmentCount),
           toSafeCsvCell(productAttachmentNames),
-          toSafeCsvCell(productAttachmentTypes),
           toSafeCsvCell(productAttachmentUrls),
           toSafeCsvCell(prod.width),
           toSafeCsvCell(prod.height),
