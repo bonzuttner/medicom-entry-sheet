@@ -307,7 +307,6 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
     const rows: string[][] = [
       [
         'シートID',
-        '内部UUID',
         '状態',
         'タイトル',
         'シート補足情報',
@@ -344,7 +343,6 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
       const sheetAttachmentUrls = (sheet.attachments || []).map((file) => file.url).join(' / ');
       rows.push([
         toSafeCsvCell(getDisplaySheetId(sheet)),
-        toSafeCsvCell(sheet.id),
         toSafeCsvCell(getWorkflowStatusView(sheet).label),
         toSafeCsvCell(sheet.title),
         toSafeCsvCell(sheet.notes || ''),

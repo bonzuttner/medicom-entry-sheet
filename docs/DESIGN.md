@@ -102,7 +102,13 @@
   - `faceLabel`, `faceMaxWidth` を保持（選択したフェイス設定）
   - `version` を保持（競合制御）
   - `status`: `draft` / `completed` / `completed_no_image`
+  - `entryStatus`, `creativeStatus`, `currentAssignee`, `returnReason` を保持（ワークフロー管理）
   - `adminMemo` を保持（編集は ADMIN のみ、`entry_sheet_admin_memos` に分離保存）
+- `Creative`: 画像1枚単位のクリエイティブ
+  - `creatorId`, `creatorName`
+  - `name`, `imageUrl`, `memo`
+  - `linkedSheets`
+- `creative_entry_sheets`: Creative と EntrySheet の紐づき中間テーブル
 - `ProductEntry`: シート保存時点の商品スナップショット（JAN、画像、販促物情報など）
 - `manufacturer_products`: メーカー内で JAN 一意の検索用商品マスタ
   - `lastUsedAt` を保持し、最終利用から2年で削除対象
@@ -148,10 +154,14 @@
 - ユーザー保存: `PUT /api/users/:id`
 - ユーザー削除: `DELETE /api/users/:id`
 - マスタ取得/更新: `GET/PUT /api/master`
+- クリエイティブ一覧: `GET /api/creatives`
+- クリエイティブ保存/削除: `GET/PUT/DELETE /api/creatives/:id`
+- シート紐づき参照: `GET /api/creatives/by-sheet`
+- シート紐づき差し替え: `PUT /api/creatives/relink-sheet`
 
 補足:
 - 一覧表示およびCSV出力の `状態` 文言は統一し、UI表示ラベル（`下書き` / `完了` / `完了 -商品画像なし`）を使用する
-- 一般一覧/Admin一覧の CSV は表示用 `シートID` と内部用 `内部UUID` を併記する
+- 一般一覧/Admin一覧の CSV は表示用 `シートID` のみを出力する
 - CSV列は画面運用に不要な項目を除外した構成にしている
 
 ## 6. 保存フロー
@@ -180,10 +190,12 @@
 
 1. Admin一覧または編集画面で Adminメモを更新
 2. Admin一覧では `dataService.saveSheetAdminMemo` を実行（`PUT /api/sheets/:id` + `mode=admin_memo`）
-3. 編集画面では、Adminメモのみ変更時は `dataService.saveSheetAdminMemo`、通常項目も同時に変更した場合は `dataService.saveSheet` を実行
-4. API側で ADMIN権限・入力検証・`adminMemo.version` 競合検知を実施
-5. `entry_sheet_admin_memos` を更新し、通常項目も同時保存された場合のみ `entry_sheets` 側も更新
-6. 成功時に更新済みシートを再取得し画面へ反映
+3. 編集画面では `admin memo only` 判定を行う
+4. Adminメモのみ変更時は `dataService.saveSheetAdminMemo`、通常項目またはワークフロー項目も同時に変更した場合は `dataService.saveSheet` を実行
+5. `admin memo only` 判定では、通常シート項目に加えて `entryStatus` / `creativeStatus` / `currentAssignee` / `returnReason` も比較対象に含める
+6. API側で ADMIN権限・入力検証・`adminMemo.version` 競合検知を実施
+7. `entry_sheet_admin_memos` を更新し、通常項目も同時保存された場合のみ `entry_sheets` 側も更新
+8. 成功時に更新済みシートを再取得し画面へ反映
 
 補足:
 - Adminメモのみ更新では `entry_sheets.updated_at` は更新しない
@@ -191,11 +203,22 @@
 - Adminメモ更新では `entry_sheet_revisions` を追加しない
 - 変更履歴画面には Adminメモ差分を表示しない
 
-### 6.3 画像/添付
+### 6.3 クリエイティブ保存・紐づき変更
+
+1. Adminが `クリエイティブ` ページで作成・更新する
+2. 保存は `Creative API` で行い、既存の `saveSheet` には混ぜない
+3. Creative本体と `creative_entry_sheets` の紐づき更新は同一処理で確定する
+4. シート詳細から差し替える場合も、内部的には `Creative API` を呼ぶ
+5. クリエイティブ保存時、紐づいたシートの `creativeStatus` は `in_progress` に更新する
+6. 未紐づきCreativeのみ削除可能とする
+7. `2年以上未更新` かつ `未紐づき` のCreativeのみ自動削除対象とする
+
+### 6.4 画像/添付
 
 - クライアントでもサイズ・解像度を先に検証
 - APIでも同条件を再検証
 - 画像/添付の実体は Blob に保存し、DBには URL を保存
+- Creative画像は既存アップロード基盤を流用しつつ、`kind=creative` で保存分類を分ける
 
 ## 7. バリデーション（主要要件）
 

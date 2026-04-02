@@ -35,6 +35,9 @@
   - `manufacturer_id -> manufacturers.id`
 - 主項目:
   - `sheet_code`: 業務用シートID（メーカーコード3桁 + 連番5桁、ユニーク）
+  - `creator_name_snapshot`: 作成者名のスナップショット
+  - `creator_email_snapshot`: 作成者メールのスナップショット
+  - `creator_phone_snapshot`: 作成者電話番号のスナップショット
   - `title`: シートタイトル
   - `notes`: 補足情報
   - `shelf_name`: シート単位の棚割名
@@ -44,6 +47,10 @@
   - `face_label`: 選択されたフェイス数ラベル
   - `face_max_width`: 選択されたフェイスMAX値（mm）
   - `status`: `draft` / `completed` / `completed_no_image`
+  - `entry_status`: エントリーシート本体の進行状態
+  - `creative_status`: クリエイティブ工程の進行状態（`none` / `in_progress` / `returned` / `approved`）
+  - `current_assignee`: 現在担当（`admin` / `manufacturer_user` / `none`）
+  - `return_reason`: 差し戻し理由
   - `created_at`, `updated_at`
 
 ## 4. `manufacturer_products`
@@ -218,6 +225,7 @@
 - 補足:
   - `entry_sheets.updated_at` とは独立して更新される
   - 変更履歴 `entry_sheet_revisions` には含めない
+  - 実装では `admin memo only` 判定により、Adminメモだけ変更された場合は専用保存を行う
 
 ## 16. `entry_sheet_revisions`
 
@@ -265,6 +273,9 @@
   - `sheet_code`: `UNIQUE`, `VARCHAR(8)`
   - `title`: `NOT NULL`, `VARCHAR(500)`
   - `status`: `CHECK (status IN ('draft', 'completed', 'completed_no_image'))`
+  - `entry_status`: `CHECK (entry_status IN ('draft', 'completed', 'completed_no_image'))`
+  - `creative_status`: `CHECK (creative_status IN ('none', 'in_progress', 'returned', 'approved'))`
+  - `current_assignee`: `CHECK (current_assignee IN ('admin', 'manufacturer_user', 'none'))`
 - APIバリデーション:
   - テキスト系項目は最大4000文字
     - `title`, `notes`, `email`, `phoneNumber`
@@ -272,6 +283,11 @@
   - `completed` 保存時:
     - `face_label` 選択肢が存在するメーカーでは `faceLabel` 選択必須
     - `width × facingCount` の商品合計が `faceMaxWidth` を超えるとエラー
+  - Adminメモのみ変更時:
+    - `entry_sheet_admin_memos` のみ更新する
+    - `entry_sheet_revisions` は追加しない
+  - 通常項目またはワークフロー項目（`entryStatus` / `creativeStatus` / `currentAssignee` / `returnReason`）も変更された場合:
+    - 通常のシート保存として扱う
 
 ### 13.3 `manufacturer_products`
 

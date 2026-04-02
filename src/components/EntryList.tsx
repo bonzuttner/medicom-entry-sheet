@@ -232,7 +232,6 @@ export const EntryList: React.FC<EntryListProps> = ({
     const csvRows: string[][] = [
       [
         'シートID',
-        '内部UUID',
         '状態',
         'タイトル',
         'シート補足情報',
@@ -279,7 +278,6 @@ export const EntryList: React.FC<EntryListProps> = ({
         const productAttachmentUrls = (prod.productAttachments || []).map((file) => file.url).join(' / ');
         csvRows.push([
           toSafeCsvCell(getDisplaySheetId(sheet)),
-          toSafeCsvCell(sheet.id),
           toSafeCsvCell(getWorkflowStatusView(sheet).label),
           toSafeCsvCell(sheet.title),
           toSafeCsvCell(sheet.notes || ''),
