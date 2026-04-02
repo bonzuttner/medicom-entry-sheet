@@ -154,15 +154,20 @@
 - ユーザー保存: `PUT /api/users/:id`
 - ユーザー削除: `DELETE /api/users/:id`
 - マスタ取得/更新: `GET/PUT /api/master`
-- クリエイティブ一覧: `GET /api/creatives`
-- クリエイティブ保存/削除: `GET/PUT/DELETE /api/creatives/:id`
-- シート紐づき参照: `GET /api/creatives/by-sheet`
-- シート紐づき差し替え: `PUT /api/creatives/relink-sheet`
+- クリエイティブ一覧/詳細/更新/削除/シート参照/差し替え: `api/creatives/[[...path]].ts`
+  - `GET /api/creatives`
+  - `GET /api/creatives/:id`
+  - `PUT /api/creatives/:id`
+  - `DELETE /api/creatives/:id`
+  - `GET /api/creatives/by-sheet`
+  - `PUT /api/creatives/relink-sheet`
 
 補足:
 - 一覧表示およびCSV出力の `状態` 文言は統一し、UI表示ラベル（`下書き` / `完了` / `完了 -商品画像なし`）を使用する
 - 一般一覧/Admin一覧の CSV は表示用 `シートID` のみを出力する
 - CSV列は画面運用に不要な項目を除外した構成にしている
+- Vercel Hobby の Serverless Functions 上限対策として、Creative API の入口は catch-all 1本に集約している
+- ただし責務は `一覧` `詳細` `シート参照` `差し替え` で分離しており、将来移管時は責務単位のAPI再分割を推奨する
 
 ## 6. 保存フロー
 
@@ -212,6 +217,11 @@
 5. クリエイティブ保存時、紐づいたシートの `creativeStatus` は `in_progress` に更新する
 6. 未紐づきCreativeのみ削除可能とする
 7. `2年以上未更新` かつ `未紐づき` のCreativeのみ自動削除対象とする
+
+補足:
+- 現行の Vercel Hobby 環境では関数数上限を避けるため、Creative API は `api/creatives/[[...path]].ts` に集約している
+- ただし設計上の責務は分離しているため、AWS移管やProプラン移行など関数数制約が緩い環境では、`一覧` `詳細` `シート参照` `差し替え` を別APIに再分割した方が保守しやすい
+- その場合も、Creativeの紐づき更新を `Creative API` 側の責務に一本化する方針は維持する
 
 ### 6.4 画像/添付
 

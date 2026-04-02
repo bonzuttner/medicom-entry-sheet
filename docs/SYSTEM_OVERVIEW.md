@@ -40,6 +40,7 @@
 - `api/current-user.ts`: セッション確認 / ログアウト
 - `api/sheets.ts`: シート一覧取得
 - `api/sheets/[id].ts`: シート保存 / 削除
+- `api/creatives/[[...path]].ts`: クリエイティブ一覧 / 詳細 / 保存 / 削除 / シート参照 / 差し替え
 - `api/users.ts`: ユーザー一覧取得
 - `api/users/[id].ts`: ユーザー保存 / 削除
 - `api/master.ts`: マスタ取得 / 更新
@@ -68,6 +69,8 @@
   - `entry_sheets`, `manufacturer_products`, `manufacturer_product_ingredients`, `product_entries`, `product_ingredients`, `attachments` を操作
 - `api/_lib/repositories/masters.ts`
   - `master_data` を操作
+- `api/_lib/repositories/creatives.ts`
+  - `creatives`, `creative_entry_sheets` を操作
 
 ## 5. APIとDBの対応表
 
@@ -79,6 +82,7 @@
 | `GET /api/sheets` | `entry_sheets` 他3表 | 商品・成分・添付を結合返却 |
 | `PUT /api/sheets/:id` | `entry_sheets` 他5表 | シート保存と商品マスタ更新をトランザクションで一括保存 |
 | `GET /api/products/search` | `manufacturer_products`, `manufacturer_product_ingredients` | JAN一意の商品マスタを検索 |
+| `GET /api/creatives` 他 | `creatives`, `creative_entry_sheets`, `entry_sheets` | Creative管理とシート紐づき参照 |
 | `PUT /api/master` | `master_data` | 20文字制約あり |
 | `POST /api/upload` | DB直接更新なし | Blob保存してURL返却 |
 
@@ -105,6 +109,10 @@
 3. 実行方式
 - 既存APIアクセス時に、1日1回まで自動で保持期間削除を実行
 
+4. `creatives`
+- `updated_at` から2年経過 かつ `creative_entry_sheets` に未紐づきのとき削除
+- シート削除時にCreative自体は残し、紐づきのみ削除
+
 ### 6.2 一覧表示
 
 1. `src/components/EntryList.tsx` が `GET /api/sheets`
@@ -119,6 +127,11 @@
 - DB接続層: `api/_lib/db.ts`（Neon接続 -> RDS/Aurora等）
 - ファイル保存層: `api/_lib/media.ts`（Vercel Blob -> S3）
 - 環境変数運用: `SESSION_SECRET`, `POSTGRES_URL`, `BLOB_READ_WRITE_TOKEN`
+
+補足:
+- 現行のCreative APIは、Vercel Hobby の関数数上限対策として `api/creatives/[[...path]].ts` に集約している
+- ただし責務は `一覧` `詳細` `シート参照` `差し替え` で論理分離している
+- AWS移管や関数数制約の緩い環境では、Creative APIを責務単位で別エンドポイントへ再分割した方が保守しやすい
 
 ### 7.2 先に確認すべきファイル
 

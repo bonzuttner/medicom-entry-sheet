@@ -617,6 +617,10 @@ const App: React.FC = () => {
   const handleSaveCreative = async (creative: Creative) => {
     try {
       const saved = await dataService.saveCreative(creative);
+      const affectedSheetIds = new Set([
+        ...creative.linkedSheets.map((sheet) => sheet.id),
+        ...saved.linkedSheets.map((sheet) => sheet.id),
+      ]);
       setCreatives((prev) => {
         const idx = prev.findIndex((row) => row.id === saved.id);
         if (idx === -1) return [saved, ...prev];
@@ -625,16 +629,15 @@ const App: React.FC = () => {
         return next;
       });
       const latestSheets = await dataService.getSheets();
-      const updatedSheetIds = new Set(saved.linkedSheets.map((sheet) => sheet.id));
       setCreativeSheets(latestSheets);
       setSheets((prev) =>
         prev.map((sheet) => {
-          if (!updatedSheetIds.has(sheet.id)) return sheet;
+          if (!affectedSheetIds.has(sheet.id)) return sheet;
           return latestSheets.find((row) => row.id === sheet.id) || sheet;
         })
       );
       setEditingSheet((prev) => {
-        if (!prev || !updatedSheetIds.has(prev.id)) return prev;
+        if (!prev || !affectedSheetIds.has(prev.id)) return prev;
         return latestSheets.find((row) => row.id === prev.id) || prev;
       });
       refreshFirstSheetsPage();
