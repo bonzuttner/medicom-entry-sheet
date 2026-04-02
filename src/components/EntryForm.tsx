@@ -1000,7 +1000,83 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     <div className="pb-24 sm:pb-20">
       {/* Sticky Action Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-3 sm:p-4 z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+         <div className="max-w-7xl mx-auto flex flex-col gap-3">
+            {linkedCreative && (
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:min-w-[520px]">
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-slate-600">ステータス</label>
+                    {isAdminUser ? (
+                      <select
+                        value={formData.creativeStatus || 'none'}
+                        onChange={(event) => {
+                          applyWorkflowChange(event.target.value as EntrySheet['creativeStatus']);
+                        }}
+                        className={getSelectClass()}
+                      >
+                        <option value="none">未着手</option>
+                        <option value="in_progress">クリエイティブ作成中</option>
+                        <option value="returned">差し戻し</option>
+                        <option value="approved">承認済み</option>
+                      </select>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          disabled={isSaving}
+                          onClick={() => applyWorkflowChange('approved')}
+                          className="rounded-lg bg-emerald-100 px-4 py-3 text-sm font-semibold text-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          承認済みにする
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isSaving}
+                          onClick={() => applyWorkflowChange('returned')}
+                          className="rounded-lg bg-rose-100 px-4 py-3 text-sm font-semibold text-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          差し戻しにする
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-slate-600">担当</label>
+                    <select
+                      value={formData.currentAssignee || resolveAssigneeFromWorkflow(formData.entryStatus || formData.status, formData.creativeStatus, currentUser.role)}
+                      onChange={(event) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          currentAssignee: event.target.value as EntrySheet['currentAssignee'],
+                        }))
+                      }
+                      className={getSelectClass()}
+                    >
+                      <option value="admin">Admin</option>
+                      <option value="manufacturer_user">メーカー</option>
+                      <option value="none">なし</option>
+                    </select>
+                  </div>
+                </div>
+                {(formData.creativeStatus || 'none') === 'returned' && (
+                  <div className="xl:max-w-[420px] xl:w-full">
+                    <label className="mb-1 block text-xs font-bold text-slate-600">差し戻し理由</label>
+                    <textarea
+                      rows={2}
+                      value={formData.returnReason || ''}
+                      onChange={(event) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          returnReason: event.target.value,
+                        }))
+                      }
+                      className={getTextareaClass()}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="w-full sm:w-auto flex gap-3 order-2 sm:order-1">
                 <button
                   onClick={onCancel}
@@ -1027,6 +1103,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     {pendingUploads > 0 ? 'アップロード中...' : isSaving ? '保存中...' : '完了'}
                 </button>
             </div>
+            </div>
          </div>
       </div>
 
@@ -1040,199 +1117,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             </span>
             <div className="mt-1 text-xs text-slate-500">担当: {assigneeLabel}</div>
           </div>
-        </div>
-
-        <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <div className="text-sm font-bold text-slate-800">紐づくクリエイティブ</div>
-              {linkedCreative ? (
-                <div className="mt-3 flex items-center gap-4">
-                  <div className="flex h-16 w-24 items-center justify-center overflow-hidden rounded-lg bg-white">
-                    <img src={linkedCreative.imageUrl} alt="" className="h-full w-full object-cover" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-slate-800">{linkedCreative.name}</div>
-                    <div className="mt-1 text-xs text-slate-500">
-                      最終更新日: {new Date(linkedCreative.updatedAt).toLocaleDateString()}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <p className="mt-2 text-sm text-slate-500">まだクリエイティブは紐づいていません。</p>
-              )}
-            </div>
-            {isAdminUser && onOpenCreatives && (
-              <div className="flex flex-wrap items-center gap-2">
-                {onRelinkCreative && (
-                  <button
-                    type="button"
-                    onClick={() => setCreativePickerOpen((prev) => !prev)}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 font-semibold text-sky-700 shadow-sm transition-all hover:bg-sky-100"
-                  >
-                    {linkedCreative ? 'クリエイティブを差し替え' : 'クリエイティブを紐づけ'}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={onOpenCreatives}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50"
-                >
-                  クリエイティブ管理を開く
-                </button>
-              </div>
-            )}
-          </div>
-          {isAdminUser && creativePickerOpen && onRelinkCreative && (
-            <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-bold text-slate-800">差し替え先クリエイティブを選択</div>
-                  <div className="mt-1 text-xs text-slate-500">
-                    同じメーカーのクリエイティブから選択します。
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setCreativePickerOpen(false)}
-                  className="rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-slate-100"
-                >
-                  閉じる
-                </button>
-              </div>
-              <div className="mt-4">
-                <input
-                  value={creativePickerQuery}
-                  onChange={(event) => setCreativePickerQuery(event.target.value)}
-                  placeholder="クリエイティブ名 / シート名 / ID / 棚割り名 / 案件名で検索"
-                  className={getFieldClass()}
-                />
-              </div>
-              <div className="mt-4 max-h-72 space-y-2 overflow-y-auto">
-                {isLoadingCreativeOptions ? (
-                  <div className="rounded-lg bg-slate-50 px-4 py-6 text-sm text-slate-500">読み込み中...</div>
-                ) : filteredCreativeOptions.length === 0 ? (
-                  <div className="rounded-lg bg-slate-50 px-4 py-6 text-sm text-slate-500">
-                    差し替え可能なクリエイティブが見つかりません。
-                  </div>
-                ) : (
-                  filteredCreativeOptions.map((creative) => {
-                    const isCurrent = creative.id === linkedCreative?.id;
-                    return (
-                      <button
-                        key={creative.id}
-                        type="button"
-                        disabled={isCurrent || isRelinkingCreative}
-                        onClick={() => {
-                          void handleRelinkCreative(creative.id);
-                        }}
-                        className={`flex w-full items-center gap-4 rounded-xl border px-4 py-3 text-left transition ${
-                          isCurrent
-                            ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
-                            : 'border-slate-200 bg-white hover:border-sky-200 hover:bg-sky-50'
-                        }`}
-                      >
-                        <div className="flex h-14 w-20 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
-                          <img src={creative.imageUrl} alt="" className="h-full w-full object-cover" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-semibold text-slate-800">{creative.name}</div>
-                          <div className="mt-1 text-xs text-slate-500">
-                            {creative.linkedSheets.length > 0
-                              ? `${creative.linkedSheets[0].sheetCode || creative.linkedSheets[0].id.slice(0, 8)} | ${creative.linkedSheets[0].title}`
-                              : '未紐づき'}
-                          </div>
-                          <div className="mt-1 text-xs text-slate-500">
-                            更新日: {new Date(creative.updatedAt).toLocaleDateString()}
-                          </div>
-                        </div>
-                        <div className="shrink-0 text-xs font-semibold text-sky-700">
-                          {isCurrent ? '現在選択中' : isRelinkingCreative ? '差し替え中...' : '差し替え'}
-                        </div>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          )}
-          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-700">進行状況</label>
-              {isAdminUser ? (
-                <select
-                  value={formData.creativeStatus || 'none'}
-                  onChange={(event) => {
-                    applyWorkflowChange(event.target.value as EntrySheet['creativeStatus']);
-                  }}
-                  disabled={!linkedCreative}
-                  className={`${getSelectClass()} ${!linkedCreative ? 'cursor-not-allowed opacity-60' : ''}`}
-                >
-                  <option value="none">未着手</option>
-                  <option value="in_progress">クリエイティブ作成中</option>
-                  <option value="returned">差し戻し</option>
-                  <option value="approved">承認済み</option>
-                </select>
-              ) : (
-                <div className="space-y-3">
-                  <div className={`rounded-lg px-3 py-3 text-sm font-semibold ${workflowStatus.pillClassName}`}>
-                    {workflowStatus.label}
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      disabled={!linkedCreative || isSaving}
-                      onClick={() => applyWorkflowChange('approved')}
-                      className="rounded-lg bg-emerald-100 px-4 py-2 text-sm font-semibold text-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      承認済みにする
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!linkedCreative || isSaving}
-                      onClick={() => applyWorkflowChange('returned')}
-                      className="rounded-lg bg-rose-100 px-4 py-2 text-sm font-semibold text-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      差し戻しにする
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-700">現在担当</label>
-              <select
-                value={formData.currentAssignee || resolveAssigneeFromWorkflow(formData.entryStatus || formData.status, formData.creativeStatus, currentUser.role)}
-                onChange={(event) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    currentAssignee: event.target.value as EntrySheet['currentAssignee'],
-                  }))
-                }
-                className={getSelectClass()}
-              >
-                <option value="admin">Admin</option>
-                <option value="manufacturer_user">メーカー</option>
-                <option value="none">なし</option>
-              </select>
-            </div>
-          </div>
-          {(formData.creativeStatus || 'none') === 'returned' && (
-            <div className="mt-4">
-              <label className="mb-2 block text-sm font-bold text-slate-700">差し戻し理由</label>
-              <textarea
-                rows={3}
-                value={formData.returnReason || ''}
-                onChange={(event) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    returnReason: event.target.value,
-                  }))
-                }
-                className={getTextareaClass()}
-              />
-            </div>
-          )}
         </div>
 
         <div className="mb-6">
@@ -1373,7 +1257,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                                   deploymentEndMonth: Number(e.target.value) || undefined,
                                 }))
                               }
-                              className={`${getSelectClass()} min-w-[140px] w-auto text-center font-semibold`}
+                              className={`${getSelectClass().replace('bg-slate-100', 'bg-white')} min-w-[140px] w-auto text-center font-semibold`}
                             >
                               {[...Array(12)].map((_, idx) => (
                                 <option key={idx + 1} value={idx + 1}>
@@ -1498,6 +1382,130 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         </div>
 
         <div className="mt-8">
+          <h4 className={`${sectionTitleClass} mb-4 flex items-center gap-2`}>
+            <span className="w-1 h-5 bg-sky-500 rounded-full"></span>
+            紐づくクリエイティブ
+          </h4>
+          <div className="mb-8 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                {linkedCreative ? (
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-16 w-24 items-center justify-center overflow-hidden rounded-lg bg-white">
+                      <img src={linkedCreative.imageUrl} alt="" className="h-full w-full object-cover" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-slate-800">{linkedCreative.name}</div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        最終更新日: {formatDate(linkedCreative.updatedAt)}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500">まだクリエイティブは紐づいていません。</p>
+                )}
+              </div>
+              {isAdminUser && onRelinkCreative && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCreativePickerOpen((prev) => !prev)}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 font-semibold text-sky-700 shadow-sm transition-all hover:bg-sky-100"
+                  >
+                    {linkedCreative ? 'クリエイティブを差し替え' : 'クリエイティブを紐づけ'}
+                  </button>
+                </div>
+              )}
+            </div>
+            {isAdminUser && creativePickerOpen && onRelinkCreative && (
+              <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-bold text-slate-800">差し替え先クリエイティブを選択</div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      同じメーカーのクリエイティブから選択します。
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCreativePickerOpen(false)}
+                    className="rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-slate-100"
+                  >
+                    閉じる
+                  </button>
+                </div>
+                <div className="mt-4">
+                  <input
+                    value={creativePickerQuery}
+                    onChange={(event) => setCreativePickerQuery(event.target.value)}
+                    placeholder="クリエイティブ名 / シート名 / ID / 棚割り名 / 案件名で検索"
+                    className={getFieldClass()}
+                  />
+                </div>
+                <div className="mt-4 max-h-72 space-y-2 overflow-y-auto">
+                  {isLoadingCreativeOptions ? (
+                    <div className="rounded-lg bg-slate-50 px-4 py-6 text-sm text-slate-500">読み込み中...</div>
+                  ) : filteredCreativeOptions.length === 0 ? (
+                    <div className="rounded-lg bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                      差し替え可能なクリエイティブが見つかりません。
+                    </div>
+                  ) : (
+                    filteredCreativeOptions.map((creative) => {
+                      const isCurrent = creative.id === linkedCreative?.id;
+                      return (
+                        <button
+                          key={creative.id}
+                          type="button"
+                          disabled={isCurrent || isRelinkingCreative}
+                          onClick={() => {
+                            void handleRelinkCreative(creative.id);
+                          }}
+                          className={`flex w-full items-center gap-4 rounded-xl border px-4 py-3 text-left transition ${
+                            isCurrent
+                              ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
+                              : 'border-slate-200 bg-white hover:border-sky-200 hover:bg-sky-50'
+                          }`}
+                        >
+                          <div className="flex h-14 w-20 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
+                            <img src={creative.imageUrl} alt="" className="h-full w-full object-cover" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-semibold text-slate-800">{creative.name}</div>
+                            <div className="mt-1 text-xs text-slate-500">
+                              {creative.linkedSheets.length > 0
+                                ? `${creative.linkedSheets[0].sheetCode || creative.linkedSheets[0].id.slice(0, 8)} | ${creative.linkedSheets[0].title}`
+                                : '未紐づき'}
+                            </div>
+                            <div className="mt-1 text-xs text-slate-500">
+                              更新日: {formatDate(creative.updatedAt)}
+                            </div>
+                          </div>
+                          <div className="shrink-0 text-xs font-semibold text-sky-700">
+                            {isCurrent ? '現在選択中' : isRelinkingCreative ? '差し替え中...' : '差し替え'}
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-bold text-slate-700">ステータス</label>
+                <div className={`rounded-lg px-3 py-3 text-sm font-semibold ${workflowStatus.pillClassName}`}>
+                  {workflowStatus.label}
+                </div>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-bold text-slate-700">現在担当</label>
+                <div className="rounded-lg bg-slate-100 px-3 py-3 text-sm font-semibold text-slate-800">
+                  {assigneeLabel}
+                </div>
+              </div>
+            </div>
+          </div>
+
           <h4 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
             <span className="w-1 h-5 bg-rose-500 rounded-full"></span>
             変更履歴（直近）

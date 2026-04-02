@@ -78,8 +78,8 @@ const parseErrorMessage = (status: number, raw: string): string => {
       SHEET_MANUFACTURER_MISMATCH:
         '選択したエントリーシートのメーカーが一致していません。同じメーカーのシートのみ選択してください。',
       CREATIVE_REQUIRED_FIELDS:
-        'クリエイティブ名、画像、紐づけるエントリーシートは必須です。',
-      MANUFACTURER_NOT_FOUND: 'メーカー情報の解決に失敗しました。紐づけるシートを確認してください。',
+        'クリエイティブ名、画像、メーカーは必須です。',
+      MANUFACTURER_NOT_FOUND: 'メーカー情報の解決に失敗しました。メーカー設定を確認してください。',
       CREATIVE_RELOAD_FAILED:
         '保存は完了しましたが、最新のクリエイティブ情報の再取得に失敗しました。画面を更新してください。',
       'dataUrl and fileName are required':

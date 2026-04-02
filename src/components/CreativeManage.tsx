@@ -75,6 +75,14 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
     });
     return map;
   }, [creatives]);
+  const manufacturerOptions = useMemo(() => {
+    const values = new Set<string>();
+    if (currentUser.manufacturerName) values.add(currentUser.manufacturerName);
+    sheets.forEach((sheet) => {
+      if (sheet.manufacturerName) values.add(sheet.manufacturerName);
+    });
+    return Array.from(values).sort((a, b) => a.localeCompare(b, 'ja'));
+  }, [currentUser.manufacturerName, sheets]);
 
   const filteredCreatives = useMemo(() => {
     const normalizedQuery = normalizeSearchText(searchTerm);
@@ -82,6 +90,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
       if (!normalizedQuery) return true;
       const haystacks = [
         creative.name,
+        creative.manufacturerName,
         creative.memo || '',
         ...creative.linkedSheets.flatMap((sheet) => [
           sheet.sheetCode || '',
@@ -102,7 +111,11 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
         case 'sheetCode':
           return firstLinkedSheet?.sheetCode || '';
         case 'manufacturerName':
-          return getSummaryText(creative.linkedSheets.map((sheet) => sheet.manufacturerName));
+          return getSummaryText(
+            creative.linkedSheets.length > 0
+              ? creative.linkedSheets.map((sheet) => sheet.manufacturerName)
+              : [creative.manufacturerName]
+          );
         case 'shelfName':
           return getSummaryText(creative.linkedSheets.map((sheet) => sheet.shelfName));
         case 'caseName':
@@ -193,9 +206,11 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
           caseName: sheet.caseName,
         })
       );
+    const linkedManufacturers = [...new Set(linkedSheets.map((sheet) => sheet.manufacturerName).filter(Boolean))];
     setEditingCreative({
       ...editingCreative,
-      manufacturerName: linkedSheets[0]?.manufacturerName || '',
+      manufacturerName:
+        linkedManufacturers.length === 1 ? linkedManufacturers[0] : editingCreative.manufacturerName,
       linkedSheets,
       selectedSheetIds: sheetIds,
     });
@@ -248,8 +263,13 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
       setValidationError('画像は必須です');
       return;
     }
-    if (editingCreative.selectedSheetIds.length === 0) {
-      setValidationError('紐づけるエントリーシートを1件以上選択してください');
+    if (!editingCreative.manufacturerName.trim()) {
+      setValidationError('メーカーは必須です');
+      return;
+    }
+    const selectedManufacturers = [...new Set(editingCreative.linkedSheets.map((sheet) => sheet.manufacturerName).filter(Boolean))];
+    if (selectedManufacturers.length > 1) {
+      setValidationError('紐づけるエントリーシートのメーカーは1つに揃えてください');
       return;
     }
 
@@ -257,7 +277,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
       setIsSaving(true);
       await onSaveCreative({
         ...editingCreative,
-        manufacturerName: editingCreative.linkedSheets[0]?.manufacturerName || '',
+        manufacturerName: editingCreative.linkedSheets[0]?.manufacturerName || editingCreative.manufacturerName,
         linkedSheets: editingCreative.linkedSheets,
       });
       setEditingCreative(null);
@@ -365,6 +385,31 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
               </div>
 
               <div>
+                <label className="mb-2 block text-sm font-bold text-slate-700">メーカー <span className="text-danger">*</span></label>
+                <select
+                  value={editingCreative.manufacturerName}
+                  onChange={(event) =>
+                    setEditingCreative({
+                      ...editingCreative,
+                      manufacturerName: event.target.value,
+                    })
+                  }
+                  disabled={editingCreative.selectedSheetIds.length > 0}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
+                >
+                  <option value="">メーカーを選択</option>
+                  {manufacturerOptions.map((manufacturerName) => (
+                    <option key={manufacturerName} value={manufacturerName}>
+                      {manufacturerName}
+                    </option>
+                  ))}
+                </select>
+                <div className="mt-1 text-xs text-slate-500">
+                  エントリーシート未紐づきでも保存できます。シートを選択するとメーカーは自動で決まります。
+                </div>
+              </div>
+
+              <div>
                 <label className="mb-2 block text-sm font-bold text-slate-700">メモ</label>
                 <textarea
                   rows={4}
@@ -399,38 +444,44 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                 </div>
 
                 <div className="mt-4 max-h-72 space-y-2 overflow-auto pr-1">
-                  {candidateSheets.map((sheet) => {
-                    const linkedCreativeId = linkedCreativeIdBySheetId.get(sheet.id);
-                    const isDisabled = Boolean(linkedCreativeId && linkedCreativeId !== editingCreative.id);
-                    const isSelected = editingCreative.selectedSheetIds.includes(sheet.id);
-                    return (
-                      <button
-                        key={sheet.id}
-                        type="button"
-                        onClick={() => toggleSheetSelection(sheet.id)}
-                        disabled={isDisabled}
-                        className={`w-full rounded-lg border px-4 py-3 text-left transition ${
-                          isSelected
-                            ? 'border-sky-300 bg-sky-50'
-                            : isDisabled
-                              ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
-                              : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className="text-sm font-semibold text-slate-800">
-                          {(sheet.sheetCode || sheet.id.slice(0, 8))} | {sheet.title || '(タイトル未設定)'}
-                        </div>
-                        <div className="mt-1 text-xs text-slate-500">
-                          {sheet.manufacturerName} | {sheet.shelfName || '棚割り未設定'} | {sheet.caseName || '案件未設定'}
-                        </div>
-                        {isDisabled && (
-                          <div className="mt-2 text-xs font-semibold text-slate-500">
-                            他クリエイティブで使用中
+                  {candidateSheets.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
+                      該当するエントリーシートが見つかりません。
+                    </div>
+                  ) : (
+                    candidateSheets.map((sheet) => {
+                      const linkedCreativeId = linkedCreativeIdBySheetId.get(sheet.id);
+                      const isDisabled = Boolean(linkedCreativeId && linkedCreativeId !== editingCreative.id);
+                      const isSelected = editingCreative.selectedSheetIds.includes(sheet.id);
+                      return (
+                        <button
+                          key={sheet.id}
+                          type="button"
+                          onClick={() => toggleSheetSelection(sheet.id)}
+                          disabled={isDisabled}
+                          className={`w-full rounded-lg border px-4 py-3 text-left transition ${
+                            isSelected
+                              ? 'border-sky-300 bg-sky-50'
+                              : isDisabled
+                                ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
+                                : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="text-sm font-semibold text-slate-800">
+                            {(sheet.sheetCode || sheet.id.slice(0, 8))} | {sheet.title || '(タイトル未設定)'}
                           </div>
-                        )}
-                      </button>
-                    );
-                  })}
+                          <div className="mt-1 text-xs text-slate-500">
+                            {sheet.manufacturerName} | {sheet.shelfName || '棚割り未設定'} | {sheet.caseName || '案件未設定'}
+                          </div>
+                          {isDisabled && (
+                            <div className="mt-2 text-xs font-semibold text-slate-500">
+                              他クリエイティブで使用中
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
               </div>
 
@@ -571,7 +622,11 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                           {firstLinkedSheet ? `${firstLinkedSheet.sheetCode || firstLinkedSheet.id.slice(0, 8)} | ${firstLinkedSheet.title}` : '未紐づき'}
                         </td>
                         <td className="px-4 py-4 align-top text-sm text-slate-700">
-                          {getSummaryText(creative.linkedSheets.map((sheet) => sheet.manufacturerName))}
+                          {getSummaryText(
+                            creative.linkedSheets.length > 0
+                              ? creative.linkedSheets.map((sheet) => sheet.manufacturerName)
+                              : [creative.manufacturerName]
+                          )}
                         </td>
                         <td className="px-4 py-4 align-top text-sm text-slate-700">
                           {getSummaryText(creative.linkedSheets.map((sheet) => sheet.shelfName))}
@@ -629,7 +684,11 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                         {firstLinkedSheet ? `${firstLinkedSheet.sheetCode || firstLinkedSheet.id.slice(0, 8)} | ${firstLinkedSheet.title}` : '未紐づき'}
                       </div>
                       <div className="mt-2 text-xs text-slate-500">
-                        {getSummaryText(creative.linkedSheets.map((sheet) => sheet.manufacturerName))} / {getSummaryText(creative.linkedSheets.map((sheet) => sheet.shelfName))}
+                        {getSummaryText(
+                          creative.linkedSheets.length > 0
+                            ? creative.linkedSheets.map((sheet) => sheet.manufacturerName)
+                            : [creative.manufacturerName]
+                        )} / {getSummaryText(creative.linkedSheets.map((sheet) => sheet.shelfName))}
                       </div>
                       <div className="mt-1 text-xs text-slate-500">
                         {getSummaryText(creative.linkedSheets.map((sheet) => sheet.caseName))} / 更新: {new Date(creative.updatedAt).toLocaleDateString()}

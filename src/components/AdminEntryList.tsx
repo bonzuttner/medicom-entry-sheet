@@ -470,9 +470,9 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                   )}
                 </button>
               </th>
-              <th className="sticky top-0 z-10 w-[96px] border-b border-slate-200 px-1 py-3 text-left text-[10px] font-bold text-slate-400 bg-slate-50">ID</th>
+              <th className="sticky top-0 z-10 w-24 border-b border-slate-200 px-2 py-3 text-left text-xs font-bold text-slate-500 bg-slate-50">ID</th>
               <th className="sticky top-0 z-10 w-[42px] border-b border-slate-200 bg-slate-50 px-1 py-3 text-center" aria-label="詳細編集"></th>
-              <th className="sticky top-0 z-10 w-[82px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">状態</th>
+              <th className="sticky top-0 z-10 w-[150px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">状態</th>
               <th className="sticky top-0 z-10 w-[180px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">タイトル</th>
               <th className="sticky top-0 z-10 w-[104px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">展開期間</th>
               <th className="sticky top-0 z-10 w-[110px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">棚割り</th>
@@ -506,27 +506,27 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                         {selectedSheets.has(sheet.id) ? <CheckSquare size={15} /> : <Square size={15} />}
                       </button>
                     </td>
-                    <td className="w-[96px] px-1 py-3 text-[10px] text-slate-400 font-mono whitespace-nowrap bg-white">
+                    <td className="w-24 px-2 py-4 text-[10px] text-slate-400 font-mono whitespace-nowrap bg-white">
                       {getDisplaySheetId(sheet)}
                     </td>
-                    <td className="px-1 py-3 text-center">
+                    <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
                         type="button"
                         onClick={() => onEdit(sheet)}
-                        className="inline-flex items-center justify-center p-2 rounded text-primary hover:text-sky-700 hover:bg-sky-100 transition-colors"
+                        className="p-2 rounded text-primary hover:text-sky-700 hover:bg-sky-100 transition-colors"
                         title="詳細編集"
                       >
                         <Edit3 size={18} />
                       </button>
                     </td>
-                    <td className="px-2 py-3 text-xs text-slate-700">
+                    <td className="px-4 py-4 whitespace-nowrap">
                       <div className="space-y-1">
                         <span
-                          className={`inline-flex items-center rounded-full px-2 py-0.5 font-medium ${workflowStatus.pillClassName}`}
+                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${workflowStatus.pillClassName}`}
                         >
                           {workflowStatus.label}
                         </span>
-                        <div className="text-[10px] text-slate-500">担当: {assigneeLabel}</div>
+                        <div className="text-[11px] text-slate-500">担当: {assigneeLabel}</div>
                       </div>
                     </td>
                     <td className="px-2 py-3 text-xs font-semibold text-slate-700 break-words leading-4">
