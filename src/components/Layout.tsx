@@ -1,6 +1,6 @@
 import React from 'react';
 import { User, Page, UserRole } from '../types';
-import { LogOut, LayoutGrid, Users, Settings, FileText, ListChecks } from 'lucide-react';
+import { LogOut, LayoutGrid, Users, Settings, FileText, ListChecks, Image as ImageIcon } from 'lucide-react';
 
 interface LayoutProps {
   currentUser: User;
@@ -65,6 +65,16 @@ export const Layout: React.FC<LayoutProps> = ({ currentUser, currentPage, onNavi
             />
 
             {/* Master Management - Explicitly Admin Only */}
+            {currentUser.role === UserRole.ADMIN && (
+              <NavButton
+                active={currentPage === Page.CREATIVES}
+                onClick={() => onNavigate(Page.CREATIVES)}
+                icon={<ImageIcon size={17} />}
+                label="クリエイティブ"
+                fullLabel="クリエイティブ"
+              />
+            )}
+
             {currentUser.role === UserRole.ADMIN && (
               <NavButton
                 active={currentPage === Page.MASTERS}

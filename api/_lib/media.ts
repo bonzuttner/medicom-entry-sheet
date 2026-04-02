@@ -27,7 +27,7 @@ const ATTACHMENT_MIME_TYPES = new Set([
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 const MIN_IMAGE_SHORT_SIDE_PX = 1000;
-type UploadKind = 'image' | 'attachment' | 'promo';
+type UploadKind = 'image' | 'attachment' | 'promo' | 'creative';
 
 const safeFileName = (name: string): string =>
   name.replace(/[^\w.\-]/g, '_').slice(0, 120) || 'file';
@@ -243,7 +243,7 @@ const normalizeMediaUrl = async (
     const { mimeType, bytes } = parseDataUrl(value);
     ensureAllowedMime(mimeType, kind);
     ensureAllowedSize(bytes.byteLength, kind);
-    if (kind === 'image') {
+    if (kind === 'image' || kind === 'creative') {
       ensureImageResolution(mimeType, bytes);
     }
     return uploadBinary(bytes, mimeType, pathPrefix, fileName);

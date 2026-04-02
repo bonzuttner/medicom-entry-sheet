@@ -53,8 +53,8 @@ const findTooLongField = (sheet: EntrySheet): string | null => {
   if (isTooLong(sheet.caseName)) return '案件';
   if (isTooLong(sheet.notes)) return 'エントリシート補足情報';
   if (isTooLong(sheet.shelfName)) return '棚割名';
-  if (isTooLong(sheet.email)) return '担当者メール';
-  if (isTooLong(sheet.phoneNumber)) return '担当者電話番号';
+  if (isTooLong(sheet.email)) return '作成者メール';
+  if (isTooLong(sheet.phoneNumber)) return '作成者電話番号';
   if (isTooLong(sheet.adminMemo?.bandPattern)) return '帯パターン';
   if (isTooLong(sheet.adminMemo?.deadlineTableUrl)) return '期限表URL';
   if (isTooLong(sheet.adminMemo?.printOther)) return '印刷依頼数量 その他';
@@ -250,9 +250,9 @@ const buildRevisionSummary = (before: EntrySheet | null, after: EntrySheet): str
   pushChange('案件', before.caseName || '', after.caseName || '');
   pushChange('補足', before.notes || '', after.notes || '');
   pushChange('棚割名', before.shelfName || '', after.shelfName || '');
-  pushChange('担当者名', before.creatorName, after.creatorName);
-  pushChange('担当者メール', before.email, after.email);
-  pushChange('担当者電話', before.phoneNumber, after.phoneNumber);
+  pushChange('作成者名', before.creatorName, after.creatorName);
+  pushChange('作成者メール', before.email, after.email);
+  pushChange('作成者電話', before.phoneNumber, after.phoneNumber);
   pushChange('状態', before.status, after.status);
   pushChange('展開スタート月', before.deploymentStartMonth, after.deploymentStartMonth);
   pushChange('展開終了月', before.deploymentEndMonth, after.deploymentEndMonth);

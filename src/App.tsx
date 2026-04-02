@@ -5,9 +5,11 @@ import { EntryList } from './components/EntryList';
 import { EntryForm } from './components/EntryForm';
 import { AdminEntryList } from './components/AdminEntryList';
 import { AccountManage } from './components/AccountManage';
+import { CreativeManage } from './components/CreativeManage';
 import { MasterManage } from './components/MasterManage';
 import { dataService } from './services/dataService';
 import {
+  Creative,
   User,
   Page,
   EntrySheet,
@@ -110,6 +112,10 @@ const toComparableSheetCore = (sheet: EntrySheet) => ({
   faceLabel: normalizeOptionalString(sheet.faceLabel),
   faceMaxWidth: normalizeOptionalNumber(sheet.faceMaxWidth),
   status: sheet.status,
+  entryStatus: sheet.entryStatus || sheet.status,
+  creativeStatus: sheet.creativeStatus || 'none',
+  currentAssignee: sheet.currentAssignee || 'none',
+  returnReason: normalizeOptionalString(sheet.returnReason),
   products: toComparableProducts(sheet.products),
   attachments: toComparableAttachments(sheet.attachments),
 });
@@ -205,6 +211,8 @@ const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>(Page.LOGIN);
   const [sheets, setSheets] = useState<EntrySheet[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [creatives, setCreatives] = useState<Creative[]>([]);
+  const [creativeSheets, setCreativeSheets] = useState<EntrySheet[]>([]);
   const [masterData, setMasterData] = useState<MasterData>(EMPTY_MASTER_DATA);
   const [editingSheet, setEditingSheet] = useState<EntrySheet | null>(null);
   const [initialProductIndex, setInitialProductIndex] = useState<number>(0);
@@ -213,6 +221,7 @@ const App: React.FC = () => {
   const [totalSheetCount, setTotalSheetCount] = useState<number>(0);
   const [sheetOffset, setSheetOffset] = useState<number>(0);
   const [isLoadingMoreSheets, setIsLoadingMoreSheets] = useState<boolean>(false);
+  const [isLoadingCreatives, setIsLoadingCreatives] = useState<boolean>(false);
   const [editingSheetRevisions, setEditingSheetRevisions] = useState<EntrySheetRevision[]>([]);
   const masterSaveSeqRef = useRef(0);
 
@@ -223,6 +232,10 @@ const App: React.FC = () => {
       return;
     }
     if (page === Page.ADMIN_LIST && currentUser.role !== UserRole.ADMIN) {
+      setCurrentPage(Page.LIST);
+      return;
+    }
+    if (page === Page.CREATIVES && currentUser.role !== UserRole.ADMIN) {
       setCurrentPage(Page.LIST);
       return;
     }
@@ -288,6 +301,23 @@ const App: React.FC = () => {
     }
   };
 
+  const loadCreatives = async (): Promise<void> => {
+    if (!currentUser || currentUser.role !== UserRole.ADMIN) return;
+    setIsLoadingCreatives(true);
+    try {
+      const [creativeRows, allSheets] = await Promise.all([
+        dataService.getCreatives(),
+        dataService.getSheets(),
+      ]);
+      setCreatives(creativeRows);
+      setCreativeSheets(allSheets);
+    } catch (error) {
+      console.error('Failed to load creatives:', error);
+    } finally {
+      setIsLoadingCreatives(false);
+    }
+  };
+
   // Initialize
   useEffect(() => {
     let mounted = true;
@@ -339,6 +369,12 @@ const App: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== UserRole.ADMIN) return;
+    if (currentPage !== Page.CREATIVES) return;
+    void loadCreatives();
+  }, [currentPage, currentUser]);
+
   const handleLogin = async (user: User) => {
     try {
       setCurrentUser(user);
@@ -361,6 +397,8 @@ const App: React.FC = () => {
       setCurrentUser(null);
       setSheets([]);
       setUsers([]);
+      setCreatives([]);
+      setCreativeSheets([]);
       setMasterData(EMPTY_MASTER_DATA);
       setHasMoreSheets(false);
       setSheetOffset(0);
@@ -576,6 +614,43 @@ const App: React.FC = () => {
     }
   };
 
+  const handleSaveCreative = async (creative: Creative) => {
+    try {
+      const saved = await dataService.saveCreative(creative);
+      setCreatives((prev) => {
+        const idx = prev.findIndex((row) => row.id === saved.id);
+        if (idx === -1) return [saved, ...prev];
+        const next = [...prev];
+        next[idx] = saved;
+        return next;
+      });
+    } catch (error) {
+      console.error('Failed to save creative:', error);
+      throw error;
+    }
+  };
+
+  const handleDeleteCreative = async (id: string) => {
+    try {
+      await dataService.deleteCreative(id);
+      setCreatives((prev) => prev.filter((creative) => creative.id !== id));
+    } catch (error) {
+      console.error('Failed to delete creative:', error);
+      alert(error instanceof Error ? error.message : 'クリエイティブの削除に失敗しました。');
+    }
+  };
+
+  const handleRelinkSheetCreative = async (
+    sheetId: string,
+    targetCreativeId: string
+  ): Promise<{ sheet: EntrySheet; creative: Creative }> => {
+    const result = await dataService.relinkSheetCreative(sheetId, targetCreativeId);
+    setSheets((prev) => upsertSheetInList(prev, result.sheet));
+    setEditingSheet((prev) => (prev && prev.id === result.sheet.id ? result.sheet : prev));
+    refreshFirstSheetsPage();
+    return result;
+  };
+
   // User Management
   const handleSaveUser = async (user: User) => {
     try {
@@ -693,6 +768,8 @@ const App: React.FC = () => {
             dataService.searchProducts({ query, manufacturerName, limit: 30 })
           }
           onSave={handleSaveSheet}
+          onOpenCreatives={() => setCurrentPage(Page.CREATIVES)}
+          onRelinkCreative={handleRelinkSheetCreative}
           onCancel={() => {
             setEditingSheet(null);
             setEditingSheetRevisions([]);
@@ -708,6 +785,17 @@ const App: React.FC = () => {
           currentUser={currentUser}
           onSaveUser={handleSaveUser}
           onDeleteUser={handleDeleteUser}
+        />
+      )}
+
+      {currentPage === Page.CREATIVES && currentUser.role === UserRole.ADMIN && (
+        <CreativeManage
+          creatives={creatives}
+          sheets={creativeSheets}
+          currentUser={currentUser}
+          onSaveCreative={handleSaveCreative}
+          onDeleteCreative={handleDeleteCreative}
+          isLoading={isLoadingCreatives}
         />
       )}
 

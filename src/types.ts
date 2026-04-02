@@ -31,6 +31,10 @@ export interface FaceOption {
   maxWidth: number;
 }
 
+export type EntryStatus = 'draft' | 'completed' | 'completed_no_image';
+export type CreativeStatus = 'none' | 'in_progress' | 'returned' | 'approved';
+export type CurrentAssignee = 'admin' | 'manufacturer_user' | 'none';
+
 export interface EntrySheetAdminMemo {
   version?: number;
   promoCode?: string;
@@ -101,8 +105,13 @@ export interface EntrySheet {
   faceLabel?: string;
   faceMaxWidth?: number;
   attachments?: Attachment[];
-  status: 'draft' | 'completed' | 'completed_no_image';
+  status: EntryStatus;
+  entryStatus?: EntryStatus;
+  creativeStatus?: CreativeStatus;
+  currentAssignee?: CurrentAssignee;
+  returnReason?: string;
   adminMemo?: EntrySheetAdminMemo;
+  creative?: CreativeSummary;
   products: ProductEntry[];
 }
 
@@ -123,12 +132,43 @@ export interface Attachment {
   dataUrl?: string;
 }
 
+export interface CreativeLinkedSheet {
+  id: string;
+  sheetCode?: string;
+  title: string;
+  manufacturerName: string;
+  shelfName: string;
+  caseName: string;
+}
+
+export interface CreativeSummary {
+  id: string;
+  name: string;
+  imageUrl: string;
+  updatedAt: string;
+}
+
+export interface Creative {
+  id: string;
+  version: number;
+  manufacturerName: string;
+  creatorId: string;
+  creatorName: string;
+  name: string;
+  imageUrl: string;
+  memo?: string;
+  createdAt: string;
+  updatedAt: string;
+  linkedSheets: CreativeLinkedSheet[];
+}
+
 // UI State Types
 export enum Page {
   LOGIN = 'LOGIN',
   LIST = 'LIST',
   ADMIN_LIST = 'ADMIN_LIST',
   EDIT = 'EDIT',
+  CREATIVES = 'CREATIVES',
   ACCOUNTS = 'ACCOUNTS',
   MASTERS = 'MASTERS',
 }

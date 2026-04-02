@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { EntrySheet, EntrySheetAdminMemo } from '../types';
 import { CheckSquare, CircleOff, Download, Edit3, ExternalLink, Save, Search, Square, X } from 'lucide-react';
+import { getCurrentAssigneeLabel, getWorkflowStatusView } from '../lib/sheetWorkflow';
 
 interface AdminEntryListProps {
   sheets: EntrySheet[];
@@ -100,26 +101,6 @@ const getDeploymentPeriodLabel = (sheet: EntrySheet): string => {
 const getShelfNames = (sheet: EntrySheet): string => sheet.shelfName?.trim() || '未設定';
 
 const isHttpUrl = (value: string): boolean => /^https?:\/\/.+/i.test(value.trim());
-const normalizeSheetStatus = (
-  status: EntrySheet['status'] | string
-): 'completed' | 'completed_no_image' | 'draft' => {
-  if (status === 'completed') return 'completed';
-  if (status === 'completed_no_image') return 'completed_no_image';
-  return 'draft';
-};
-const getStatusLabel = (status: EntrySheet['status'] | string): string => {
-  const normalized = normalizeSheetStatus(status);
-  if (normalized === 'completed') return '完了';
-  if (normalized === 'completed_no_image') return '完了 -商品画像なし';
-  return '下書き';
-};
-const getStatusPillClass = (status: EntrySheet['status'] | string): string => {
-  const normalized = normalizeSheetStatus(status);
-  if (normalized === 'completed') return 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200';
-  if (normalized === 'completed_no_image') return 'bg-amber-100 text-amber-800 ring-1 ring-amber-200';
-  return 'bg-slate-100 text-slate-700 ring-1 ring-slate-200';
-};
-
 export const AdminEntryList: React.FC<AdminEntryListProps> = ({
   sheets,
   hasMore = false,
@@ -364,7 +345,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
       rows.push([
         toSafeCsvCell(getDisplaySheetId(sheet)),
         toSafeCsvCell(sheet.id),
-        toSafeCsvCell(getStatusLabel(sheet.status)),
+        toSafeCsvCell(getWorkflowStatusView(sheet).label),
         toSafeCsvCell(sheet.title),
         toSafeCsvCell(sheet.notes || ''),
         toSafeCsvCell(sheet.manufacturerName),
@@ -512,6 +493,8 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
               const draft = drafts[sheet.id] || buildDraftFromSheet(sheet);
               const urlEnabled = isHttpUrl(draft.deadlineTableUrl);
               const dirty = isDraftDirty(sheet);
+              const workflowStatus = getWorkflowStatusView(sheet);
+              const assigneeLabel = getCurrentAssigneeLabel(sheet.currentAssignee);
               return (
                 <React.Fragment key={sheet.id}>
                   <tr className={`${dirty ? 'bg-amber-50/40 hover:bg-amber-50/70' : 'hover:bg-slate-50'}`}>
@@ -539,11 +522,14 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                       </button>
                     </td>
                     <td className="px-2 py-3 text-xs text-slate-700">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 font-medium ${getStatusPillClass(sheet.status)}`}
-                      >
-                        {getStatusLabel(sheet.status)}
-                      </span>
+                      <div className="space-y-1">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 font-medium ${workflowStatus.pillClassName}`}
+                        >
+                          {workflowStatus.label}
+                        </span>
+                        <div className="text-[10px] text-slate-500">担当: {assigneeLabel}</div>
+                      </div>
                     </td>
                     <td className="px-2 py-3 text-xs font-semibold text-slate-700 break-words leading-4">
                       {sheet.title}

@@ -9,6 +9,7 @@
 - 主キー: `id (UUID)`
 - 主項目:
   - `name`: メーカー名（ユニーク）
+  - `code`: メーカー固有3桁コード（ユニーク、`100`〜`999`）
   - `created_at`: 作成日時
 
 ## 2. `users`
@@ -33,11 +34,15 @@
   - `creator_id -> users.id`（`ON DELETE SET NULL`）
   - `manufacturer_id -> manufacturers.id`
 - 主項目:
+  - `sheet_code`: 業務用シートID（メーカーコード3桁 + 連番5桁、ユニーク）
   - `title`: シートタイトル
   - `notes`: 補足情報
   - `shelf_name`: シート単位の棚割名
+  - `case_name`: 案件名
   - `deployment_start_month`: 展開スタート月（1〜12）
-  - `admin_*`: 管理者メモ項目
+  - `deployment_end_month`: 展開終了月（1〜12）
+  - `face_label`: 選択されたフェイス数ラベル
+  - `face_max_width`: 選択されたフェイスMAX値（mm）
   - `status`: `draft` / `completed` / `completed_no_image`
   - `created_at`, `updated_at`
 
@@ -158,7 +163,37 @@
 - 制約:
   - `UNIQUE (manufacturer_id, month)`
 
-## 10. `entry_sheet_admin_memos`
+## 12. `manufacturer_face_options`
+
+- 目的: メーカー別フェイス設定マスタ
+- 主キー: `id (UUID)`
+- 外部キー:
+  - `manufacturer_id -> manufacturers.id`
+- 主項目:
+  - `face_label`: フェイス数の表示ラベル
+  - `max_width`: そのラベル選択時の許容MAX幅(mm)
+  - `display_order`
+  - `created_at`
+- 制約:
+  - `UNIQUE (manufacturer_id, face_label)`
+
+## 13. `manufacturer_code_sequence`
+
+- 目的: メーカーコード採番のシーケンス保持
+- 主キー: `id (BOOLEAN, TRUE固定)`
+- 主項目:
+  - `last_code`
+  - `updated_at`
+
+## 14. `sheet_code_sequences`
+
+- 目的: メーカーコードごとのシート連番保持
+- 主キー: `manufacturer_code (VARCHAR(3))`
+- 主項目:
+  - `last_sequence`
+  - `updated_at`
+
+## 15. `entry_sheet_admin_memos`
 
 - 目的: エントリーシートに紐づく Adminメモの分離保存
 - 主キー: `sheet_id (UUID)`
@@ -184,7 +219,7 @@
   - `entry_sheets.updated_at` とは独立して更新される
   - 変更履歴 `entry_sheet_revisions` には含めない
 
-## 11. `entry_sheet_revisions`
+## 16. `entry_sheet_revisions`
 
 - 目的: エントリーシート変更履歴
 - 対象: 通常シート項目の更新のみ
@@ -227,12 +262,16 @@
 - DB制約:
   - `creator_id`: `NULL許容`, `FK`（ユーザー削除時は `NULL`）
   - `manufacturer_id`: `NOT NULL`, `FK`
+  - `sheet_code`: `UNIQUE`, `VARCHAR(8)`
   - `title`: `NOT NULL`, `VARCHAR(500)`
   - `status`: `CHECK (status IN ('draft', 'completed', 'completed_no_image'))`
 - APIバリデーション:
   - テキスト系項目は最大4000文字
     - `title`, `notes`, `email`, `phoneNumber`
   - `products` は1件以上必須
+  - `completed` 保存時:
+    - `face_label` 選択肢が存在するメーカーでは `faceLabel` 選択必須
+    - `width × facingCount` の商品合計が `faceMaxWidth` を超えるとエラー
 
 ### 13.3 `manufacturer_products`
 
@@ -299,6 +338,17 @@
 - APIバリデーション:
   - マスタ値は20文字以内
   - 対象カテゴリ: メーカー名 / リスク分類 / 特定成分
+
+### 13.7 `manufacturer_face_options`
+
+- DB制約:
+  - `manufacturer_id`: `NOT NULL`, `FK`
+  - `face_label`: `NOT NULL`, `VARCHAR(50)`
+  - `max_width`: `NOT NULL`, `INTEGER`, `> 0`
+  - `UNIQUE (manufacturer_id, face_label)`
+- APIバリデーション:
+  - `face_label` は20文字以内
+  - `max_width` は正の整数
 
 ## 14. 参照先
 

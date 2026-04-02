@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import JSZip from 'jszip';
 import { EntrySheet, User, UserRole } from '../types';
 import { Plus, Copy, Edit3, Trash2, Search, FileWarning, ChevronDown, ChevronUp, Download, CheckSquare, Square, Image as ImageIcon, X, AlertCircle, AlertTriangle, ArrowUpDown } from 'lucide-react';
+import { getCurrentAssigneeLabel, getWorkflowStatusView } from '../lib/sheetWorkflow';
 
 interface EntryListProps {
   sheets: EntrySheet[];
@@ -54,25 +55,6 @@ export const EntryList: React.FC<EntryListProps> = ({
   const [showExportModal, setShowExportModal] = useState(false);
   const [isDownloadingImages, setIsDownloadingImages] = useState(false);
 
-  const normalizeSheetStatus = (
-    status: EntrySheet['status'] | string
-  ): 'completed' | 'completed_no_image' | 'draft' => {
-    if (status === 'completed') return 'completed';
-    if (status === 'completed_no_image') return 'completed_no_image';
-    return 'draft';
-  };
-  const getStatusLabel = (status: EntrySheet['status'] | string): string => {
-    const normalized = normalizeSheetStatus(status);
-    if (normalized === 'completed') return '完了';
-    if (normalized === 'completed_no_image') return '完了 -商品画像なし';
-    return '下書き';
-  };
-  const getStatusPillClass = (status: EntrySheet['status'] | string): string => {
-    const normalized = normalizeSheetStatus(status);
-    if (normalized === 'completed') return 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200';
-    if (normalized === 'completed_no_image') return 'bg-amber-100 text-amber-800 ring-1 ring-amber-200';
-    return 'bg-slate-100 text-slate-700 ring-1 ring-slate-200';
-  };
   const normalizeManufacturerKey = (value: string): string => value.trim();
 
   const hasText = (value: unknown): boolean =>
@@ -298,7 +280,7 @@ export const EntryList: React.FC<EntryListProps> = ({
         csvRows.push([
           toSafeCsvCell(getDisplaySheetId(sheet)),
           toSafeCsvCell(sheet.id),
-          toSafeCsvCell(getStatusLabel(sheet.status)),
+          toSafeCsvCell(getWorkflowStatusView(sheet).label),
           toSafeCsvCell(sheet.title),
           toSafeCsvCell(sheet.notes || ''),
           toSafeCsvCell(sheet.manufacturerName),
@@ -665,6 +647,8 @@ export const EntryList: React.FC<EntryListProps> = ({
             {filteredSheets.map(sheet => {
                 const isExpanded = expandedSheets.has(sheet.id);
                 const isSelected = selectedSheets.has(sheet.id);
+                const workflowStatus = getWorkflowStatusView(sheet);
+                const assigneeLabel = getCurrentAssigneeLabel(sheet.currentAssignee);
 
                 return (
                     <div key={sheet.id} className={`bg-white rounded-xl border ${isSelected ? 'border-primary ring-1 ring-primary' : 'border-slate-200'} shadow-sm overflow-hidden`}>
@@ -675,8 +659,8 @@ export const EntryList: React.FC<EntryListProps> = ({
                             </div>
                             <div className="flex-1 min-w-0" onClick={() => toggleExpand(sheet.id)}>
                                 <div className="flex justify-between items-start mb-1">
-                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${getStatusPillClass(sheet.status)}`}>
-                                        {getStatusLabel(sheet.status)}
+                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${workflowStatus.pillClassName}`}>
+                                        {workflowStatus.label}
                                     </span>
                                     <span className="text-xs text-slate-400">{new Date(sheet.updatedAt).toLocaleDateString()}</span>
                                 </div>
@@ -690,6 +674,9 @@ export const EntryList: React.FC<EntryListProps> = ({
                                 </div>
                                 <div className="text-xs text-slate-600 mt-0.5 break-words">
                                     棚割り: {getSheetShelfNames(sheet)}
+                                </div>
+                                <div className="text-xs text-slate-500 mt-0.5">
+                                    担当: {assigneeLabel}
                                 </div>
                             </div>
                         </div>
@@ -809,6 +796,8 @@ export const EntryList: React.FC<EntryListProps> = ({
                   {filteredSheets.map((sheet) => {
                      const isExpanded = expandedSheets.has(sheet.id);
                      const isSelected = selectedSheets.has(sheet.id);
+                     const workflowStatus = getWorkflowStatusView(sheet);
+                     const assigneeLabel = getCurrentAssigneeLabel(sheet.currentAssignee);
 
                      return (
                       <React.Fragment key={sheet.id}>
@@ -828,9 +817,12 @@ export const EntryList: React.FC<EntryListProps> = ({
                             {getDisplaySheetId(sheet)}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap">
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusPillClass(sheet.status)}`}>
-                              {getStatusLabel(sheet.status)}
-                            </span>
+                            <div className="space-y-1">
+                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${workflowStatus.pillClassName}`}>
+                                {workflowStatus.label}
+                              </span>
+                              <div className="text-[11px] text-slate-500">担当: {assigneeLabel}</div>
+                            </div>
                           </td>
                           <td className="px-6 py-4">
                             <div className="text-sm font-bold text-slate-900 line-clamp-2 break-words leading-tight">{sheet.title}</div>

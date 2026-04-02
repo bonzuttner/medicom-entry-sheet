@@ -34,6 +34,10 @@ interface SheetRow {
   face_label: string | null;
   face_max_width: number | null;
   status: string;
+  entry_status: string | null;
+  creative_status: string | null;
+  current_assignee: string | null;
+  return_reason: string | null;
   created_at: Date | string;
   updated_at: Date | string;
 }
@@ -258,6 +262,7 @@ let ensureSheetVersionColumnPromise: Promise<void> | null = null;
 let ensureSheetRevisionTablePromise: Promise<void> | null = null;
 let ensureSheetStatusConstraintPromise: Promise<void> | null = null;
 let ensureDeploymentColumnsPromise: Promise<void> | null = null;
+let ensureWorkflowColumnsPromise: Promise<void> | null = null;
 let ensureManufacturerProductTablesPromise: Promise<void> | null = null;
 let ensureProductManufacturerProductColumnPromise: Promise<void> | null = null;
 let ensureSheetCodeInfrastructurePromise: Promise<void> | null = null;
@@ -373,6 +378,40 @@ const ensureDeploymentColumns = async (): Promise<void> => {
     });
   }
   await ensureDeploymentColumnsPromise;
+};
+
+const ensureWorkflowColumns = async (): Promise<void> => {
+  if (!ensureWorkflowColumnsPromise) {
+    ensureWorkflowColumnsPromise = (async () => {
+      await db.query(
+        `ALTER TABLE entry_sheets
+         ADD COLUMN IF NOT EXISTS entry_status VARCHAR(30)`
+      );
+      await db.query(
+        `ALTER TABLE entry_sheets
+         ADD COLUMN IF NOT EXISTS creative_status VARCHAR(30) NOT NULL DEFAULT 'none'`
+      );
+      await db.query(
+        `ALTER TABLE entry_sheets
+         ADD COLUMN IF NOT EXISTS current_assignee VARCHAR(30) DEFAULT 'none'`
+      );
+      await db.query(
+        `ALTER TABLE entry_sheets
+         ADD COLUMN IF NOT EXISTS return_reason TEXT`
+      );
+      await db.query(
+        `
+        UPDATE entry_sheets
+        SET entry_status = status
+        WHERE entry_status IS NULL
+        `
+      );
+    })().catch((error) => {
+      ensureWorkflowColumnsPromise = null;
+      throw error;
+    });
+  }
+  await ensureWorkflowColumnsPromise;
 };
 
 const formatSheetCode = (manufacturerCode: string, sequence: number): string =>
@@ -727,6 +766,10 @@ const rowsToSheet = (
     faceMaxWidth: sheetRow.face_max_width ?? undefined,
     adminMemo: adminMemoBySheetId.get(sheetRow.id),
     status: sheetRow.status as 'draft' | 'completed' | 'completed_no_image',
+    entryStatus: (sheetRow.entry_status || sheetRow.status) as 'draft' | 'completed' | 'completed_no_image',
+    creativeStatus: (sheetRow.creative_status || 'none') as 'none' | 'in_progress' | 'returned' | 'approved',
+    currentAssignee: (sheetRow.current_assignee || 'none') as 'admin' | 'manufacturer_user' | 'none',
+    returnReason: sheetRow.return_reason || undefined,
     createdAt: toIsoString(sheetRow.created_at),
     updatedAt: toIsoString(sheetRow.updated_at),
     products,
@@ -1002,6 +1045,7 @@ export const findAll = async (limit?: number, offset: number = 0): Promise<Entry
   await ensureAdminMemoTable();
   await ensureSheetVersionColumn();
   await ensureDeploymentColumns();
+  await ensureWorkflowColumns();
   await ensureSheetCodeInfrastructure();
   await ensureManufacturerProductTables();
   await ensureProductManufacturerProductColumn();
@@ -1009,6 +1053,7 @@ export const findAll = async (limit?: number, offset: number = 0): Promise<Entry
   const sheetQuery = `
     SELECT
       s.id, s.sheet_code, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
+      s.entry_status, s.creative_status, s.current_assignee, s.return_reason,
       s.shelf_name, s.case_name, s.deployment_start_month, s.deployment_end_month,
       s.face_label, s.face_max_width,
       s.created_at, s.updated_at,
@@ -1103,6 +1148,7 @@ export const findByManufacturerId = async (
   await ensureAdminMemoTable();
   await ensureSheetVersionColumn();
   await ensureDeploymentColumns();
+  await ensureWorkflowColumns();
   await ensureSheetCodeInfrastructure();
   await ensureManufacturerProductTables();
   await ensureProductManufacturerProductColumn();
@@ -1110,6 +1156,7 @@ export const findByManufacturerId = async (
   const sheetQuery = `
     SELECT
       s.id, s.sheet_code, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
+      s.entry_status, s.creative_status, s.current_assignee, s.return_reason,
       s.shelf_name, s.case_name, s.deployment_start_month, s.deployment_end_month,
       s.face_label, s.face_max_width,
       s.created_at, s.updated_at,
@@ -1216,6 +1263,7 @@ export const findById = async (sheetId: string): Promise<EntrySheet | null> => {
   await ensureAdminMemoTable();
   await ensureSheetVersionColumn();
   await ensureDeploymentColumns();
+  await ensureWorkflowColumns();
   await ensureSheetCodeInfrastructure();
   await ensureManufacturerProductTables();
   await ensureProductManufacturerProductColumn();
@@ -1223,6 +1271,7 @@ export const findById = async (sheetId: string): Promise<EntrySheet | null> => {
     `
     SELECT
       s.id, s.sheet_code, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
+      s.entry_status, s.creative_status, s.current_assignee, s.return_reason,
       s.shelf_name, s.case_name, s.deployment_start_month, s.deployment_end_month,
       s.face_label, s.face_max_width,
       s.created_at, s.updated_at,
@@ -1311,6 +1360,7 @@ export const upsert = async (
   await ensureSheetRevisionTable();
   await ensureSheetStatusConstraint();
   await ensureDeploymentColumns();
+  await ensureWorkflowColumns();
   await ensureSheetCodeInfrastructure();
   await ensureManufacturerProductTables();
   await ensureProductManufacturerProductColumn();
@@ -1354,6 +1404,31 @@ export const upsert = async (
           : sheet.status === 'completed_no_image'
             ? 'completed_no_image'
             : 'draft',
+      entryStatus:
+        sheet.entryStatus === 'completed'
+          ? 'completed'
+          : sheet.entryStatus === 'completed_no_image'
+            ? 'completed_no_image'
+            : sheet.status === 'completed'
+              ? 'completed'
+              : sheet.status === 'completed_no_image'
+                ? 'completed_no_image'
+                : 'draft',
+      creativeStatus:
+        sheet.creativeStatus === 'in_progress'
+          ? 'in_progress'
+          : sheet.creativeStatus === 'returned'
+            ? 'returned'
+            : sheet.creativeStatus === 'approved'
+              ? 'approved'
+              : 'none',
+      currentAssignee:
+        sheet.currentAssignee === 'admin' || sheet.currentAssignee === 'manufacturer_user'
+          ? sheet.currentAssignee
+          : sheet.status === 'draft'
+            ? 'manufacturer_user'
+            : 'admin',
+      returnReason: String(sheet.returnReason || '').trim() || undefined,
       adminMemo: {
         version:
           Number.isInteger(Number(sheet.adminMemo?.version)) && Number(sheet.adminMemo?.version) > 0
@@ -1443,8 +1518,9 @@ export const upsert = async (
         id, sheet_code, version, creator_id, manufacturer_id,
         creator_name_snapshot, creator_email_snapshot, creator_phone_snapshot,
         title, case_name, notes, shelf_name, deployment_start_month, deployment_end_month,
-        face_label, face_max_width, status, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+        face_label, face_max_width, status, entry_status, creative_status, current_assignee, return_reason,
+        created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
       ON CONFLICT (id) DO UPDATE SET
         sheet_code = COALESCE(entry_sheets.sheet_code, EXCLUDED.sheet_code),
         version = EXCLUDED.version,
@@ -1460,6 +1536,10 @@ export const upsert = async (
         face_label = EXCLUDED.face_label,
         face_max_width = EXCLUDED.face_max_width,
         status = EXCLUDED.status,
+        entry_status = EXCLUDED.entry_status,
+        creative_status = EXCLUDED.creative_status,
+        current_assignee = EXCLUDED.current_assignee,
+        return_reason = EXCLUDED.return_reason,
         updated_at = EXCLUDED.updated_at
       `,
       [
@@ -1480,6 +1560,10 @@ export const upsert = async (
         normalizedSheet.faceLabel || null,
         normalizedSheet.faceMaxWidth ?? null,
         normalizedSheet.status,
+        normalizedSheet.entryStatus,
+        normalizedSheet.creativeStatus,
+        normalizedSheet.currentAssignee,
+        normalizedSheet.returnReason || null,
         normalizedSheet.createdAt,
         normalizedSheet.updatedAt,
       ]

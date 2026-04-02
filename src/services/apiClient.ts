@@ -64,6 +64,24 @@ const parseErrorMessage = (status: number, raw: string): string => {
       'Failed to reload saved sheet':
         '保存は完了しましたが、最新データの再取得に失敗しました。画面を再読み込みして確認してください。',
       'You cannot delete this sheet': 'このエントリーシートを削除する権限がありません。',
+      'Only admin can access creatives': 'クリエイティブ機能を利用できるのは管理者のみです。',
+      'Creative id is required': 'クリエイティブIDが不足しています。画面を再読み込みして再試行してください。',
+      'creative is required': 'クリエイティブ情報が不足しています。入力内容を確認して再試行してください。',
+      'Creative not found': '対象のクリエイティブが見つかりません。一覧を更新して確認してください。',
+      'Target creative id is required':
+        '差し替え先のクリエイティブIDが不足しています。画面を更新して再試行してください。',
+      TARGET_CREATIVE_NOT_FOUND:
+        '差し替え先のクリエイティブが見つかりません。一覧を更新して再試行してください。',
+      CREATIVE_STILL_LINKED: '紐づいているエントリーシートがあるため、クリエイティブを削除できません。',
+      SHEET_ALREADY_LINKED: '選択したエントリーシートは他のクリエイティブで使用中です。',
+      SHEET_NOT_FOUND: '紐づけ対象のエントリーシートが見つかりません。',
+      SHEET_MANUFACTURER_MISMATCH:
+        '選択したエントリーシートのメーカーが一致していません。同じメーカーのシートのみ選択してください。',
+      CREATIVE_REQUIRED_FIELDS:
+        'クリエイティブ名、画像、紐づけるエントリーシートは必須です。',
+      MANUFACTURER_NOT_FOUND: 'メーカー情報の解決に失敗しました。紐づけるシートを確認してください。',
+      CREATIVE_RELOAD_FAILED:
+        '保存は完了しましたが、最新のクリエイティブ情報の再取得に失敗しました。画面を更新してください。',
       'dataUrl and fileName are required':
         '画像アップロード情報が不足しています。画像を選択し直して再試行してください。',
       'Blob storage is not configured':

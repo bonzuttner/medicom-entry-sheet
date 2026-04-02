@@ -84,7 +84,11 @@
   - `attachments`
   - `master_data`
   - `manufacturer_shelf_names`
+  - `manufacturer_case_names`
   - `manufacturer_default_start_months`
+  - `manufacturer_face_options`
+  - `manufacturer_code_sequence`
+  - `sheet_code_sequences`
   - `entry_sheet_revisions`
 
 ## 4. データモデル（アプリ）
@@ -93,17 +97,20 @@
 
 - `User`: `ADMIN` / `STAFF` を持つ
 - `EntrySheet`: シートヘッダ情報 + `products`
+  - `sheetCode` を保持（業務用シートID、表示/CSV用）
   - `deploymentStartMonth` を保持
+  - `faceLabel`, `faceMaxWidth` を保持（選択したフェイス設定）
   - `version` を保持（競合制御）
   - `status`: `draft` / `completed` / `completed_no_image`
   - `adminMemo` を保持（編集は ADMIN のみ、`entry_sheet_admin_memos` に分離保存）
 - `ProductEntry`: シート保存時点の商品スナップショット（JAN、画像、販促物情報など）
 - `manufacturer_products`: メーカー内で JAN 一意の検索用商品マスタ
   - `lastUsedAt` を保持し、最終利用から2年で削除対象
-- `MasterData`: メーカー名・リスク分類・特定成分・メーカー別棚割名・メーカー別デフォルト展開スタート月
+- `MasterData`: メーカー名・リスク分類・特定成分・メーカー別棚割名・メーカー別案件・メーカー別デフォルト展開スタート月・メーカー別フェイス設定
 
 補足:
 - APIでは `manufacturer_id`（UUID FK）で正規化しつつ、UIには `manufacturerName` を返す
+- メーカーには `code`（3桁）を採番し、シートには `sheet_code`（メーカーコード3桁 + 連番5桁）を採番する
 
 ## 5. API設計（要点）
 
@@ -144,6 +151,8 @@
 
 補足:
 - 一覧表示およびCSV出力の `状態` 文言は統一し、UI表示ラベル（`下書き` / `完了` / `完了 -商品画像なし`）を使用する
+- 一般一覧/Admin一覧の CSV は表示用 `シートID` と内部用 `内部UUID` を併記する
+- CSV列は画面運用に不要な項目を除外した構成にしている
 
 ## 6. 保存フロー
 
@@ -158,6 +167,8 @@
 補足:
 - 過去商品検索は `manufacturer_products` を検索元とする
 - `product_entries` はシート保存時点のスナップショットとして維持する
+- フェイス数はマスタで `label + maxWidth` の組として管理し、シート保存時には選択した `faceLabel` / `faceMaxWidth` を `entry_sheets` に保存する
+- 完了保存時の棚割り幅判定は `商品ごとの width × facingCount の合計 <= faceMaxWidth` を用いる
 - 保存は 1 トランザクションで実施し、途中失敗時は全ロールバックする
 - 本対応では、本番後に不要になる一時DB項目・移行専用テーブルは追加しない
 - 保持ポリシー:
@@ -196,6 +207,9 @@
   - 25MB以下
 - JANコード
   - 全角数字入力を半角数字へ正規化して扱う
+- 棚割り幅合計
+  - `width × facingCount` の商品合計値
+  - `completed` 保存時は、選択した `faceMaxWidth` を超えるとエラー
 
 ## 8. 非機能上の注意
 

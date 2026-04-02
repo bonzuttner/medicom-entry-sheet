@@ -60,6 +60,10 @@ CREATE TABLE IF NOT EXISTS entry_sheets (
   face_label VARCHAR(50),
   face_max_width INTEGER,
   status VARCHAR(30) NOT NULL CHECK (status IN ('draft', 'completed', 'completed_no_image')),
+  entry_status VARCHAR(30) CHECK (entry_status IN ('draft', 'completed', 'completed_no_image')),
+  creative_status VARCHAR(30) NOT NULL DEFAULT 'none' CHECK (creative_status IN ('none', 'in_progress', 'returned', 'approved')),
+  current_assignee VARCHAR(30) DEFAULT 'none' CHECK (current_assignee IN ('admin', 'manufacturer_user', 'none')),
+  return_reason TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
@@ -98,6 +102,43 @@ ALTER TABLE entry_sheets
   ADD COLUMN IF NOT EXISTS face_max_width INTEGER;
 
 ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS entry_status VARCHAR(30);
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS creative_status VARCHAR(30) NOT NULL DEFAULT 'none';
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS current_assignee VARCHAR(30) DEFAULT 'none';
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS return_reason TEXT;
+
+ALTER TABLE entry_sheets
+  DROP CONSTRAINT IF EXISTS entry_sheets_entry_status_check;
+
+ALTER TABLE entry_sheets
+  ADD CONSTRAINT entry_sheets_entry_status_check
+  CHECK (entry_status IS NULL OR entry_status IN ('draft', 'completed', 'completed_no_image'));
+
+ALTER TABLE entry_sheets
+  DROP CONSTRAINT IF EXISTS entry_sheets_creative_status_check;
+
+ALTER TABLE entry_sheets
+  ADD CONSTRAINT entry_sheets_creative_status_check
+  CHECK (creative_status IN ('none', 'in_progress', 'returned', 'approved'));
+
+ALTER TABLE entry_sheets
+  DROP CONSTRAINT IF EXISTS entry_sheets_current_assignee_check;
+
+ALTER TABLE entry_sheets
+  ADD CONSTRAINT entry_sheets_current_assignee_check
+  CHECK (current_assignee IN ('admin', 'manufacturer_user', 'none'));
+
+UPDATE entry_sheets
+SET entry_status = status
+WHERE entry_status IS NULL;
+
+ALTER TABLE entry_sheets
   DROP COLUMN IF EXISTS admin_promo_code,
   DROP COLUMN IF EXISTS admin_board_picking_jan,
   DROP COLUMN IF EXISTS admin_deadline_table_url,
@@ -121,6 +162,10 @@ CREATE INDEX IF NOT EXISTS idx_sheets_manufacturer_updated_at
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sheets_sheet_code
   ON entry_sheets(sheet_code)
   WHERE sheet_code IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_sheets_entry_status ON entry_sheets(entry_status);
+CREATE INDEX IF NOT EXISTS idx_sheets_creative_status ON entry_sheets(creative_status);
+CREATE INDEX IF NOT EXISTS idx_sheets_current_assignee ON entry_sheets(current_assignee);
 
 CREATE TABLE IF NOT EXISTS sheet_code_sequences (
   manufacturer_code VARCHAR(3) PRIMARY KEY,
@@ -150,6 +195,36 @@ CREATE TABLE IF NOT EXISTS entry_sheet_admin_memos (
 
 CREATE INDEX IF NOT EXISTS idx_entry_sheet_admin_memos_updated_at
   ON entry_sheet_admin_memos(updated_at DESC);
+
+-- クリエイティブ
+CREATE TABLE IF NOT EXISTS creatives (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  version INTEGER NOT NULL DEFAULT 1,
+  manufacturer_id UUID NOT NULL REFERENCES manufacturers(id) ON DELETE RESTRICT,
+  creator_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  creator_name_snapshot VARCHAR(200),
+  name VARCHAR(500) NOT NULL,
+  image_url TEXT NOT NULL,
+  memo TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_creatives_manufacturer ON creatives(manufacturer_id);
+CREATE INDEX IF NOT EXISTS idx_creatives_updated_at ON creatives(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_creatives_manufacturer_updated_at
+  ON creatives(manufacturer_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS creative_entry_sheets (
+  creative_id UUID NOT NULL REFERENCES creatives(id) ON DELETE CASCADE,
+  sheet_id UUID NOT NULL REFERENCES entry_sheets(id) ON DELETE CASCADE,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (creative_id, sheet_id),
+  UNIQUE (sheet_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_creative_entry_sheets_creative
+  ON creative_entry_sheets(creative_id);
 
 -- メーカー商品マスタ（検索用の正本）
 CREATE TABLE IF NOT EXISTS manufacturer_products (

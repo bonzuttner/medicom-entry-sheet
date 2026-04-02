@@ -1,7 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { EntrySheet, EntrySheetRevision, FaceOption, MasterData, ProductEntry, User, UserRole } from '../types';
+import { Creative, EntrySheet, EntrySheetRevision, FaceOption, MasterData, ProductEntry, User, UserRole } from '../types';
 import { Save, ArrowLeft, Plus, Trash2, AlertTriangle, Image as ImageIcon, Search, ChevronRight } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
+import { dataService } from '../services/dataService';
+import { getCurrentAssigneeLabel, getWorkflowStatusView } from '../lib/sheetWorkflow';
 
 interface EntryFormProps {
   initialData: EntrySheet;
@@ -13,6 +15,11 @@ interface EntryFormProps {
   onSearchProducts: (query: string, manufacturerName: string) => Promise<ProductEntry[]>;
   onSave: (sheet: EntrySheet) => Promise<void> | void;
   onCancel: () => void;
+  onOpenCreatives?: () => void;
+  onRelinkCreative?: (
+    sheetId: string,
+    targetCreativeId: string
+  ) => Promise<{ sheet: EntrySheet; creative: Creative }>;
 }
 
 const normalizeProductName = (value: string): string => value.trim().toLowerCase();
@@ -21,6 +28,7 @@ const AUTO_TITLE_PATTERN =
   /^\d{4}(?:\/|年)\d{1,2}(?:月)?\s+.+\s+"ブランド名を記入"$/;
 const LARGE_IMAGE_UPLOAD_ERROR =
   '画像サイズが大きすぎてアップロードできません。25MB以下の画像を使用してください。BMPは通信量が大きくなりやすいため、JPEG/PNGに変換するか画像サイズを下げて再試行してください。それでもできない場合は、担当者へメールで画像を送信ください。';
+const normalizeSearchText = (value: string): string => value.normalize('NFKC').trim().toLowerCase();
 
 export const EntryForm: React.FC<EntryFormProps> = ({
   initialData,
@@ -32,6 +40,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   onSearchProducts,
   onSave,
   onCancel,
+  onOpenCreatives,
+  onRelinkCreative,
 }) => {
   const sectionTitleClass = 'text-base font-bold text-slate-800';
   const pageBlockTitleClass = 'text-lg font-bold text-slate-800';
@@ -43,6 +53,12 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   const [productSearchQuery, setProductSearchQuery] = useState('');
   const [productSearchResults, setProductSearchResults] = useState<ProductEntry[]>([]);
   const [isSearchingProducts, setIsSearchingProducts] = useState(false);
+  const [linkedCreative, setLinkedCreative] = useState<Creative | null>(initialData.creative || null);
+  const [creativePickerOpen, setCreativePickerOpen] = useState(false);
+  const [creativePickerQuery, setCreativePickerQuery] = useState('');
+  const [creativeOptions, setCreativeOptions] = useState<Creative[]>([]);
+  const [isLoadingCreativeOptions, setIsLoadingCreativeOptions] = useState(false);
+  const [isRelinkingCreative, setIsRelinkingCreative] = useState(false);
   const askedPrefillByProductRef = useRef<Map<number, string>>(new Map());
   const lastAutoTitleRef = useRef('');
   const isAdminUser = currentUser.role === UserRole.ADMIN;
@@ -137,6 +153,18 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   const compactSelectWrapperClass = 'w-full md:max-w-[420px]';
   const compactSelectClass = (highlight = false): string =>
     `${getSelectClass(highlight)} ring-1 ring-inset ${highlight ? 'ring-amber-200' : 'ring-slate-200'}`;
+  const resolveAssigneeFromWorkflow = (
+    entryStatus: EntrySheet['entryStatus'] | EntrySheet['status'] | undefined,
+    creativeStatus: EntrySheet['creativeStatus'] | undefined,
+    changedByRole: UserRole
+  ): 'admin' | 'manufacturer_user' | 'none' => {
+    if (creativeStatus === 'approved') return 'none';
+    if (creativeStatus === 'in_progress') return 'manufacturer_user';
+    if (creativeStatus === 'returned') {
+      return changedByRole === UserRole.ADMIN ? 'manufacturer_user' : 'admin';
+    }
+    return entryStatus === 'draft' ? 'manufacturer_user' : 'admin';
+  };
 
   const getShelfOptions = (): string[] => {
     return (
@@ -223,6 +251,50 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   ]);
 
   useEffect(() => {
+    let mounted = true;
+    if (!initialData.id) {
+      setLinkedCreative(null);
+      return;
+    }
+    void dataService
+      .getCreativeBySheetId(initialData.id)
+      .then((creative) => {
+        if (!mounted) return;
+        setLinkedCreative(creative);
+      })
+      .catch((error) => {
+        console.error('Failed to load linked creative:', error);
+        if (!mounted) return;
+        setLinkedCreative(null);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [initialData.id]);
+
+  useEffect(() => {
+    if (!creativePickerOpen || !isAdminUser) return;
+    let mounted = true;
+    setIsLoadingCreativeOptions(true);
+    void dataService
+      .getCreatives()
+      .then((rows) => {
+        if (!mounted) return;
+        setCreativeOptions(rows);
+      })
+      .catch((error) => {
+        console.error('Failed to load creatives for picker:', error);
+      })
+      .finally(() => {
+        if (!mounted) return;
+        setIsLoadingCreativeOptions(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [creativePickerOpen, isAdminUser]);
+
+  useEffect(() => {
     const nextAutoTitle = buildAutoTitle(selectedStartMonth, formData.caseName);
     if (!nextAutoTitle) return;
 
@@ -263,6 +335,19 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
   const handleHeaderChange = (field: keyof EntrySheet, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const applyWorkflowChange = (nextCreativeStatus: EntrySheet['creativeStatus']) => {
+    setFormData((prev) => ({
+      ...prev,
+      creativeStatus: nextCreativeStatus,
+      currentAssignee: resolveAssigneeFromWorkflow(
+        prev.entryStatus || prev.status,
+        nextCreativeStatus,
+        currentUser.role
+      ),
+      returnReason: nextCreativeStatus === 'returned' ? prev.returnReason || '' : undefined,
+    }));
   };
 
   const handleAdminMemoChange = (field: string, value: string | number | undefined) => {
@@ -702,11 +787,11 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         return;
     }
     if (!formData.email) {
-        alert("担当者メールを入力してください");
+        alert("作成者メールを入力してください");
         return;
     }
     if (!formData.phoneNumber) {
-        alert("担当者電話番号を入力してください");
+        alert("作成者電話番号を入力してください");
         return;
     }
     if (!formData.title) {
@@ -851,15 +936,41 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     return sum + width * facing;
   }, 0);
   const isShelfWidthOver = selectedFaceMaxWidth ? shelfWidthTotal > selectedFaceMaxWidth : false;
-  const getSheetStatusLabel = (status: EntrySheet['status'] | string): string => {
-    if (status === 'completed') return '完了';
-    if (status === 'completed_no_image') return '完了 -商品画像なし';
-    return '下書き';
-  };
-  const getSheetStatusPillClass = (status: EntrySheet['status'] | string): string => {
-    if (status === 'completed') return 'bg-emerald-100 text-emerald-800';
-    if (status === 'completed_no_image') return 'bg-amber-100 text-amber-800';
-    return 'bg-slate-100 text-slate-700';
+  const workflowStatus = getWorkflowStatusView(formData);
+  const assigneeLabel = getCurrentAssigneeLabel(formData.currentAssignee);
+  const filteredCreativeOptions = creativeOptions.filter((creative) => {
+    if (creative.manufacturerName !== formData.manufacturerName) return false;
+    const query = normalizeSearchText(creativePickerQuery);
+    if (!query) return true;
+    return [creative.name, creative.memo || '', ...creative.linkedSheets.flatMap((sheet) => [
+      sheet.sheetCode || '',
+      sheet.title,
+      sheet.manufacturerName,
+      sheet.shelfName,
+      sheet.caseName,
+    ])].some((value) => normalizeSearchText(value).includes(query));
+  });
+  const handleRelinkCreative = async (targetCreativeId: string) => {
+    if (!onRelinkCreative || !initialData.id || isRelinkingCreative) return;
+    try {
+      setIsRelinkingCreative(true);
+      const result = await onRelinkCreative(initialData.id, targetCreativeId);
+      setLinkedCreative(result.creative);
+      setFormData((prev) => ({
+        ...prev,
+        version: result.sheet.version,
+        updatedAt: result.sheet.updatedAt,
+        creativeStatus: result.sheet.creativeStatus,
+        currentAssignee: result.sheet.currentAssignee,
+        returnReason: result.sheet.returnReason,
+      }));
+      setCreativePickerOpen(false);
+      setCreativePickerQuery('');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'クリエイティブの差し替えに失敗しました。');
+    } finally {
+      setIsRelinkingCreative(false);
+    }
   };
   const getProductTabState = (product: ProductEntry): { label: string; tone: string } => {
     const coreChecks = [
@@ -923,10 +1034,207 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 mb-4 sm:mb-6">
         <div className="mb-4 flex items-center justify-between border-b pb-4">
           <h3 className={pageBlockTitleClass}>シート基本情報</h3>
-          <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${getSheetStatusPillClass(formData.status)}`}>
-            {getSheetStatusLabel(formData.status)}
-          </span>
+          <div className="text-right">
+            <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${workflowStatus.pillClassName}`}>
+              {workflowStatus.label}
+            </span>
+            <div className="mt-1 text-xs text-slate-500">担当: {assigneeLabel}</div>
+          </div>
         </div>
+
+        <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <div className="text-sm font-bold text-slate-800">紐づくクリエイティブ</div>
+              {linkedCreative ? (
+                <div className="mt-3 flex items-center gap-4">
+                  <div className="flex h-16 w-24 items-center justify-center overflow-hidden rounded-lg bg-white">
+                    <img src={linkedCreative.imageUrl} alt="" className="h-full w-full object-cover" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-slate-800">{linkedCreative.name}</div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      最終更新日: {new Date(linkedCreative.updatedAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-slate-500">まだクリエイティブは紐づいていません。</p>
+              )}
+            </div>
+            {isAdminUser && onOpenCreatives && (
+              <div className="flex flex-wrap items-center gap-2">
+                {onRelinkCreative && (
+                  <button
+                    type="button"
+                    onClick={() => setCreativePickerOpen((prev) => !prev)}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 font-semibold text-sky-700 shadow-sm transition-all hover:bg-sky-100"
+                  >
+                    {linkedCreative ? 'クリエイティブを差し替え' : 'クリエイティブを紐づけ'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onOpenCreatives}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50"
+                >
+                  クリエイティブ管理を開く
+                </button>
+              </div>
+            )}
+          </div>
+          {isAdminUser && creativePickerOpen && onRelinkCreative && (
+            <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-slate-800">差し替え先クリエイティブを選択</div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    同じメーカーのクリエイティブから選択します。
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCreativePickerOpen(false)}
+                  className="rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-slate-100"
+                >
+                  閉じる
+                </button>
+              </div>
+              <div className="mt-4">
+                <input
+                  value={creativePickerQuery}
+                  onChange={(event) => setCreativePickerQuery(event.target.value)}
+                  placeholder="クリエイティブ名 / シート名 / ID / 棚割り名 / 案件名で検索"
+                  className={getFieldClass()}
+                />
+              </div>
+              <div className="mt-4 max-h-72 space-y-2 overflow-y-auto">
+                {isLoadingCreativeOptions ? (
+                  <div className="rounded-lg bg-slate-50 px-4 py-6 text-sm text-slate-500">読み込み中...</div>
+                ) : filteredCreativeOptions.length === 0 ? (
+                  <div className="rounded-lg bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                    差し替え可能なクリエイティブが見つかりません。
+                  </div>
+                ) : (
+                  filteredCreativeOptions.map((creative) => {
+                    const isCurrent = creative.id === linkedCreative?.id;
+                    return (
+                      <button
+                        key={creative.id}
+                        type="button"
+                        disabled={isCurrent || isRelinkingCreative}
+                        onClick={() => {
+                          void handleRelinkCreative(creative.id);
+                        }}
+                        className={`flex w-full items-center gap-4 rounded-xl border px-4 py-3 text-left transition ${
+                          isCurrent
+                            ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
+                            : 'border-slate-200 bg-white hover:border-sky-200 hover:bg-sky-50'
+                        }`}
+                      >
+                        <div className="flex h-14 w-20 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
+                          <img src={creative.imageUrl} alt="" className="h-full w-full object-cover" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-semibold text-slate-800">{creative.name}</div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            {creative.linkedSheets.length > 0
+                              ? `${creative.linkedSheets[0].sheetCode || creative.linkedSheets[0].id.slice(0, 8)} | ${creative.linkedSheets[0].title}`
+                              : '未紐づき'}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            更新日: {new Date(creative.updatedAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-xs font-semibold text-sky-700">
+                          {isCurrent ? '現在選択中' : isRelinkingCreative ? '差し替え中...' : '差し替え'}
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-sm font-bold text-slate-700">進行状況</label>
+              {isAdminUser ? (
+                <select
+                  value={formData.creativeStatus || 'none'}
+                  onChange={(event) => {
+                    applyWorkflowChange(event.target.value as EntrySheet['creativeStatus']);
+                  }}
+                  disabled={!linkedCreative}
+                  className={`${getSelectClass()} ${!linkedCreative ? 'cursor-not-allowed opacity-60' : ''}`}
+                >
+                  <option value="none">未着手</option>
+                  <option value="in_progress">クリエイティブ作成中</option>
+                  <option value="returned">差し戻し</option>
+                  <option value="approved">承認済み</option>
+                </select>
+              ) : (
+                <div className="space-y-3">
+                  <div className={`rounded-lg px-3 py-3 text-sm font-semibold ${workflowStatus.pillClassName}`}>
+                    {workflowStatus.label}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={!linkedCreative || isSaving}
+                      onClick={() => applyWorkflowChange('approved')}
+                      className="rounded-lg bg-emerald-100 px-4 py-2 text-sm font-semibold text-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      承認済みにする
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!linkedCreative || isSaving}
+                      onClick={() => applyWorkflowChange('returned')}
+                      className="rounded-lg bg-rose-100 px-4 py-2 text-sm font-semibold text-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      差し戻しにする
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-bold text-slate-700">現在担当</label>
+              <select
+                value={formData.currentAssignee || resolveAssigneeFromWorkflow(formData.entryStatus || formData.status, formData.creativeStatus, currentUser.role)}
+                onChange={(event) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    currentAssignee: event.target.value as EntrySheet['currentAssignee'],
+                  }))
+                }
+                className={getSelectClass()}
+              >
+                <option value="admin">Admin</option>
+                <option value="manufacturer_user">メーカー</option>
+                <option value="none">なし</option>
+              </select>
+            </div>
+          </div>
+          {(formData.creativeStatus || 'none') === 'returned' && (
+            <div className="mt-4">
+              <label className="mb-2 block text-sm font-bold text-slate-700">差し戻し理由</label>
+              <textarea
+                rows={3}
+                value={formData.returnReason || ''}
+                onChange={(event) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    returnReason: event.target.value,
+                  }))
+                }
+                className={getTextareaClass()}
+              />
+            </div>
+          )}
+        </div>
+
         <div className="mb-6">
             <h4 className={`${sectionTitleClass} mb-4 flex items-center gap-2`}>
                 <span className="w-1 h-5 bg-amber-500 rounded-full"></span>
@@ -955,7 +1263,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">担当者メール <span className="text-danger">*</span></label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">作成者メール <span className="text-danger">*</span></label>
                     <input 
                         type="email" 
                         value={formData.email} 
@@ -964,7 +1272,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">担当者電話番号 <span className="text-danger">*</span></label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">作成者電話番号 <span className="text-danger">*</span></label>
                     <input 
                         type="tel" 
                         value={formData.phoneNumber} 

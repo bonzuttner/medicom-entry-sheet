@@ -1,4 +1,4 @@
-import { EntrySheet, EntrySheetRevision, MasterData, ProductEntry, User } from '../types';
+import { Creative, EntrySheet, EntrySheetRevision, MasterData, ProductEntry, User } from '../types';
 import { apiClient } from './apiClient';
 
 export interface PagedResult<T> {
@@ -34,6 +34,17 @@ export interface DataService {
   }) => Promise<ProductEntry[]>;
   getMasterData: () => Promise<MasterData>;
   saveMasterData: (data: MasterData) => Promise<MasterData>;
+  getCreatives: () => Promise<Creative[]>;
+  getCreativeBySheetId: (sheetId: string) => Promise<Creative | null>;
+  saveCreative: (
+    creative: Creative,
+    options?: { forceOverwrite?: boolean }
+  ) => Promise<Creative>;
+  deleteCreative: (id: string) => Promise<void>;
+  relinkSheetCreative: (
+    sheetId: string,
+    targetCreativeId: string
+  ) => Promise<{ sheet: EntrySheet; creative: Creative }>;
 }
 
 const apiDataService: DataService = {
@@ -84,6 +95,24 @@ const apiDataService: DataService = {
     ),
   getMasterData: async () => apiClient.get<MasterData>('/api/master'),
   saveMasterData: async (data) => apiClient.put<MasterData>('/api/master', { data }),
+  getCreatives: async () => apiClient.get<Creative[]>('/api/creatives'),
+  getCreativeBySheetId: async (sheetId) =>
+    apiClient.get<Creative | null>(`/api/creatives/by-sheet?sheetId=${encodeURIComponent(sheetId)}`),
+  saveCreative: async (creative, options) =>
+    apiClient
+      .put<{ ok: boolean; creative: Creative }>(`/api/creatives/${creative.id}`, {
+        creative,
+        forceOverwrite: options?.forceOverwrite === true,
+      })
+      .then((result) => result.creative),
+  deleteCreative: async (id) => {
+    await apiClient.delete<void>(`/api/creatives/${id}`);
+  },
+  relinkSheetCreative: async (sheetId, targetCreativeId) =>
+    apiClient.put<{ ok: boolean; sheet: EntrySheet; creative: Creative }>('/api/creatives/relink-sheet', {
+      sheetId,
+      targetCreativeId,
+    }),
 };
 
 export const isApiDataSource = true;

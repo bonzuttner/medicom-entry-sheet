@@ -5,7 +5,7 @@ import { uploadMediaDataUrl } from './_lib/media.js';
 interface UploadBody {
   dataUrl?: string;
   fileName?: string;
-  kind?: 'image' | 'attachment' | 'promo';
+  kind?: 'image' | 'attachment' | 'promo' | 'creative';
 }
 
 export default async function handler(req: any, res: any) {
@@ -29,7 +29,9 @@ export default async function handler(req: any, res: any) {
   }
 
   const kind =
-    body.kind === 'attachment' || body.kind === 'promo' ? body.kind : 'image';
+    body.kind === 'attachment' || body.kind === 'promo' || body.kind === 'creative'
+      ? body.kind
+      : 'image';
 
   try {
     const url = await uploadMediaDataUrl(
