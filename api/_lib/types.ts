@@ -29,7 +29,7 @@ export interface FaceOption {
 }
 
 export type EntryStatus = 'draft' | 'completed' | 'completed_no_image';
-export type CreativeStatus = 'none' | 'in_progress' | 'returned' | 'approved';
+export type CreativeStatus = 'none' | 'in_progress' | 'confirmation_pending' | 'returned' | 'approved';
 export type CurrentAssignee = 'admin' | 'manufacturer_user' | 'none';
 
 export interface EntrySheetAdminMemo {

@@ -48,7 +48,7 @@
   - `face_max_width`: 選択されたフェイスMAX値（mm）
   - `status`: `draft` / `completed` / `completed_no_image`
   - `entry_status`: エントリーシート本体の進行状態
-  - `creative_status`: クリエイティブ工程の進行状態（`none` / `in_progress` / `returned` / `approved`）
+  - `creative_status`: クリエイティブ工程の進行状態（`none` / `in_progress` / `confirmation_pending` / `returned` / `approved`）
   - `current_assignee`: 現在担当（`admin` / `manufacturer_user` / `none`）
   - `return_reason`: 差し戻し理由
   - `created_at`, `updated_at`
@@ -274,7 +274,7 @@
   - `title`: `NOT NULL`, `VARCHAR(500)`
   - `status`: `CHECK (status IN ('draft', 'completed', 'completed_no_image'))`
   - `entry_status`: `CHECK (entry_status IN ('draft', 'completed', 'completed_no_image'))`
-  - `creative_status`: `CHECK (creative_status IN ('none', 'in_progress', 'returned', 'approved'))`
+  - `creative_status`: `CHECK (creative_status IN ('none', 'in_progress', 'confirmation_pending', 'returned', 'approved'))`
   - `current_assignee`: `CHECK (current_assignee IN ('admin', 'manufacturer_user', 'none'))`
 - APIバリデーション:
   - テキスト系項目は最大4000文字

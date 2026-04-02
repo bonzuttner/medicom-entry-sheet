@@ -59,6 +59,8 @@ const parseErrorMessage = (status: number, raw: string): string => {
       'You can only save sheets in your manufacturer':
         '他社メーカーのエントリーシートは保存できません。自社メーカーのシートを編集してください。',
       'You cannot modify this sheet': 'このエントリーシートを編集する権限がありません。',
+      'You cannot modify this workflow status':
+        'この進行状況へ変更する権限がありません。',
       'You cannot access this sheet': 'このエントリーシートを閲覧する権限がありません。',
       'Sheet not found': '対象のエントリーシートが見つかりません。一覧を更新して確認してください。',
       'Failed to reload saved sheet':

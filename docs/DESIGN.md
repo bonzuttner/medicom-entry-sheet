@@ -164,6 +164,7 @@
 
 補足:
 - 一覧表示およびCSV出力の `状態` 文言は統一し、UI表示ラベル（`下書き` / `完了` / `完了 -商品画像なし`）を使用する
+- クリエイティブ工程の UI 表示ラベルは `クリエイティブ作成中` / `確認待ち` / `差し戻し` / `承認済み`
 - 一般一覧/Admin一覧の CSV は表示用 `シートID` のみを出力する
 - CSV列は画面運用に不要な項目を除外した構成にしている
 - Vercel Hobby の Serverless Functions 上限対策として、Creative API の入口は catch-all 1本に集約している
@@ -215,13 +216,57 @@
 3. Creative本体と `creative_entry_sheets` の紐づき更新は同一処理で確定する
 4. シート詳細から差し替える場合も、内部的には `Creative API` を呼ぶ
 5. クリエイティブ保存時、紐づいたシートの `creativeStatus` は `in_progress` に更新する
-6. 未紐づきCreativeのみ削除可能とする
-7. `2年以上未更新` かつ `未紐づき` のCreativeのみ自動削除対象とする
+6. シート詳細の進行管理ボタン（`クリエイティブ作成中にする` / `確認待ちにする` / `承認済みにする` / `差し戻しを確定`）は押下時点で即保存する
+7. Adminが制作完了後、シート詳細で `確認待ち` に進める
+8. 一般ユーザーは `確認待ち` のときのみ `承認済み` または `差し戻し` を実行する
+9. 一般ユーザーが `差し戻し` 状態のシートを修正して `エントリー完了` を押した場合、`creativeStatus` は `none` に戻し、再びAdmin工程へ戻す
+10. 未紐づきCreativeのみ削除可能とする
+11. `2年以上未更新` かつ `未紐づき` のCreativeのみ自動削除対象とする
 
 補足:
 - 現行の Vercel Hobby 環境では関数数上限を避けるため、Creative API は `api/creatives/[[...path]].ts` に集約している
 - ただし設計上の責務は分離しているため、AWS移管やProプラン移行など関数数制約が緩い環境では、`一覧` `詳細` `シート参照` `差し替え` を別APIに再分割した方が保守しやすい
 - その場合も、Creativeの紐づき更新を `Creative API` 側の責務に一本化する方針は維持する
+
+#### 6.3.1 ステータスの流れ
+
+```text
+下書き
+  ├─ 一時保存 → 下書き
+  └─ エントリー完了 → エントリー完了 / エントリー完了（画像なし）
+
+エントリー完了 / エントリー完了（画像なし）
+  ├─ Adminがクリエイティブ作成中にする → クリエイティブ作成中
+  └─ Adminが差し戻し → 差し戻し
+
+クリエイティブ作成中
+  ├─ Adminが確認待ちにする → 確認待ち
+  └─ Adminが差し戻し → 差し戻し
+
+確認待ち
+  ├─ 一般ユーザーが承認済みにする → 承認済み
+  └─ 一般ユーザーが差し戻し → 差し戻し
+
+差し戻し
+  ├─ 一般ユーザーが修正してエントリー完了 → エントリー完了 / エントリー完了（画像なし）
+  └─ Adminがクリエイティブ作成中に戻す → クリエイティブ作成中
+
+承認済み
+  ├─ Adminがクリエイティブ作成中に戻す → クリエイティブ作成中
+  └─ Adminがクリエイティブを差し替える → クリエイティブ作成中
+```
+
+#### 6.3.2 UI表示と内部値の対応
+
+| UI表示 | 内部値 |
+|---|---|
+| 下書き | `status=draft` `entryStatus=draft` `creativeStatus=none` |
+| エントリー完了 | `status=completed` `entryStatus=completed` `creativeStatus=none` |
+| エントリー完了（画像なし） | `status=completed_no_image` `entryStatus=completed_no_image` `creativeStatus=none` |
+| クリエイティブ作成中 | `creativeStatus=in_progress` |
+| 確認待ち | `creativeStatus=confirmation_pending` |
+| 差し戻し | `creativeStatus=returned` |
+| 承認済み | `creativeStatus=approved` |
 
 ### 6.4 画像/添付
 

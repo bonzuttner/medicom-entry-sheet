@@ -111,7 +111,6 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
   onSaveAdminMemo,
 }) => {
   const pageTitleClass = 'text-2xl font-bold tracking-tight text-slate-800';
-  const pageSubtitleClass = 'mt-1 text-sm text-slate-500';
   const toolbarAccentButtonClass =
     'flex items-center justify-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 font-semibold text-sky-700 shadow-sm transition-all hover:bg-sky-100';
   const searchInputClass =
@@ -390,9 +389,6 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
           <h2 className={pageTitleClass}>エントリー履歴（Admin）</h2>
-          <p className={pageSubtitleClass}>
-            {selectedCount > 0 ? `${selectedCount}件 選択中` : 'Adminメモを一覧上で編集できます。'}
-          </p>
         </div>
         <button
           onClick={() => setShowExportModal(true)}
@@ -403,55 +399,53 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
         </button>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-4">
-          <div className="relative w-full">
-            <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+      <div className="flex flex-col gap-4">
+        <div className="relative w-full">
+          <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            className={searchInputClass}
+            placeholder="タイトル / メーカー名 / 棚割名で検索"
+          />
+        </div>
+        <div className="flex flex-col lg:flex-row gap-3">
+          <select
+            value={manufacturerFilter}
+            onChange={(e) => setManufacturerFilter(e.target.value)}
+            className="min-w-52 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm"
+          >
+            <option value="">メーカー: すべて</option>
+            {manufacturerOptions.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-600">展開期間</span>
             <input
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              className={searchInputClass}
-              placeholder="タイトル / メーカー名 / 棚割名で検索"
+              type="date"
+              value={deploymentDate}
+              onChange={(e) => setDeploymentDate(e.target.value)}
+              className={filterControlClass}
             />
-          </div>
-          <div className="flex flex-col lg:flex-row gap-3">
             <select
-              value={manufacturerFilter}
-              onChange={(e) => setManufacturerFilter(e.target.value)}
-              className="min-w-52 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm"
+              value={deploymentFilterMode}
+              onChange={(e) => setDeploymentFilterMode(e.target.value as 'since' | 'until')}
+              className={filterControlClass}
             >
-              <option value="">メーカー: すべて</option>
-              {manufacturerOptions.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
+              <option value="since">以降</option>
+              <option value="until">以前</option>
             </select>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold text-slate-600">展開期間</span>
-              <input
-                type="date"
-                value={deploymentDate}
-                onChange={(e) => setDeploymentDate(e.target.value)}
-                className={filterControlClass}
-              />
-              <select
-                value={deploymentFilterMode}
-                onChange={(e) => setDeploymentFilterMode(e.target.value as 'since' | 'until')}
-                className={filterControlClass}
+            {deploymentDate && (
+              <button
+                onClick={() => setDeploymentDate('')}
+                className="px-2 py-2 rounded-md border border-slate-300 text-xs text-slate-600 hover:bg-slate-50"
               >
-                <option value="since">以降</option>
-                <option value="until">以前</option>
-              </select>
-              {deploymentDate && (
-                <button
-                  onClick={() => setDeploymentDate('')}
-                  className="px-2 py-2 rounded-md border border-slate-300 text-xs text-slate-600 hover:bg-slate-50"
-                >
-                  解除
-                </button>
-              )}
-            </div>
+                解除
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -471,9 +465,8 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                 </button>
               </th>
               <th className="sticky top-0 z-10 w-24 border-b border-slate-200 px-2 py-3 text-left text-xs font-bold text-slate-500 bg-slate-50">ID</th>
-              <th className="sticky top-0 z-10 w-[42px] border-b border-slate-200 bg-slate-50 px-1 py-3 text-center" aria-label="詳細編集"></th>
               <th className="sticky top-0 z-10 w-[150px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">状態</th>
-              <th className="sticky top-0 z-10 w-[180px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">タイトル</th>
+              <th className="sticky top-0 z-10 w-[220px] border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-xs font-bold text-slate-500">タイトル</th>
               <th className="sticky top-0 z-10 w-[104px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">展開期間</th>
               <th className="sticky top-0 z-10 w-[110px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">棚割り</th>
               <th className="sticky top-0 z-10 w-[116px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">メーカー名</th>
@@ -509,16 +502,6 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                     <td className="w-24 px-2 py-4 text-[10px] text-slate-400 font-mono whitespace-nowrap bg-white">
                       {getDisplaySheetId(sheet)}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        type="button"
-                        onClick={() => onEdit(sheet)}
-                        className="p-2 rounded text-primary hover:text-sky-700 hover:bg-sky-100 transition-colors"
-                        title="詳細編集"
-                      >
-                        <Edit3 size={18} />
-                      </button>
-                    </td>
                     <td className="px-4 py-4 whitespace-nowrap">
                       <div className="space-y-1">
                         <span
@@ -529,8 +512,20 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                         <div className="text-[11px] text-slate-500">担当: {assigneeLabel}</div>
                       </div>
                     </td>
-                    <td className="px-2 py-3 text-xs font-semibold text-slate-700 break-words leading-4">
-                      {sheet.title}
+                    <td className="px-4 py-4">
+                      <div className="flex items-start gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onEdit(sheet)}
+                          className="mt-0.5 p-2 rounded text-primary hover:text-sky-700 hover:bg-sky-100 transition-colors"
+                          title="詳細編集"
+                        >
+                          <Edit3 size={18} />
+                        </button>
+                        <div className="min-w-0 flex-1 text-sm font-bold text-slate-900 break-words leading-tight">
+                          {sheet.title}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-2 py-3 text-xs text-slate-700 whitespace-nowrap">
                       {getDeploymentPeriodLabel(sheet)}

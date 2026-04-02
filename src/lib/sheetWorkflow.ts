@@ -5,6 +5,7 @@ export type WorkflowStatusKey =
   | 'entry_completed'
   | 'entry_completed_no_image'
   | 'creative_in_progress'
+  | 'confirmation_pending'
   | 'returned'
   | 'approved';
 
@@ -39,6 +40,13 @@ export const getWorkflowStatusView = (
       key: 'returned',
       label: '差し戻し',
       pillClassName: 'bg-rose-100 text-rose-800 ring-1 ring-rose-200',
+    };
+  }
+  if (creativeStatus === 'confirmation_pending') {
+    return {
+      key: 'confirmation_pending',
+      label: '確認待ち',
+      pillClassName: 'bg-violet-100 text-violet-800 ring-1 ring-violet-200',
     };
   }
   if (creativeStatus === 'in_progress') {

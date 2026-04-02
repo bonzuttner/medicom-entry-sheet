@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS entry_sheets (
   face_max_width INTEGER,
   status VARCHAR(30) NOT NULL CHECK (status IN ('draft', 'completed', 'completed_no_image')),
   entry_status VARCHAR(30) CHECK (entry_status IN ('draft', 'completed', 'completed_no_image')),
-  creative_status VARCHAR(30) NOT NULL DEFAULT 'none' CHECK (creative_status IN ('none', 'in_progress', 'returned', 'approved')),
+  creative_status VARCHAR(30) NOT NULL DEFAULT 'none' CHECK (creative_status IN ('none', 'in_progress', 'confirmation_pending', 'returned', 'approved')),
   current_assignee VARCHAR(30) DEFAULT 'none' CHECK (current_assignee IN ('admin', 'manufacturer_user', 'none')),
   return_reason TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -125,7 +125,7 @@ ALTER TABLE entry_sheets
 
 ALTER TABLE entry_sheets
   ADD CONSTRAINT entry_sheets_creative_status_check
-  CHECK (creative_status IN ('none', 'in_progress', 'returned', 'approved'));
+  CHECK (creative_status IN ('none', 'in_progress', 'confirmation_pending', 'returned', 'approved'));
 
 ALTER TABLE entry_sheets
   DROP CONSTRAINT IF EXISTS entry_sheets_current_assignee_check;

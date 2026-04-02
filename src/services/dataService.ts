@@ -25,6 +25,11 @@ export interface DataService {
     adminMemo: EntrySheet['adminMemo'],
     options?: { forceOverwrite?: boolean }
   ) => Promise<EntrySheet>;
+  saveSheetWorkflow: (
+    sheetId: string,
+    workflow: Pick<EntrySheet, 'version' | 'creativeStatus' | 'currentAssignee' | 'returnReason'>,
+    options?: { forceOverwrite?: boolean }
+  ) => Promise<EntrySheet>;
   deleteSheet: (id: string) => Promise<void>;
   getSheetRevisions: (sheetId: string) => Promise<EntrySheetRevision[]>;
   searchProducts: (params: {
@@ -79,6 +84,14 @@ const apiDataService: DataService = {
       .put<{ ok: boolean; sheet: EntrySheet }>(`/api/sheets/${sheetId}`, {
         mode: 'admin_memo',
         adminMemo,
+        forceOverwrite: options?.forceOverwrite === true,
+      })
+      .then((result) => result.sheet),
+  saveSheetWorkflow: async (sheetId, workflow, options) =>
+    apiClient
+      .put<{ ok: boolean; sheet: EntrySheet }>(`/api/sheets/${sheetId}`, {
+        mode: 'workflow',
+        workflow,
         forceOverwrite: options?.forceOverwrite === true,
       })
       .then((result) => result.sheet),

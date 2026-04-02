@@ -6,8 +6,9 @@ import * as SheetRepository from '../_lib/repositories/sheets.js';
 
 interface PutSheetBody {
   sheet?: EntrySheet;
-  mode?: 'admin_memo';
+  mode?: 'admin_memo' | 'workflow';
   adminMemo?: EntrySheetAdminMemo;
+  workflow?: Pick<EntrySheet, 'version' | 'creativeStatus' | 'currentAssignee' | 'returnReason'>;
   forceOverwrite?: boolean;
   forceJanOverwrite?: boolean;
 }
@@ -29,6 +30,24 @@ const normalizeStatus = (
   if (value === 'completed') return 'completed';
   if (value === 'completed_no_image') return 'completed_no_image';
   return 'draft';
+};
+
+const normalizeCreativeStatus = (
+  value: string | undefined
+): 'none' | 'in_progress' | 'confirmation_pending' | 'returned' | 'approved' => {
+  if (value === 'in_progress') return 'in_progress';
+  if (value === 'confirmation_pending') return 'confirmation_pending';
+  if (value === 'returned') return 'returned';
+  if (value === 'approved') return 'approved';
+  return 'none';
+};
+
+const normalizeCurrentAssignee = (
+  value: string | undefined
+): 'admin' | 'manufacturer_user' | 'none' => {
+  if (value === 'admin') return 'admin';
+  if (value === 'manufacturer_user') return 'manufacturer_user';
+  return 'none';
 };
 
 const normalizeProducts = (
@@ -277,6 +296,27 @@ const buildRevisionSummary = (before: EntrySheet | null, after: EntrySheet): str
   return changes.slice(0, 80).join('\n');
 };
 
+const buildWorkflowSummary = (
+  before: EntrySheet,
+  after: EntrySheet
+): string => {
+  const changes: string[] = [];
+  if ((before.creativeStatus || 'none') !== (after.creativeStatus || 'none')) {
+    changes.push(
+      `進行状態: ${before.creativeStatus || 'none'} -> ${after.creativeStatus || 'none'}`
+    );
+  }
+  if ((before.currentAssignee || 'none') !== (after.currentAssignee || 'none')) {
+    changes.push(
+      `担当: ${before.currentAssignee || 'none'} -> ${after.currentAssignee || 'none'}`
+    );
+  }
+  if ((before.returnReason || '') !== (after.returnReason || '')) {
+    changes.push('差し戻し理由を更新');
+  }
+  return changes.length > 0 ? changes.join(' / ') : '進行管理を更新';
+};
+
 const stripAdminMemo = (sheet: EntrySheet): EntrySheet => ({
   ...sheet,
   adminMemo: undefined,
@@ -377,6 +417,85 @@ export default async function handler(req: any, res: any) {
         return;
       }
       sendJson(res, 200, { ok: true, sheet: stripAdminMemo(updatedSheet) });
+      return;
+    }
+
+    if (body.mode === 'workflow') {
+      const existingSheet = await SheetRepository.findById(sheetId);
+      if (!existingSheet) {
+        sendError(res, 404, 'Sheet not found');
+        return;
+      }
+      if (!canAccessManufacturer(currentUser, existingSheet.manufacturerName)) {
+        sendError(res, 403, 'You cannot modify this sheet');
+        return;
+      }
+
+      const currentCreativeStatus = normalizeCreativeStatus(existingSheet.creativeStatus);
+      const nextCreativeStatus = normalizeCreativeStatus(body.workflow?.creativeStatus);
+      const nextCurrentAssignee = normalizeCurrentAssignee(body.workflow?.currentAssignee);
+      const nextReturnReason =
+        nextCreativeStatus === 'returned'
+          ? String(body.workflow?.returnReason || '').trim()
+          : undefined;
+
+      if (!isAdmin(currentUser)) {
+        const allowedWorkflowTransition =
+          nextCreativeStatus === currentCreativeStatus ||
+          (currentCreativeStatus === 'confirmation_pending' &&
+            (nextCreativeStatus === 'approved' || nextCreativeStatus === 'returned'));
+        if (!allowedWorkflowTransition) {
+          sendError(res, 403, 'You cannot modify this workflow status');
+          return;
+        }
+      }
+
+      if (nextCreativeStatus === 'returned' && !nextReturnReason) {
+        sendError(res, 400, '差し戻し理由を入力してください。');
+        return;
+      }
+
+      const workflowSheet: EntrySheet = {
+        ...existingSheet,
+        version:
+          Number.isInteger(Number(body.workflow?.version)) && Number(body.workflow?.version) > 0
+            ? Number(body.workflow?.version)
+            : existingSheet.version,
+        creativeStatus: nextCreativeStatus,
+        currentAssignee: nextCurrentAssignee,
+        returnReason: nextReturnReason,
+        updatedAt: new Date().toISOString(),
+      };
+
+      try {
+        await SheetRepository.upsert(workflowSheet, {
+          changedByUserId: currentUser.id,
+          changedByName: currentUser.displayName || currentUser.username,
+          summary: buildWorkflowSummary(existingSheet, workflowSheet),
+          keepLatestCount: 30,
+          updateAdminMemo: false,
+          expectedVersion: workflowSheet.version,
+          forceOverwrite: body.forceOverwrite === true,
+        });
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          (error.message === 'VERSION_CONFLICT' || error.message === 'ADMIN_MEMO_VERSION_CONFLICT')
+        ) {
+          sendError(res, 409, 'VERSION_CONFLICT');
+          return;
+        }
+        const message = error instanceof Error ? error.message : 'Failed to save workflow';
+        sendError(res, 500, message);
+        return;
+      }
+
+      const updatedSheet = await SheetRepository.findById(sheetId);
+      if (!updatedSheet) {
+        sendError(res, 500, 'Failed to reload saved sheet');
+        return;
+      }
+      sendJson(res, 200, { ok: true, sheet: isAdmin(currentUser) ? updatedSheet : stripAdminMemo(updatedSheet) });
       return;
     }
 

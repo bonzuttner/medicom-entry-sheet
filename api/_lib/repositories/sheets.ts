@@ -401,6 +401,45 @@ const ensureWorkflowColumns = async (): Promise<void> => {
       );
       await db.query(
         `
+        ALTER TABLE entry_sheets
+          DROP CONSTRAINT IF EXISTS entry_sheets_entry_status_check
+        `
+      );
+      await db.query(
+        `
+        ALTER TABLE entry_sheets
+          ADD CONSTRAINT entry_sheets_entry_status_check
+          CHECK (entry_status IS NULL OR entry_status IN ('draft', 'completed', 'completed_no_image'))
+        `
+      );
+      await db.query(
+        `
+        ALTER TABLE entry_sheets
+          DROP CONSTRAINT IF EXISTS entry_sheets_creative_status_check
+        `
+      );
+      await db.query(
+        `
+        ALTER TABLE entry_sheets
+          ADD CONSTRAINT entry_sheets_creative_status_check
+          CHECK (creative_status IN ('none', 'in_progress', 'confirmation_pending', 'returned', 'approved'))
+        `
+      );
+      await db.query(
+        `
+        ALTER TABLE entry_sheets
+          DROP CONSTRAINT IF EXISTS entry_sheets_current_assignee_check
+        `
+      );
+      await db.query(
+        `
+        ALTER TABLE entry_sheets
+          ADD CONSTRAINT entry_sheets_current_assignee_check
+          CHECK (current_assignee IN ('admin', 'manufacturer_user', 'none'))
+        `
+      );
+      await db.query(
+        `
         UPDATE entry_sheets
         SET entry_status = status
         WHERE entry_status IS NULL
@@ -767,7 +806,7 @@ const rowsToSheet = (
     adminMemo: adminMemoBySheetId.get(sheetRow.id),
     status: sheetRow.status as 'draft' | 'completed' | 'completed_no_image',
     entryStatus: (sheetRow.entry_status || sheetRow.status) as 'draft' | 'completed' | 'completed_no_image',
-    creativeStatus: (sheetRow.creative_status || 'none') as 'none' | 'in_progress' | 'returned' | 'approved',
+    creativeStatus: (sheetRow.creative_status || 'none') as 'none' | 'in_progress' | 'confirmation_pending' | 'returned' | 'approved',
     currentAssignee: (sheetRow.current_assignee || 'none') as 'admin' | 'manufacturer_user' | 'none',
     returnReason: sheetRow.return_reason || undefined,
     createdAt: toIsoString(sheetRow.created_at),
@@ -1417,6 +1456,8 @@ export const upsert = async (
       creativeStatus:
         sheet.creativeStatus === 'in_progress'
           ? 'in_progress'
+          : sheet.creativeStatus === 'confirmation_pending'
+            ? 'confirmation_pending'
           : sheet.creativeStatus === 'returned'
             ? 'returned'
             : sheet.creativeStatus === 'approved'

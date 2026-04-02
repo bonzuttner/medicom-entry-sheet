@@ -604,6 +604,50 @@ const App: React.FC = () => {
     }
   };
 
+  const handleSaveSheetWorkflow = async (
+    sheet: EntrySheet
+  ): Promise<EntrySheet> => {
+    try {
+      const savedSheet = await dataService.saveSheetWorkflow(
+        sheet.id,
+        {
+          version: sheet.version,
+          creativeStatus: sheet.creativeStatus,
+          currentAssignee: sheet.currentAssignee,
+          returnReason: sheet.returnReason,
+        }
+      );
+      setSheets((prev) => upsertSheetInList(prev, savedSheet));
+      setEditingSheet((prev) => (prev && prev.id === savedSheet.id ? savedSheet : prev));
+      refreshFirstSheetsPage();
+      return savedSheet;
+    } catch (error) {
+      if (isVersionConflictError(error)) {
+        const confirmOverwrite = window.confirm(
+          '他のユーザーが先に進行状況を更新しました。\n上書き保存しますか？'
+        );
+        if (confirmOverwrite) {
+          const savedSheet = await dataService.saveSheetWorkflow(
+            sheet.id,
+            {
+              version: sheet.version,
+              creativeStatus: sheet.creativeStatus,
+              currentAssignee: sheet.currentAssignee,
+              returnReason: sheet.returnReason,
+            },
+            { forceOverwrite: true }
+          );
+          setSheets((prev) => upsertSheetInList(prev, savedSheet));
+          setEditingSheet((prev) => (prev && prev.id === savedSheet.id ? savedSheet : prev));
+          refreshFirstSheetsPage();
+          return savedSheet;
+        }
+      }
+      console.error('Failed to save workflow:', error);
+      throw error instanceof Error ? error : new Error('Failed to save workflow');
+    }
+  };
+
   const handleDeleteSheet = async (id: string) => {
     try {
       await dataService.deleteSheet(id);
@@ -785,6 +829,7 @@ const App: React.FC = () => {
             dataService.searchProducts({ query, manufacturerName, limit: 30 })
           }
           onSave={handleSaveSheet}
+          onSaveWorkflow={handleSaveSheetWorkflow}
           onOpenCreatives={() => setCurrentPage(Page.CREATIVES)}
           onRelinkCreative={handleRelinkSheetCreative}
           onCancel={() => {
