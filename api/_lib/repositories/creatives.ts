@@ -381,7 +381,7 @@ export const upsert = async (
           current_assignee = CASE
             WHEN EXISTS (
               SELECT 1 FROM creative_entry_sheets ces WHERE ces.sheet_id = es.id
-            ) THEN 'manufacturer_user'
+            ) THEN 'admin'
             WHEN COALESCE(es.entry_status, es.status) = 'draft' THEN 'manufacturer_user'
             ELSE 'admin'
           END,
@@ -501,7 +501,7 @@ export const relinkSheetToCreative = async (
       UPDATE entry_sheets
       SET
         creative_status = 'in_progress',
-        current_assignee = 'manufacturer_user',
+        current_assignee = 'admin',
         return_reason = NULL,
         updated_at = NOW()
       WHERE id = $1

@@ -624,6 +624,20 @@ const App: React.FC = () => {
         next[idx] = saved;
         return next;
       });
+      const latestSheets = await dataService.getSheets();
+      const updatedSheetIds = new Set(saved.linkedSheets.map((sheet) => sheet.id));
+      setCreativeSheets(latestSheets);
+      setSheets((prev) =>
+        prev.map((sheet) => {
+          if (!updatedSheetIds.has(sheet.id)) return sheet;
+          return latestSheets.find((row) => row.id === sheet.id) || sheet;
+        })
+      );
+      setEditingSheet((prev) => {
+        if (!prev || !updatedSheetIds.has(prev.id)) return prev;
+        return latestSheets.find((row) => row.id === prev.id) || prev;
+      });
+      refreshFirstSheetsPage();
     } catch (error) {
       console.error('Failed to save creative:', error);
       throw error;

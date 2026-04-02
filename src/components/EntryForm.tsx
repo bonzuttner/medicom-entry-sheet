@@ -159,7 +159,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     changedByRole: UserRole
   ): 'admin' | 'manufacturer_user' | 'none' => {
     if (creativeStatus === 'approved') return 'none';
-    if (creativeStatus === 'in_progress') return 'manufacturer_user';
+    if (creativeStatus === 'in_progress') return 'admin';
     if (creativeStatus === 'returned') {
       return changedByRole === UserRole.ADMIN ? 'manufacturer_user' : 'admin';
     }
