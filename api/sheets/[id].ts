@@ -296,6 +296,26 @@ const buildRevisionSummary = (before: EntrySheet | null, after: EntrySheet): str
   return changes.slice(0, 80).join('\n');
 };
 
+const getWorkflowStatusLabel = (
+  sheet: Pick<EntrySheet, 'status' | 'creativeStatus'>
+): string => {
+  const creativeStatus = sheet.creativeStatus || 'none';
+  if (creativeStatus === 'approved') return '承認済み';
+  if (creativeStatus === 'returned') return '差し戻し';
+  if (creativeStatus === 'confirmation_pending') return '確認待ち';
+  if (creativeStatus === 'in_progress') return 'クリエイティブ作成中';
+  const entryStatus = sheet.status || 'draft';
+  if (entryStatus === 'completed_no_image') return 'エントリー完了（画像なし）';
+  if (entryStatus === 'completed') return 'エントリー完了';
+  return '下書き';
+};
+
+const getAssigneeLabel = (assignee: string | undefined): string => {
+  if (assignee === 'admin') return 'Admin';
+  if (assignee === 'manufacturer_user') return 'メーカー';
+  return 'なし';
+};
+
 const buildWorkflowSummary = (
   before: EntrySheet,
   after: EntrySheet
@@ -303,12 +323,12 @@ const buildWorkflowSummary = (
   const changes: string[] = [];
   if ((before.creativeStatus || 'none') !== (after.creativeStatus || 'none')) {
     changes.push(
-      `進行状態: ${before.creativeStatus || 'none'} -> ${after.creativeStatus || 'none'}`
+      `進行状態: ${getWorkflowStatusLabel(before)} → ${getWorkflowStatusLabel(after)}`
     );
   }
   if ((before.currentAssignee || 'none') !== (after.currentAssignee || 'none')) {
     changes.push(
-      `担当: ${before.currentAssignee || 'none'} -> ${after.currentAssignee || 'none'}`
+      `担当: ${getAssigneeLabel(before.currentAssignee)} → ${getAssigneeLabel(after.currentAssignee)}`
     );
   }
   if ((before.returnReason || '') !== (after.returnReason || '')) {

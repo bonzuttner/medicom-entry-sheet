@@ -590,7 +590,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                       {filteredCreatives.map((creative) => {
                         const firstLinkedSheet = getFirstLinkedSheet(creative);
                         return (
-                          <tr key={creative.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                          <tr key={creative.id} className="group border-b border-slate-100 last:border-0 hover:bg-sky-50 transition-colors cursor-pointer" onClick={() => editCreative(creative)}>
                             <td className="px-4 py-4">
                               <div className="flex h-16 w-24 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
                                 <img src={creative.imageUrl} alt="" className="h-full w-full object-cover" />
@@ -600,8 +600,15 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                               <div className="font-bold text-slate-800">{creative.name}</div>
                               <div className="mt-1 text-xs text-slate-500">{creative.linkedSheets.length}件紐づき</div>
                             </td>
-                            <td className="px-4 py-4 align-top text-sm text-slate-700">
-                              {firstLinkedSheet ? `${firstLinkedSheet.sheetCode || firstLinkedSheet.id.slice(0, 8)} | ${firstLinkedSheet.title}` : '未紐づき'}
+                            <td className="px-4 py-4 align-top">
+                              {firstLinkedSheet ? (
+                                <div>
+                                  <div className="font-semibold text-slate-800">{firstLinkedSheet.title || '(タイトル未設定)'}</div>
+                                  <div className="mt-0.5 text-xs text-slate-400">ID: {firstLinkedSheet.sheetCode || firstLinkedSheet.id.slice(0, 8)}</div>
+                                </div>
+                              ) : (
+                                <span className="text-sm text-slate-400">未紐づき</span>
+                              )}
                             </td>
                             <td className="px-4 py-4 align-top text-sm text-slate-700">
                               {getSummaryText(
@@ -623,23 +630,27 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                               <div className="flex justify-end gap-2">
                                 <button
                                   type="button"
-                                  onClick={() => editCreative(creative)}
-                                  className="rounded-lg p-2 text-primary hover:bg-blue-50"
-                                  title="編集"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    editCreative(creative);
+                                  }}
+                                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-primary bg-blue-50 hover:bg-blue-100 transition-colors"
                                 >
-                                  <Edit size={16} />
+                                  <Edit size={14} />
+                                  編集
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => {
+                                  onClick={(e) => {
+                                    e.stopPropagation();
                                     if (window.confirm('本当に削除しますか？')) {
                                       void onDeleteCreative(creative.id);
                                     }
                                   }}
-                                  className="rounded-lg p-2 text-danger hover:bg-red-50"
-                                  title="削除"
+                                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-danger bg-red-50 hover:bg-red-100 transition-colors"
                                 >
-                                  <Trash2 size={16} />
+                                  <Trash2 size={14} />
+                                  削除
                                 </button>
                               </div>
                             </td>
@@ -662,9 +673,14 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="font-bold text-slate-800">{creative.name}</div>
-                          <div className="mt-1 text-xs text-slate-500">
-                            {firstLinkedSheet ? `${firstLinkedSheet.sheetCode || firstLinkedSheet.id.slice(0, 8)} | ${firstLinkedSheet.title}` : '未紐づき'}
-                          </div>
+                          {firstLinkedSheet ? (
+                            <div className="mt-1">
+                              <div className="text-sm text-slate-700">{firstLinkedSheet.title || '(タイトル未設定)'}</div>
+                              <div className="text-xs text-slate-400">ID: {firstLinkedSheet.sheetCode || firstLinkedSheet.id.slice(0, 8)}</div>
+                            </div>
+                          ) : (
+                            <div className="mt-1 text-xs text-slate-400">未紐づき</div>
+                          )}
                           <div className="mt-2 text-xs text-slate-500">
                             {getSummaryText(
                               creative.linkedSheets.length > 0
@@ -681,9 +697,10 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                         <button
                           type="button"
                           onClick={() => editCreative(creative)}
-                          className="rounded-lg p-2 text-primary hover:bg-blue-50"
+                          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-primary bg-blue-50 hover:bg-blue-100 transition-colors"
                         >
-                          <Edit size={16} />
+                          <Edit size={14} />
+                          編集
                         </button>
                         <button
                           type="button"
@@ -692,9 +709,10 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                               void onDeleteCreative(creative.id);
                             }
                           }}
-                          className="rounded-lg p-2 text-danger hover:bg-red-50"
+                          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-danger bg-red-50 hover:bg-red-100 transition-colors"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={14} />
+                          削除
                         </button>
                       </div>
                     </div>
