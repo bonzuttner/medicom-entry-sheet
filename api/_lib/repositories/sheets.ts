@@ -25,6 +25,9 @@ interface SheetRow {
   manufacturer_name: string;
   creator_email: string;
   creator_phone: string;
+  creative_name_snapshot: string | null;
+  creative_image_url_snapshot: string | null;
+  creative_updated_at_snapshot: Date | string | null;
   shelf_name: string | null;
   case_name: string | null;
   title: string;
@@ -282,6 +285,18 @@ const ensureSheetSnapshotColumns = async (): Promise<void> => {
       await db.query(
         `ALTER TABLE entry_sheets
          ADD COLUMN IF NOT EXISTS creator_phone_snapshot VARCHAR(50)`
+      );
+      await db.query(
+        `ALTER TABLE entry_sheets
+         ADD COLUMN IF NOT EXISTS creative_name_snapshot VARCHAR(500)`
+      );
+      await db.query(
+        `ALTER TABLE entry_sheets
+         ADD COLUMN IF NOT EXISTS creative_image_url_snapshot TEXT`
+      );
+      await db.query(
+        `ALTER TABLE entry_sheets
+         ADD COLUMN IF NOT EXISTS creative_updated_at_snapshot TIMESTAMP`
       );
     })().catch((error) => {
       ensureSnapshotColumnsPromise = null;
@@ -811,6 +826,15 @@ const rowsToSheet = (
     returnReason: sheetRow.return_reason || undefined,
     createdAt: toIsoString(sheetRow.created_at),
     updatedAt: toIsoString(sheetRow.updated_at),
+    creative:
+      sheetRow.creative_name_snapshot && sheetRow.creative_image_url_snapshot
+        ? {
+            id: '',
+            name: sheetRow.creative_name_snapshot,
+            imageUrl: sheetRow.creative_image_url_snapshot,
+            updatedAt: toIsoString(sheetRow.creative_updated_at_snapshot || sheetRow.updated_at),
+          }
+        : undefined,
     products,
     attachments: sheetAttachments.length > 0 ? sheetAttachments : undefined,
   };
@@ -1093,6 +1117,7 @@ export const findAll = async (limit?: number, offset: number = 0): Promise<Entry
     SELECT
       s.id, s.sheet_code, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
       s.entry_status, s.creative_status, s.current_assignee, s.return_reason,
+      s.creative_name_snapshot, s.creative_image_url_snapshot, s.creative_updated_at_snapshot,
       s.shelf_name, s.case_name, s.deployment_start_month, s.deployment_end_month,
       s.face_label, s.face_max_width,
       s.created_at, s.updated_at,
@@ -1196,6 +1221,7 @@ export const findByManufacturerId = async (
     SELECT
       s.id, s.sheet_code, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
       s.entry_status, s.creative_status, s.current_assignee, s.return_reason,
+      s.creative_name_snapshot, s.creative_image_url_snapshot, s.creative_updated_at_snapshot,
       s.shelf_name, s.case_name, s.deployment_start_month, s.deployment_end_month,
       s.face_label, s.face_max_width,
       s.created_at, s.updated_at,
@@ -1311,6 +1337,7 @@ export const findById = async (sheetId: string): Promise<EntrySheet | null> => {
     SELECT
       s.id, s.sheet_code, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
       s.entry_status, s.creative_status, s.current_assignee, s.return_reason,
+      s.creative_name_snapshot, s.creative_image_url_snapshot, s.creative_updated_at_snapshot,
       s.shelf_name, s.case_name, s.deployment_start_month, s.deployment_end_month,
       s.face_label, s.face_max_width,
       s.created_at, s.updated_at,
@@ -1470,6 +1497,15 @@ export const upsert = async (
             ? 'manufacturer_user'
             : 'admin',
       returnReason: String(sheet.returnReason || '').trim() || undefined,
+      creative:
+        sheet.creative?.name && sheet.creative?.imageUrl
+          ? {
+              id: String(sheet.creative.id || '').trim(),
+              name: String(sheet.creative.name || '').trim(),
+              imageUrl: String(sheet.creative.imageUrl || '').trim(),
+              updatedAt: toSafeIso(sheet.creative.updatedAt, nowIso),
+            }
+          : undefined,
       adminMemo: {
         version:
           Number.isInteger(Number(sheet.adminMemo?.version)) && Number(sheet.adminMemo?.version) > 0
@@ -1558,16 +1594,20 @@ export const upsert = async (
       INSERT INTO entry_sheets (
         id, sheet_code, version, creator_id, manufacturer_id,
         creator_name_snapshot, creator_email_snapshot, creator_phone_snapshot,
+        creative_name_snapshot, creative_image_url_snapshot, creative_updated_at_snapshot,
         title, case_name, notes, shelf_name, deployment_start_month, deployment_end_month,
         face_label, face_max_width, status, entry_status, creative_status, current_assignee, return_reason,
         created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
       ON CONFLICT (id) DO UPDATE SET
         sheet_code = COALESCE(entry_sheets.sheet_code, EXCLUDED.sheet_code),
         version = EXCLUDED.version,
         creator_name_snapshot = EXCLUDED.creator_name_snapshot,
         creator_email_snapshot = EXCLUDED.creator_email_snapshot,
         creator_phone_snapshot = EXCLUDED.creator_phone_snapshot,
+        creative_name_snapshot = EXCLUDED.creative_name_snapshot,
+        creative_image_url_snapshot = EXCLUDED.creative_image_url_snapshot,
+        creative_updated_at_snapshot = EXCLUDED.creative_updated_at_snapshot,
         title = EXCLUDED.title,
         case_name = EXCLUDED.case_name,
         notes = EXCLUDED.notes,
@@ -1592,6 +1632,9 @@ export const upsert = async (
         normalizedSheet.creatorName || null,
         normalizedSheet.email || null,
         normalizedSheet.phoneNumber || null,
+        normalizedSheet.creative?.name || null,
+        normalizedSheet.creative?.imageUrl || null,
+        normalizedSheet.creative?.updatedAt || null,
         normalizedSheet.title,
         normalizedSheet.caseName || null,
         normalizedSheet.notes || null,

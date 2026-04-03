@@ -51,6 +51,9 @@ CREATE TABLE IF NOT EXISTS entry_sheets (
   creator_name_snapshot VARCHAR(200),
   creator_email_snapshot VARCHAR(255),
   creator_phone_snapshot VARCHAR(50),
+  creative_name_snapshot VARCHAR(500),
+  creative_image_url_snapshot TEXT,
+  creative_updated_at_snapshot TIMESTAMP,
   shelf_name VARCHAR(200),
   title VARCHAR(500) NOT NULL,
   case_name VARCHAR(200),
@@ -82,6 +85,15 @@ ALTER TABLE entry_sheets
 
 ALTER TABLE entry_sheets
   ADD COLUMN IF NOT EXISTS creator_phone_snapshot VARCHAR(50);
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS creative_name_snapshot VARCHAR(500);
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS creative_image_url_snapshot TEXT;
+
+ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS creative_updated_at_snapshot TIMESTAMP;
 
 ALTER TABLE entry_sheets
   ADD COLUMN IF NOT EXISTS shelf_name VARCHAR(200);

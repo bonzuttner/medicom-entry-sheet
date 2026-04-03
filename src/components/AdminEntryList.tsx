@@ -466,7 +466,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
               </th>
               <th className="sticky top-0 z-10 w-24 border-b border-slate-200 px-2 py-3 text-left text-xs font-bold text-slate-500 bg-slate-50">ID</th>
               <th className="sticky top-0 z-10 w-[150px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">状態</th>
-              <th className="sticky top-0 z-10 w-[220px] border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-xs font-bold text-slate-500">タイトル</th>
+              <th className="sticky top-0 z-10 w-[240px] border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-xs font-bold text-slate-500">タイトル</th>
               <th className="sticky top-0 z-10 w-[104px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">展開期間</th>
               <th className="sticky top-0 z-10 w-[110px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">棚割り</th>
               <th className="sticky top-0 z-10 w-[116px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">メーカー名</th>
@@ -500,7 +500,17 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                       </button>
                     </td>
                     <td className="w-24 px-2 py-4 text-[10px] text-slate-400 font-mono whitespace-nowrap bg-white">
-                      {getDisplaySheetId(sheet)}
+                      <div className="flex items-center gap-2">
+                        <span>{getDisplaySheetId(sheet)}</span>
+                        <button
+                          type="button"
+                          onClick={() => onEdit(sheet)}
+                          className="inline-flex items-center justify-center rounded p-1 text-primary hover:bg-sky-100 hover:text-sky-700 transition-colors"
+                          title="詳細編集"
+                        >
+                          <Edit3 size={16} />
+                        </button>
+                      </div>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
                       <div className="space-y-1">
@@ -513,18 +523,8 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                       </div>
                     </td>
                     <td className="px-4 py-4">
-                      <div className="flex items-start gap-2">
-                        <button
-                          type="button"
-                          onClick={() => onEdit(sheet)}
-                          className="mt-0.5 p-2 rounded text-primary hover:text-sky-700 hover:bg-sky-100 transition-colors"
-                          title="詳細編集"
-                        >
-                          <Edit3 size={18} />
-                        </button>
-                        <div className="min-w-0 flex-1 text-sm font-bold text-slate-900 break-words leading-tight">
-                          {sheet.title}
-                        </div>
+                      <div className="text-sm font-bold text-slate-900 break-words leading-tight">
+                        {sheet.title}
                       </div>
                     </td>
                     <td className="px-2 py-3 text-xs text-slate-700 whitespace-nowrap">

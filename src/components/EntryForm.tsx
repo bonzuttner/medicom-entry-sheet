@@ -48,6 +48,22 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   const sectionTitleClass = 'text-base font-bold text-slate-800';
   const pageBlockTitleClass = 'text-lg font-bold text-slate-800';
   const helpTextClass = 'mt-1 text-xs text-slate-500';
+  const toCreativePreview = (creative: EntrySheet['creative']): Creative | null =>
+    creative
+      ? ({
+          id: creative.id || '',
+          version: 1,
+          manufacturerName: initialData.manufacturerName,
+          creatorId: '',
+          creatorName: '',
+          name: creative.name,
+          imageUrl: creative.imageUrl,
+          memo: '',
+          createdAt: creative.updatedAt,
+          updatedAt: creative.updatedAt,
+          linkedSheets: [],
+        } as Creative)
+      : null;
   const [formData, setFormData] = useState<EntrySheet>(initialData);
   const [activeTab, setActiveTab] = useState<number>(initialActiveTab); // Index of the product being edited
   const [isSaving, setIsSaving] = useState(false);
@@ -55,7 +71,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   const [productSearchQuery, setProductSearchQuery] = useState('');
   const [productSearchResults, setProductSearchResults] = useState<ProductEntry[]>([]);
   const [isSearchingProducts, setIsSearchingProducts] = useState(false);
-  const [linkedCreative, setLinkedCreative] = useState<Creative | null>(initialData.creative || null);
+  const [linkedCreative, setLinkedCreative] = useState<Creative | null>(toCreativePreview(initialData.creative));
   const [creativePickerOpen, setCreativePickerOpen] = useState(false);
   const [creativePickerQuery, setCreativePickerQuery] = useState('');
   const [creativeOptions, setCreativeOptions] = useState<Creative[]>([]);
@@ -153,6 +169,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     `w-full rounded-lg border-0 py-3 pl-3 pr-12 shadow-none outline-none transition-colors appearance-none bg-no-repeat bg-[length:16px_16px] bg-[position:right_1rem_center] ${
       highlight ? 'bg-amber-100/70 text-slate-900' : 'bg-slate-100 text-slate-800'
     } focus:bg-white focus:ring-2 focus:ring-sky-200 bg-[url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 20 20%27 fill=%27none%27 stroke=%27%23475569%27 stroke-width=%271.8%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3E%3Cpath d=%27m5 7 5 6 5-6%27/%3E%3C/svg%3E")]`;
+  const getWorkflowSelectClass = (): string =>
+    'w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-3 pr-10 text-sm text-slate-800 shadow-sm outline-none transition-colors appearance-none bg-no-repeat bg-[length:16px_16px] bg-[position:right_0.75rem_center] focus:border-sky-300 focus:ring-2 focus:ring-sky-100 bg-[url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 20 20%27 fill=%27none%27 stroke=%27%23475569%27 stroke-width=%271.8%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3E%3Cpath d=%27m5 7 5 6 5-6%27/%3E%3C/svg%3E")]';
   const compactSelectWrapperClass = 'w-full md:max-w-[420px]';
   const compactSelectClass = (highlight = false): string =>
     `${getSelectClass(highlight)} ring-1 ring-inset ${highlight ? 'ring-amber-200' : 'ring-slate-200'}`;
@@ -257,24 +275,24 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   useEffect(() => {
     let mounted = true;
     if (!initialData.id) {
-      setLinkedCreative(null);
+      setLinkedCreative(toCreativePreview(initialData.creative));
       return;
     }
     void dataService
       .getCreativeBySheetId(initialData.id)
       .then((creative) => {
         if (!mounted) return;
-        setLinkedCreative(creative);
+        setLinkedCreative(creative || toCreativePreview(initialData.creative));
       })
       .catch((error) => {
         console.error('Failed to load linked creative:', error);
         if (!mounted) return;
-        setLinkedCreative(null);
+        setLinkedCreative(toCreativePreview(initialData.creative));
       });
     return () => {
       mounted = false;
     };
-  }, [initialData.id]);
+  }, [initialData.creative, initialData.id, initialData.manufacturerName]);
 
   useEffect(() => {
     if (!creativePickerOpen || !isAdminUser) return;
@@ -1015,6 +1033,40 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   const assigneeLabel = getCurrentAssigneeLabel(formData.currentAssignee);
   const currentCreativeStatus = formData.creativeStatus || 'none';
   const currentEntryStatus = formData.entryStatus || formData.status;
+  const workflowContextText = (() => {
+    if (currentEntryStatus === 'draft') {
+      return 'まずは入力を進めて、下部の「エントリー完了」で提出します。';
+    }
+    if (currentCreativeStatus === 'approved') {
+      return isAdminUser
+        ? '確認は完了しています。問題があれば制作工程へ戻せます。'
+        : '確認は完了しています。追加の操作はありません。';
+    }
+    if (currentCreativeStatus === 'returned') {
+      return isAdminUser
+        ? '差し戻し理由を確認し、必要なら制作工程へ戻します。'
+        : '差し戻し理由を確認し、修正後に再提出します。';
+    }
+    if (currentCreativeStatus === 'confirmation_pending') {
+      return isAdminUser
+        ? '一般ユーザーの確認待ちです。'
+        : '内容を確認して、承認または差し戻しを行います。';
+    }
+    if (currentCreativeStatus === 'in_progress') {
+      return isAdminUser
+        ? 'クリエイティブの準備ができたら確認依頼へ進めます。'
+        : 'Adminがクリエイティブを作成しています。';
+    }
+    return isAdminUser
+      ? '内容確認後に制作を開始するか、差し戻しを行います。'
+      : 'Adminが内容を確認しています。';
+  })();
+
+  const hasWorkflowAction =
+    (isAdminUser && currentCreativeStatus === 'none' && currentEntryStatus !== 'draft') ||
+    (isAdminUser && currentCreativeStatus === 'in_progress') ||
+    (!isAdminUser && currentCreativeStatus === 'confirmation_pending') ||
+    (isAdminUser && (currentCreativeStatus === 'returned' || currentCreativeStatus === 'approved'));
   const filteredCreativeOptions = creativeOptions.filter((creative) => {
     if (creative.manufacturerName !== formData.manufacturerName) return false;
     const query = normalizeSearchText(creativePickerQuery);
@@ -1984,120 +2036,134 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             </div>
           )}
           <div className="mt-4 space-y-4">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,220px)_minmax(0,280px)_1fr]">
-              <div>
-                <label className="mb-2 block text-sm font-bold text-slate-700">ステータス</label>
-                <div className={`inline-flex rounded-full px-3 py-2 text-sm font-semibold ${workflowStatus.pillClassName}`}>
-                  {workflowStatus.label}
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,280px)_1fr]">
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="text-xs font-bold tracking-wide text-slate-500">現在の状態</div>
+                <div className="mt-3">
+                  <span className={`inline-flex rounded-full px-3 py-2 text-sm font-semibold ${workflowStatus.pillClassName}`}>
+                    {workflowStatus.label}
+                  </span>
                 </div>
+                <div className="mt-3 text-sm font-semibold text-slate-700">現在担当: {assigneeLabel}</div>
+                <div className="mt-2 text-xs leading-5 text-slate-500">{workflowContextText}</div>
               </div>
-              <div>
-                <label className="mb-2 block text-sm font-bold text-slate-700">担当</label>
-                <select
-                  value={formData.currentAssignee || resolveAssigneeFromWorkflow(formData.entryStatus || formData.status, formData.creativeStatus, currentUser.role)}
-                  onChange={(event) => {
-                    const nextAssignee = event.target.value as EntrySheet['currentAssignee'];
-                    setFormData((prev) => ({
-                      ...prev,
-                      currentAssignee: nextAssignee,
-                    }));
-                    void saveWorkflowChange(
-                      currentCreativeStatus,
-                      nextAssignee,
-                      currentCreativeStatus === 'returned' ? formData.returnReason : undefined
-                    );
-                  }}
-                  className={getSelectClass()}
-                >
-                  <option value="admin">Admin</option>
-                  <option value="manufacturer_user">メーカー</option>
-                  <option value="none">なし</option>
-                </select>
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-bold text-slate-700">次の操作</label>
-                <div className="flex flex-wrap gap-2">
-                  {isAdminUser &&
-                    currentCreativeStatus === 'none' &&
-                    currentEntryStatus !== 'draft' && (
-                      <>
-                        <button
-                          type="button"
-                          disabled={isSaving}
-                          onClick={() => {
-                            void saveWorkflowChange('in_progress');
-                          }}
-                          className="rounded-lg bg-sky-100 px-4 py-3 text-sm font-semibold text-sky-800 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          クリエイティブ作成中にする
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isSaving}
-                          onClick={startReturnFlow}
-                          className="rounded-lg bg-rose-100 px-4 py-3 text-sm font-semibold text-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          差し戻し
-                        </button>
-                      </>
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-bold tracking-wide text-slate-500">次にやること</div>
+                    {hasWorkflowAction ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {isAdminUser &&
+                          currentCreativeStatus === 'none' &&
+                          currentEntryStatus !== 'draft' && (
+                            <>
+                              <button
+                                type="button"
+                                disabled={isSaving}
+                                onClick={() => {
+                                  void saveWorkflowChange('in_progress');
+                                }}
+                                className="rounded-lg bg-sky-100 px-4 py-3 text-sm font-semibold text-sky-800 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                制作を開始
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isSaving}
+                                onClick={startReturnFlow}
+                                className="rounded-lg bg-rose-100 px-4 py-3 text-sm font-semibold text-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                差し戻す
+                              </button>
+                            </>
+                          )}
+                        {isAdminUser && currentCreativeStatus === 'in_progress' && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={isSaving || !linkedCreative}
+                              onClick={() => {
+                                void saveWorkflowChange('confirmation_pending');
+                              }}
+                              className="rounded-lg bg-violet-100 px-4 py-3 text-sm font-semibold text-violet-800 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              確認依頼する
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isSaving}
+                              onClick={startReturnFlow}
+                              className="rounded-lg bg-rose-100 px-4 py-3 text-sm font-semibold text-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              差し戻す
+                            </button>
+                          </>
+                        )}
+                        {!isAdminUser && currentCreativeStatus === 'confirmation_pending' && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={isSaving}
+                              onClick={() => {
+                                void saveWorkflowChange('approved');
+                              }}
+                              className="rounded-lg bg-emerald-100 px-4 py-3 text-sm font-semibold text-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              承認する
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isSaving}
+                              onClick={startReturnFlow}
+                              className="rounded-lg bg-rose-100 px-4 py-3 text-sm font-semibold text-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              差し戻す
+                            </button>
+                          </>
+                        )}
+                        {isAdminUser &&
+                          (currentCreativeStatus === 'returned' || currentCreativeStatus === 'approved') && (
+                          <button
+                            type="button"
+                            disabled={isSaving}
+                            onClick={() => {
+                              void saveWorkflowChange('in_progress');
+                            }}
+                            className="rounded-lg bg-sky-100 px-4 py-3 text-sm font-semibold text-sky-800 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            制作に戻す
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="mt-3 text-sm text-slate-500">
+                        この状態で進める操作はありません。
+                      </div>
                     )}
-                  {isAdminUser && currentCreativeStatus === 'in_progress' && (
-                    <>
-                      <button
-                        type="button"
-                        disabled={isSaving || !linkedCreative}
-                        onClick={() => {
-                          void saveWorkflowChange('confirmation_pending');
-                        }}
-                        className="rounded-lg bg-violet-100 px-4 py-3 text-sm font-semibold text-violet-800 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        確認待ちにする
-                      </button>
-                      <button
-                        type="button"
-                        disabled={isSaving}
-                        onClick={startReturnFlow}
-                        className="rounded-lg bg-rose-100 px-4 py-3 text-sm font-semibold text-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        差し戻し
-                      </button>
-                    </>
-                  )}
-                  {!isAdminUser && currentCreativeStatus === 'confirmation_pending' && (
-                    <>
-                      <button
-                        type="button"
-                        disabled={isSaving}
-                        onClick={() => {
-                          void saveWorkflowChange('approved');
-                        }}
-                        className="rounded-lg bg-emerald-100 px-4 py-3 text-sm font-semibold text-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        承認済みにする
-                      </button>
-                      <button
-                        type="button"
-                        disabled={isSaving}
-                        onClick={startReturnFlow}
-                        className="rounded-lg bg-rose-100 px-4 py-3 text-sm font-semibold text-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        差し戻し
-                      </button>
-                    </>
-                  )}
-                  {isAdminUser &&
-                    (currentCreativeStatus === 'returned' || currentCreativeStatus === 'approved') && (
-                    <button
-                      type="button"
-                      disabled={isSaving}
-                      onClick={() => {
-                        void saveWorkflowChange('in_progress');
+                  </div>
+                  <div className="w-full lg:max-w-[220px]">
+                    <label className="mb-2 block text-xs font-bold tracking-wide text-slate-500">担当変更</label>
+                    <select
+                      value={formData.currentAssignee || resolveAssigneeFromWorkflow(formData.entryStatus || formData.status, formData.creativeStatus, currentUser.role)}
+                      onChange={(event) => {
+                        const nextAssignee = event.target.value as EntrySheet['currentAssignee'];
+                        setFormData((prev) => ({
+                          ...prev,
+                          currentAssignee: nextAssignee,
+                        }));
+                        void saveWorkflowChange(
+                          currentCreativeStatus,
+                          nextAssignee,
+                          currentCreativeStatus === 'returned' ? formData.returnReason : undefined
+                        );
                       }}
-                      className="rounded-lg bg-sky-100 px-4 py-3 text-sm font-semibold text-sky-800 disabled:cursor-not-allowed disabled:opacity-50"
+                      className={getWorkflowSelectClass()}
                     >
-                      クリエイティブ作成中に戻す
-                    </button>
-                  )}
+                      <option value="admin">Admin</option>
+                      <option value="manufacturer_user">メーカー</option>
+                      <option value="none">なし</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>

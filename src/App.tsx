@@ -519,6 +519,18 @@ const App: React.FC = () => {
 
   const handleDuplicateSheet = async (sheet: EntrySheet) => {
     try {
+      const inheritedCreative =
+        sheet.creative ||
+        (await dataService.getCreativeBySheetId(sheet.id).then((creative) =>
+          creative
+            ? {
+                id: creative.id,
+                name: creative.name,
+                imageUrl: creative.imageUrl,
+                updatedAt: creative.updatedAt,
+              }
+            : undefined
+        ));
       const duplicatedProducts = sheet.products.map((product) => ({
         ...product,
         id: uuidv4(),
@@ -533,6 +545,11 @@ const App: React.FC = () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         status: 'draft',
+        entryStatus: 'draft',
+        creativeStatus: 'none',
+        currentAssignee: 'none',
+        returnReason: undefined,
+        creative: inheritedCreative,
         products: duplicatedProducts,
       };
       const saved = await saveSheetWithConflictHandling(duplicated);

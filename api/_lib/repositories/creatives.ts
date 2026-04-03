@@ -79,6 +79,18 @@ const ensureCreativeTables = async (): Promise<void> => {
         ON creative_entry_sheets(creative_id)
         `
       );
+      await db.query(
+        `ALTER TABLE entry_sheets
+         ADD COLUMN IF NOT EXISTS creative_name_snapshot VARCHAR(500)`
+      );
+      await db.query(
+        `ALTER TABLE entry_sheets
+         ADD COLUMN IF NOT EXISTS creative_image_url_snapshot TEXT`
+      );
+      await db.query(
+        `ALTER TABLE entry_sheets
+         ADD COLUMN IF NOT EXISTS creative_updated_at_snapshot TIMESTAMP`
+      );
     })().catch((error) => {
       ensureCreativeTablesPromise = null;
       throw error;
@@ -378,6 +390,42 @@ export const upsert = async (
             ) THEN 'in_progress'
             ELSE 'none'
           END,
+          creative_name_snapshot = CASE
+            WHEN EXISTS (
+              SELECT 1 FROM creative_entry_sheets ces WHERE ces.sheet_id = es.id
+            ) THEN (
+              SELECT c.name
+              FROM creative_entry_sheets ces
+              JOIN creatives c ON c.id = ces.creative_id
+              WHERE ces.sheet_id = es.id
+              LIMIT 1
+            )
+            ELSE NULL
+          END,
+          creative_image_url_snapshot = CASE
+            WHEN EXISTS (
+              SELECT 1 FROM creative_entry_sheets ces WHERE ces.sheet_id = es.id
+            ) THEN (
+              SELECT c.image_url
+              FROM creative_entry_sheets ces
+              JOIN creatives c ON c.id = ces.creative_id
+              WHERE ces.sheet_id = es.id
+              LIMIT 1
+            )
+            ELSE NULL
+          END,
+          creative_updated_at_snapshot = CASE
+            WHEN EXISTS (
+              SELECT 1 FROM creative_entry_sheets ces WHERE ces.sheet_id = es.id
+            ) THEN (
+              SELECT c.updated_at
+              FROM creative_entry_sheets ces
+              JOIN creatives c ON c.id = ces.creative_id
+              WHERE ces.sheet_id = es.id
+              LIMIT 1
+            )
+            ELSE NULL
+          END,
           current_assignee = CASE
             WHEN EXISTS (
               SELECT 1 FROM creative_entry_sheets ces WHERE ces.sheet_id = es.id
@@ -429,10 +477,12 @@ export const relinkSheetToCreative = async (
   return db.transaction(async () => {
     const targetCreativeRow = await db.queryOne<{
       id: string;
+      name: string;
+      image_url: string;
       manufacturer_name: string;
     }>(
       `
-      SELECT c.id, m.name AS manufacturer_name
+      SELECT c.id, c.name, c.image_url, m.name AS manufacturer_name
       FROM creatives c
       JOIN manufacturers m ON m.id = c.manufacturer_id
       WHERE c.id = $1
@@ -501,12 +551,15 @@ export const relinkSheetToCreative = async (
       UPDATE entry_sheets
       SET
         creative_status = 'in_progress',
+        creative_name_snapshot = $2,
+        creative_image_url_snapshot = $3,
+        creative_updated_at_snapshot = NOW(),
         current_assignee = 'admin',
         return_reason = NULL,
         updated_at = NOW()
       WHERE id = $1
       `,
-      [sheetId]
+      [sheetId, targetCreativeRow.name, targetCreativeRow.image_url]
     );
 
     const sheet = await SheetRepository.findById(sheetId);

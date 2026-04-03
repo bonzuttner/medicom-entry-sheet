@@ -75,15 +75,6 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
     });
     return map;
   }, [creatives]);
-  const manufacturerOptions = useMemo(() => {
-    const values = new Set<string>();
-    if (currentUser.manufacturerName) values.add(currentUser.manufacturerName);
-    sheets.forEach((sheet) => {
-      if (sheet.manufacturerName) values.add(sheet.manufacturerName);
-    });
-    return Array.from(values).sort((a, b) => a.localeCompare(b, 'ja'));
-  }, [currentUser.manufacturerName, sheets]);
-
   const filteredCreatives = useMemo(() => {
     const normalizedQuery = normalizeSearchText(searchTerm);
     const filtered = creatives.filter((creative) => {
@@ -158,7 +149,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
     setEditingCreative({
       id: uuidv4(),
       version: 1,
-      manufacturerName: '',
+      manufacturerName: currentUser.manufacturerName || '',
       creatorId: currentUser.id,
       creatorName: currentUser.displayName,
       name: '',
@@ -289,19 +280,35 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
     }
   };
 
+  const closeEditor = () => {
+    setEditingCreative(null);
+    setValidationError('');
+    setSheetSearchTerm('');
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-800">クリエイティブ</h2>
         </div>
-        <button
-          onClick={startNewCreative}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 font-bold text-white shadow-lg shadow-sky-200 transition-all hover:bg-sky-600 hover:-translate-y-0.5"
-        >
-          <Plus size={18} />
-          新規登録
-        </button>
+        {editingCreative ? (
+          <button
+            type="button"
+            onClick={closeEditor}
+            className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+          >
+            一覧に戻る
+          </button>
+        ) : (
+          <button
+            onClick={startNewCreative}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 font-bold text-white shadow-lg shadow-sky-200 transition-all hover:bg-sky-600 hover:-translate-y-0.5"
+          >
+            <Plus size={18} />
+            新規登録
+          </button>
+        )}
       </div>
 
       {editingCreative && (
@@ -312,10 +319,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
             </h3>
             <button
               type="button"
-              onClick={() => {
-                setEditingCreative(null);
-                setValidationError('');
-              }}
+              onClick={closeEditor}
               className="rounded-full p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
               title="閉じる"
             >
@@ -383,29 +387,8 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                 />
               </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-bold text-slate-700">メーカー <span className="text-danger">*</span></label>
-                <select
-                  value={editingCreative.manufacturerName}
-                  onChange={(event) =>
-                    setEditingCreative({
-                      ...editingCreative,
-                      manufacturerName: event.target.value,
-                    })
-                  }
-                  disabled={editingCreative.selectedSheetIds.length > 0}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100"
-                >
-                  <option value="">メーカーを選択</option>
-                  {manufacturerOptions.map((manufacturerName) => (
-                    <option key={manufacturerName} value={manufacturerName}>
-                      {manufacturerName}
-                    </option>
-                  ))}
-                </select>
-                <div className="mt-1 text-xs text-slate-500">
-                  エントリーシート未紐づきでも保存できます。シートを選択するとメーカーは自動で決まります。
-                </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                メーカーは紐づけたエントリーシートに応じて自動設定されます。未紐づきでも保存できます。
               </div>
 
               <div>
@@ -424,109 +407,112 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <h4 className="text-base font-bold text-slate-800">紐づけるエントリーシート</h4>
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
-                    選択中 {editingCreative.selectedSheetIds.length}件
-                  </span>
-                </div>
-                <div className="relative mt-4">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    value={sheetSearchTerm}
-                    onChange={(event) => setSheetSearchTerm(event.target.value)}
-                    placeholder="ID / シート名 / メーカー名 / 棚割り名 / 案件名で検索"
-                    className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm shadow-sm"
-                  />
-                </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white px-6 py-8 text-center text-sm text-slate-500">
+                画像・名称・メーカーを入力したあと、下の「紐づけるエントリーシート」で対象シートを選択します。
+              </div>
+            </div>
+          </div>
 
-                <div className="mt-4 max-h-72 space-y-2 overflow-auto pr-1">
-                  {candidateSheets.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
-                      該当するエントリーシートが見つかりません。
-                    </div>
-                  ) : (
-                    candidateSheets.map((sheet) => {
-                      const linkedCreativeId = linkedCreativeIdBySheetId.get(sheet.id);
-                      const isDisabled = Boolean(linkedCreativeId && linkedCreativeId !== editingCreative.id);
-                      const isSelected = editingCreative.selectedSheetIds.includes(sheet.id);
-                      return (
-                        <button
-                          key={sheet.id}
-                          type="button"
-                          onClick={() => toggleSheetSelection(sheet.id)}
-                          disabled={isDisabled}
-                          className={`w-full rounded-lg border px-4 py-3 text-left transition ${
-                            isSelected
-                              ? 'border-sky-300 bg-sky-50'
-                              : isDisabled
-                                ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
-                                : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-                          }`}
-                        >
-                          <div className="text-sm font-semibold text-slate-800">
-                            {(sheet.sheetCode || sheet.id.slice(0, 8))} | {sheet.title || '(タイトル未設定)'}
-                          </div>
-                          <div className="mt-1 text-xs text-slate-500">
-                            {sheet.manufacturerName} | {sheet.shelfName || '棚割り未設定'} | {sheet.caseName || '案件未設定'}
-                          </div>
-                          {isDisabled && (
-                            <div className="mt-2 text-xs font-semibold text-slate-500">
-                              他クリエイティブで使用中
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
+          <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <h4 className="text-base font-bold text-slate-800">紐づけるエントリーシート</h4>
+                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
+                  選択中 {editingCreative.selectedSheetIds.length}件
+                </span>
+              </div>
+              <div className="relative mt-4">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={sheetSearchTerm}
+                  onChange={(event) => setSheetSearchTerm(event.target.value)}
+                  placeholder="ID / シート名 / メーカー名 / 棚割り名 / 案件名で検索"
+                  className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm shadow-sm"
+                />
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <h4 className="text-base font-bold text-slate-800">選択中のエントリーシート</h4>
-                {editingCreative.linkedSheets.length === 0 ? (
-                  <p className="mt-3 text-sm text-slate-500">まだ選択されていません。</p>
-                ) : (
-                  <div className="mt-3 space-y-2">
-                    {editingCreative.linkedSheets.map((sheet) => (
-                      <div key={sheet.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-semibold text-slate-800">
-                            {(sheet.sheetCode || sheet.id.slice(0, 8))} | {sheet.title}
-                          </div>
-                          <div className="mt-1 text-xs text-slate-500">
-                            {sheet.manufacturerName} | {sheet.shelfName || '棚割り未設定'} | {sheet.caseName || '案件未設定'}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSelectedSheetIds(
-                              editingCreative.selectedSheetIds.filter((id) => id !== sheet.id)
-                            )
-                          }
-                          className="rounded-full p-2 text-slate-400 hover:bg-white hover:text-danger"
-                          title="解除"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                    ))}
+              <div className="mt-4 max-h-72 space-y-2 overflow-auto pr-1">
+                {candidateSheets.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
+                    該当するエントリーシートが見つかりません。
                   </div>
+                ) : (
+                  candidateSheets.map((sheet) => {
+                    const linkedCreativeId = linkedCreativeIdBySheetId.get(sheet.id);
+                    const isDisabled = Boolean(linkedCreativeId && linkedCreativeId !== editingCreative.id);
+                    const isSelected = editingCreative.selectedSheetIds.includes(sheet.id);
+                    return (
+                      <button
+                        key={sheet.id}
+                        type="button"
+                        onClick={() => toggleSheetSelection(sheet.id)}
+                        disabled={isDisabled}
+                        className={`w-full rounded-lg border px-4 py-3 text-left transition ${
+                          isSelected
+                            ? 'border-sky-300 bg-sky-50'
+                            : isDisabled
+                              ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
+                              : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="text-sm font-semibold text-slate-800">
+                          {(sheet.sheetCode || sheet.id.slice(0, 8))} | {sheet.title || '(タイトル未設定)'}
+                        </div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          {sheet.manufacturerName} | {sheet.shelfName || '棚割り未設定'} | {sheet.caseName || '案件未設定'}
+                        </div>
+                        {isDisabled && (
+                          <div className="mt-2 text-xs font-semibold text-slate-500">
+                            他クリエイティブで使用中
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })
                 )}
               </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <h4 className="text-base font-bold text-slate-800">選択中のエントリーシート</h4>
+              {editingCreative.linkedSheets.length === 0 ? (
+                <p className="mt-3 text-sm text-slate-500">まだ選択されていません。</p>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {editingCreative.linkedSheets.map((sheet) => (
+                    <div key={sheet.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-slate-800">
+                          {(sheet.sheetCode || sheet.id.slice(0, 8))} | {sheet.title}
+                        </div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          {sheet.manufacturerName} | {sheet.shelfName || '棚割り未設定'} | {sheet.caseName || '案件未設定'}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSelectedSheetIds(
+                            editingCreative.selectedSheetIds.filter((id) => id !== sheet.id)
+                          )
+                        }
+                        className="rounded-full p-2 text-slate-400 hover:bg-white hover:text-danger"
+                        title="解除"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
           <div className="mt-6 flex justify-end gap-3">
             <button
               type="button"
-              onClick={() => {
-                setEditingCreative(null);
-                setValidationError('');
-              }}
+              onClick={closeEditor}
               disabled={isSaving}
               className="rounded-lg border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700 shadow-sm"
             >
@@ -546,178 +532,182 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
         </div>
       )}
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="クリエイティブ名 / シート名 / ID / メーカー名 / 棚割り名 / 案件名 / メモで検索"
-            className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm shadow-sm"
-          />
-        </div>
-      </div>
-
-      {!isLoading && filteredCreatives.length === 0 ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-slate-500 shadow-sm">
-          クリエイティブが見つかりません
-        </div>
-      ) : (
+      {!editingCreative && (
         <>
-          <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm md:block">
-            <div className="overflow-x-auto">
-              <table className="min-w-[1320px] w-full">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">画像</th>
-                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">
-                      <button type="button" onClick={() => toggleSort('name')} className="inline-flex items-center gap-1">
-                        クリエイティブ名 <ArrowUpDown size={14} />
-                      </button>
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">
-                      <button type="button" onClick={() => toggleSort('sheetCode')} className="inline-flex items-center gap-1">
-                        エントリーシート <ArrowUpDown size={14} />
-                      </button>
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">
-                      <button type="button" onClick={() => toggleSort('manufacturerName')} className="inline-flex items-center gap-1">
-                        メーカー名 <ArrowUpDown size={14} />
-                      </button>
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">
-                      <button type="button" onClick={() => toggleSort('shelfName')} className="inline-flex items-center gap-1">
-                        棚割り名 <ArrowUpDown size={14} />
-                      </button>
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">
-                      <button type="button" onClick={() => toggleSort('caseName')} className="inline-flex items-center gap-1">
-                        案件名 <ArrowUpDown size={14} />
-                      </button>
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">
-                      <button type="button" onClick={() => toggleSort('updatedAt')} className="inline-flex items-center gap-1">
-                        最終更新日 <ArrowUpDown size={14} />
-                      </button>
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-bold text-slate-500">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCreatives.map((creative) => {
-                    const firstLinkedSheet = getFirstLinkedSheet(creative);
-                    return (
-                      <tr key={creative.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                        <td className="px-4 py-4">
-                          <div className="flex h-16 w-24 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
-                            <img src={creative.imageUrl} alt="" className="h-full w-full object-cover" />
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 align-top">
-                          <div className="font-bold text-slate-800">{creative.name}</div>
-                          <div className="mt-1 text-xs text-slate-500">{creative.linkedSheets.length}件紐づき</div>
-                        </td>
-                        <td className="px-4 py-4 align-top text-sm text-slate-700">
-                          {firstLinkedSheet ? `${firstLinkedSheet.sheetCode || firstLinkedSheet.id.slice(0, 8)} | ${firstLinkedSheet.title}` : '未紐づき'}
-                        </td>
-                        <td className="px-4 py-4 align-top text-sm text-slate-700">
-                          {getSummaryText(
-                            creative.linkedSheets.length > 0
-                              ? creative.linkedSheets.map((sheet) => sheet.manufacturerName)
-                              : [creative.manufacturerName]
-                          )}
-                        </td>
-                        <td className="px-4 py-4 align-top text-sm text-slate-700">
-                          {getSummaryText(creative.linkedSheets.map((sheet) => sheet.shelfName))}
-                        </td>
-                        <td className="px-4 py-4 align-top text-sm text-slate-700">
-                          {getSummaryText(creative.linkedSheets.map((sheet) => sheet.caseName))}
-                        </td>
-                        <td className="px-4 py-4 align-top text-sm text-slate-700">
-                          {new Date(creative.updatedAt).toLocaleDateString()}
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="flex justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => editCreative(creative)}
-                              className="rounded-lg p-2 text-primary hover:bg-blue-50"
-                              title="編集"
-                            >
-                              <Edit size={16} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (window.confirm('本当に削除しますか？')) {
-                                  void onDeleteCreative(creative.id);
-                                }
-                              }}
-                              className="rounded-lg p-2 text-danger hover:bg-red-50"
-                              title="削除"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="クリエイティブ名 / シート名 / ID / メーカー名 / 棚割り名 / 案件名 / メモで検索"
+                className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm shadow-sm"
+              />
             </div>
           </div>
 
-          <div className="space-y-4 md:hidden">
-            {filteredCreatives.map((creative) => {
-              const firstLinkedSheet = getFirstLinkedSheet(creative);
-              return (
-                <div key={creative.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="flex gap-4">
-                    <div className="flex h-20 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
-                      <img src={creative.imageUrl} alt="" className="h-full w-full object-cover" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="font-bold text-slate-800">{creative.name}</div>
-                      <div className="mt-1 text-xs text-slate-500">
-                        {firstLinkedSheet ? `${firstLinkedSheet.sheetCode || firstLinkedSheet.id.slice(0, 8)} | ${firstLinkedSheet.title}` : '未紐づき'}
-                      </div>
-                      <div className="mt-2 text-xs text-slate-500">
-                        {getSummaryText(
-                          creative.linkedSheets.length > 0
-                            ? creative.linkedSheets.map((sheet) => sheet.manufacturerName)
-                            : [creative.manufacturerName]
-                        )} / {getSummaryText(creative.linkedSheets.map((sheet) => sheet.shelfName))}
-                      </div>
-                      <div className="mt-1 text-xs text-slate-500">
-                        {getSummaryText(creative.linkedSheets.map((sheet) => sheet.caseName))} / 更新: {new Date(creative.updatedAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-4 flex justify-end gap-2 border-t border-slate-100 pt-3">
-                    <button
-                      type="button"
-                      onClick={() => editCreative(creative)}
-                      className="rounded-lg p-2 text-primary hover:bg-blue-50"
-                    >
-                      <Edit size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (window.confirm('本当に削除しますか？')) {
-                          void onDeleteCreative(creative.id);
-                        }
-                      }}
-                      className="rounded-lg p-2 text-danger hover:bg-red-50"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
+          {!isLoading && filteredCreatives.length === 0 ? (
+            <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-slate-500 shadow-sm">
+              クリエイティブが見つかりません
+            </div>
+          ) : (
+            <>
+              <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm md:block">
+                <div className="overflow-x-auto">
+                  <table className="min-w-[1320px] w-full">
+                    <thead className="bg-slate-50 border-b border-slate-200">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">画像</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">
+                          <button type="button" onClick={() => toggleSort('name')} className="inline-flex items-center gap-1">
+                            クリエイティブ名 <ArrowUpDown size={14} />
+                          </button>
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">
+                          <button type="button" onClick={() => toggleSort('sheetCode')} className="inline-flex items-center gap-1">
+                            エントリーシート <ArrowUpDown size={14} />
+                          </button>
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">
+                          <button type="button" onClick={() => toggleSort('manufacturerName')} className="inline-flex items-center gap-1">
+                            メーカー名 <ArrowUpDown size={14} />
+                          </button>
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">
+                          <button type="button" onClick={() => toggleSort('shelfName')} className="inline-flex items-center gap-1">
+                            棚割り名 <ArrowUpDown size={14} />
+                          </button>
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">
+                          <button type="button" onClick={() => toggleSort('caseName')} className="inline-flex items-center gap-1">
+                            案件名 <ArrowUpDown size={14} />
+                          </button>
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">
+                          <button type="button" onClick={() => toggleSort('updatedAt')} className="inline-flex items-center gap-1">
+                            最終更新日 <ArrowUpDown size={14} />
+                          </button>
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-bold text-slate-500">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredCreatives.map((creative) => {
+                        const firstLinkedSheet = getFirstLinkedSheet(creative);
+                        return (
+                          <tr key={creative.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                            <td className="px-4 py-4">
+                              <div className="flex h-16 w-24 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
+                                <img src={creative.imageUrl} alt="" className="h-full w-full object-cover" />
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 align-top">
+                              <div className="font-bold text-slate-800">{creative.name}</div>
+                              <div className="mt-1 text-xs text-slate-500">{creative.linkedSheets.length}件紐づき</div>
+                            </td>
+                            <td className="px-4 py-4 align-top text-sm text-slate-700">
+                              {firstLinkedSheet ? `${firstLinkedSheet.sheetCode || firstLinkedSheet.id.slice(0, 8)} | ${firstLinkedSheet.title}` : '未紐づき'}
+                            </td>
+                            <td className="px-4 py-4 align-top text-sm text-slate-700">
+                              {getSummaryText(
+                                creative.linkedSheets.length > 0
+                                  ? creative.linkedSheets.map((sheet) => sheet.manufacturerName)
+                                  : [creative.manufacturerName]
+                              )}
+                            </td>
+                            <td className="px-4 py-4 align-top text-sm text-slate-700">
+                              {getSummaryText(creative.linkedSheets.map((sheet) => sheet.shelfName))}
+                            </td>
+                            <td className="px-4 py-4 align-top text-sm text-slate-700">
+                              {getSummaryText(creative.linkedSheets.map((sheet) => sheet.caseName))}
+                            </td>
+                            <td className="px-4 py-4 align-top text-sm text-slate-700">
+                              {new Date(creative.updatedAt).toLocaleDateString()}
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => editCreative(creative)}
+                                  className="rounded-lg p-2 text-primary hover:bg-blue-50"
+                                  title="編集"
+                                >
+                                  <Edit size={16} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (window.confirm('本当に削除しますか？')) {
+                                      void onDeleteCreative(creative.id);
+                                    }
+                                  }}
+                                  className="rounded-lg p-2 text-danger hover:bg-red-50"
+                                  title="削除"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+
+              <div className="space-y-4 md:hidden">
+                {filteredCreatives.map((creative) => {
+                  const firstLinkedSheet = getFirstLinkedSheet(creative);
+                  return (
+                    <div key={creative.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <div className="flex gap-4">
+                        <div className="flex h-20 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
+                          <img src={creative.imageUrl} alt="" className="h-full w-full object-cover" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-bold text-slate-800">{creative.name}</div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            {firstLinkedSheet ? `${firstLinkedSheet.sheetCode || firstLinkedSheet.id.slice(0, 8)} | ${firstLinkedSheet.title}` : '未紐づき'}
+                          </div>
+                          <div className="mt-2 text-xs text-slate-500">
+                            {getSummaryText(
+                              creative.linkedSheets.length > 0
+                                ? creative.linkedSheets.map((sheet) => sheet.manufacturerName)
+                                : [creative.manufacturerName]
+                            )} / {getSummaryText(creative.linkedSheets.map((sheet) => sheet.shelfName))}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            {getSummaryText(creative.linkedSheets.map((sheet) => sheet.caseName))} / 更新: {new Date(creative.updatedAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-4 flex justify-end gap-2 border-t border-slate-100 pt-3">
+                        <button
+                          type="button"
+                          onClick={() => editCreative(creative)}
+                          className="rounded-lg p-2 text-primary hover:bg-blue-50"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (window.confirm('本当に削除しますか？')) {
+                              void onDeleteCreative(creative.id);
+                            }
+                          }}
+                          className="rounded-lg p-2 text-danger hover:bg-red-50"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </>
       )}
     </div>
