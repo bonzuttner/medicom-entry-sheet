@@ -154,7 +154,7 @@
 - ユーザー保存: `PUT /api/users/:id`
 - ユーザー削除: `DELETE /api/users/:id`
 - マスタ取得/更新: `GET/PUT /api/master`
-- クリエイティブ一覧/詳細/更新/削除/シート参照/差し替え: `api/creatives/[[...path]].ts`
+- クリエイティブ一覧/詳細/更新/削除/シート参照/差し替え: `api/creatives/index.ts`
   - `GET /api/creatives`
   - `GET /api/creatives/:id`
   - `PUT /api/creatives/:id`
@@ -224,7 +224,7 @@
 11. `2年以上未更新` かつ `未紐づき` のCreativeのみ自動削除対象とする
 
 補足:
-- 現行の Vercel Hobby 環境では関数数上限を避けるため、Creative API は `api/creatives/[[...path]].ts` に集約している
+- 現行の Vercel Hobby 環境では関数数上限を避けるため、Creative API は `api/creatives/index.ts` に集約している
 - ただし設計上の責務は分離しているため、AWS移管やProプラン移行など関数数制約が緩い環境では、`一覧` `詳細` `シート参照` `差し替え` を別APIに再分割した方が保守しやすい
 - その場合も、Creativeの紐づき更新を `Creative API` 側の責務に一本化する方針は維持する
 

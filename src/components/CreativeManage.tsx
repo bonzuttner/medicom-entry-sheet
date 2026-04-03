@@ -333,8 +333,8 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
             </div>
           )}
 
-          <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
-            <div className="space-y-4">
+          <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+            <div>
               <div>
                 <label className="mb-2 block text-sm font-bold text-slate-700">クリエイティブ画像 <span className="text-danger">*</span></label>
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -372,7 +372,8 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                   </button>
                 </div>
               </div>
-
+            </div>
+            <div className="space-y-4">
               <div>
                 <label className="mb-2 block text-sm font-bold text-slate-700">クリエイティブ名 <span className="text-danger">*</span></label>
                 <input
@@ -388,13 +389,13 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                メーカーは紐づけたエントリーシートに応じて自動設定されます。未紐づきでも保存できます。
+                画像を登録したあと、下の「紐づけるエントリーシート」から対象シートを選択します。未紐づきのまま保存もできます。
               </div>
 
               <div>
                 <label className="mb-2 block text-sm font-bold text-slate-700">メモ</label>
                 <textarea
-                  rows={4}
+                  rows={8}
                   value={editingCreative.memo || ''}
                   onChange={(event) =>
                     setEditingCreative({
@@ -404,12 +405,6 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                   }
                   className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm"
                 />
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white px-6 py-8 text-center text-sm text-slate-500">
-                画像・名称・メーカーを入力したあと、下の「紐づけるエントリーシート」で対象シートを選択します。
               </div>
             </div>
           </div>

@@ -385,7 +385,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
           <h2 className={pageTitleClass}>エントリー履歴（Admin）</h2>
@@ -399,37 +399,32 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
         </button>
       </div>
 
-      <div className="flex flex-col gap-4">
+      <div className="space-y-3">
         <div className="relative w-full">
           <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             className={searchInputClass}
-            placeholder="タイトル / メーカー名 / 棚割名で検索"
+            placeholder="シート名、メーカー名、棚割名で検索..."
           />
         </div>
-        <div className="flex flex-col lg:flex-row gap-3">
-          <select
-            value={manufacturerFilter}
-            onChange={(e) => setManufacturerFilter(e.target.value)}
-            className="min-w-52 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm"
-          >
-            <option value="">メーカー: すべて</option>
-            {manufacturerOptions.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold text-slate-600">展開期間</span>
-            <input
-              type="date"
-              value={deploymentDate}
-              onChange={(e) => setDeploymentDate(e.target.value)}
-              className={filterControlClass}
-            />
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <span className="text-[11px] font-bold text-slate-600 shrink-0">絞り込み</span>
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 flex-1">
+            <select
+              value={manufacturerFilter}
+              onChange={(e) => setManufacturerFilter(e.target.value)}
+              className={`${filterControlClass} min-w-[132px]`}
+            >
+              <option value="">メーカー</option>
+              {manufacturerOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <span className="hidden sm:inline-flex items-center text-[11px] font-bold text-slate-600">展開期間</span>
             <select
               value={deploymentFilterMode}
               onChange={(e) => setDeploymentFilterMode(e.target.value as 'since' | 'until')}
@@ -438,10 +433,16 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
               <option value="since">以降</option>
               <option value="until">以前</option>
             </select>
+            <input
+              type="date"
+              value={deploymentDate}
+              onChange={(e) => setDeploymentDate(e.target.value)}
+              className={`${filterControlClass} col-span-2 sm:col-span-1`}
+            />
             {deploymentDate && (
               <button
                 onClick={() => setDeploymentDate('')}
-                className="px-2 py-2 rounded-md border border-slate-300 text-xs text-slate-600 hover:bg-slate-50"
+                className="px-2 py-2 rounded-md border border-slate-300 text-xs text-slate-600 hover:bg-slate-50 col-span-2 sm:col-span-1 sm:w-auto"
               >
                 解除
               </button>
@@ -452,7 +453,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div className="overflow-auto max-h-[calc(100vh-260px)]">
-        <table className="min-w-[1380px] w-full table-fixed border-separate border-spacing-0">
+        <table className="min-w-[1480px] w-full table-fixed border-separate border-spacing-0">
           <thead className="bg-slate-50">
             <tr>
               <th className="sticky left-0 top-0 z-50 w-[52px] border-b border-slate-200 px-2 py-3 text-center text-xs font-bold text-slate-500 bg-slate-50 shadow-[1px_0_0_0_rgba(226,232,240,1)]">
@@ -464,9 +465,9 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                   )}
                 </button>
               </th>
-              <th className="sticky top-0 z-10 w-24 border-b border-slate-200 px-2 py-3 text-left text-xs font-bold text-slate-500 bg-slate-50">ID</th>
-              <th className="sticky top-0 z-10 w-[150px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">状態</th>
-              <th className="sticky top-0 z-10 w-[240px] border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-xs font-bold text-slate-500">タイトル</th>
+              <th className="sticky top-0 z-10 w-24 border-b border-slate-200 px-2 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50">ID</th>
+              <th className="sticky top-0 z-10 w-[168px] border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">状態</th>
+              <th className="sticky top-0 z-10 w-[360px] border-b border-slate-200 bg-slate-50 px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">タイトル</th>
               <th className="sticky top-0 z-10 w-[104px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">展開期間</th>
               <th className="sticky top-0 z-10 w-[110px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">棚割り</th>
               <th className="sticky top-0 z-10 w-[116px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">メーカー名</th>
@@ -514,18 +515,15 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
                       <div className="space-y-1">
-                        <span
-                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${workflowStatus.pillClassName}`}
-                        >
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full whitespace-nowrap ${workflowStatus.pillClassName}`}>
                           {workflowStatus.label}
                         </span>
                         <div className="text-[11px] text-slate-500">担当: {assigneeLabel}</div>
                       </div>
                     </td>
-                    <td className="px-4 py-4">
-                      <div className="text-sm font-bold text-slate-900 break-words leading-tight">
-                        {sheet.title}
-                      </div>
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-bold text-slate-900 break-words leading-tight line-clamp-2">{sheet.title}</div>
+                      <div className="text-xs text-slate-500">{sheet.products.length} 商品登録済</div>
                     </td>
                     <td className="px-2 py-3 text-xs text-slate-700 whitespace-nowrap">
                       {getDeploymentPeriodLabel(sheet)}

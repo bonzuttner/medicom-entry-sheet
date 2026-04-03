@@ -40,7 +40,7 @@
 - `api/current-user.ts`: セッション確認 / ログアウト
 - `api/sheets.ts`: シート一覧取得
 - `api/sheets/[id].ts`: シート保存 / 削除
-- `api/creatives/[[...path]].ts`: クリエイティブ一覧 / 詳細 / 保存 / 削除 / シート参照 / 差し替え
+- `api/creatives/index.ts`: クリエイティブ一覧 / 詳細 / 保存 / 削除 / シート参照 / 差し替え
 - `api/users.ts`: ユーザー一覧取得
 - `api/users/[id].ts`: ユーザー保存 / 削除
 - `api/master.ts`: マスタ取得 / 更新
@@ -129,7 +129,7 @@
 - 環境変数運用: `SESSION_SECRET`, `POSTGRES_URL`, `BLOB_READ_WRITE_TOKEN`
 
 補足:
-- 現行のCreative APIは、Vercel Hobby の関数数上限対策として `api/creatives/[[...path]].ts` に集約している
+- 現行のCreative APIは、Vercel Hobby の関数数上限対策として `api/creatives/index.ts` に集約している
 - ただし責務は `一覧` `詳細` `シート参照` `差し替え` で論理分離している
 - AWS移管や関数数制約の緩い環境では、Creative APIを責務単位で別エンドポイントへ再分割した方が保守しやすい
 

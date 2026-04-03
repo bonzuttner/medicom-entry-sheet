@@ -110,19 +110,21 @@ const apiDataService: DataService = {
   saveMasterData: async (data) => apiClient.put<MasterData>('/api/master', { data }),
   getCreatives: async () => apiClient.get<Creative[]>('/api/creatives'),
   getCreativeBySheetId: async (sheetId) =>
-    apiClient.get<Creative | null>(`/api/creatives/by-sheet?sheetId=${encodeURIComponent(sheetId)}`),
+    apiClient.get<Creative | null>(`/api/creatives?sheetId=${encodeURIComponent(sheetId)}`),
   saveCreative: async (creative, options) =>
     apiClient
-      .put<{ ok: boolean; creative: Creative }>(`/api/creatives/${creative.id}`, {
+      .put<{ ok: boolean; creative: Creative }>(`/api/creatives`, {
+        mode: 'save',
         creative,
         forceOverwrite: options?.forceOverwrite === true,
       })
       .then((result) => result.creative),
   deleteCreative: async (id) => {
-    await apiClient.delete<void>(`/api/creatives/${id}`);
+    await apiClient.delete<void>(`/api/creatives?id=${encodeURIComponent(id)}`);
   },
   relinkSheetCreative: async (sheetId, targetCreativeId) =>
-    apiClient.put<{ ok: boolean; sheet: EntrySheet; creative: Creative }>('/api/creatives/relink-sheet', {
+    apiClient.put<{ ok: boolean; sheet: EntrySheet; creative: Creative }>('/api/creatives', {
+      mode: 'relink',
       sheetId,
       targetCreativeId,
     }),
