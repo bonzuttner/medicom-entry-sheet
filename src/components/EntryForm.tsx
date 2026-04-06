@@ -166,9 +166,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       highlight ? 'bg-amber-100/70 text-slate-900' : 'bg-slate-100 text-slate-800'
     } focus:bg-white focus:ring-2 focus:ring-sky-200`;
   const getSelectClass = (highlight = false): string =>
-    `w-full rounded-lg border-0 py-3 pl-3 pr-12 shadow-none outline-none transition-colors appearance-none bg-no-repeat bg-[length:16px_16px] bg-[position:right_1rem_center] ${
+    `w-full rounded-lg border-0 py-3 pl-3 pr-12 shadow-none outline-none transition-colors appearance-none select-with-arrow ${
       highlight ? 'bg-amber-100/70 text-slate-900' : 'bg-slate-100 text-slate-800'
-    } focus:bg-white focus:ring-2 focus:ring-sky-200 bg-[url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 20 20%27 fill=%27none%27 stroke=%27%23475569%27 stroke-width=%271.8%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3E%3Cpath d=%27m5 7 5 6 5-6%27/%3E%3C/svg%3E")]`;
+    } focus:bg-white focus:ring-2 focus:ring-sky-200`;
   const compactSelectWrapperClass = 'w-full md:max-w-[420px]';
   const compactSelectClass = (highlight = false): string =>
     `${getSelectClass(highlight)} ring-1 ring-inset ${highlight ? 'ring-amber-200' : 'ring-slate-200'}`;
@@ -1367,7 +1367,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                       </select>
                     </div>
                 </div>
-                <div className="col-span-1 md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                <div className="col-span-1 md:col-span-2 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6 items-start">
                       <div>
                         <label className="block text-sm font-bold text-slate-700 mb-2">展開スタート月</label>
@@ -1490,7 +1490,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                         </ul>
                     )}
                 </div>
-                <div className="col-span-1 md:col-span-2 rounded-xl bg-slate-50 p-4 sm:p-5">
+                <div className="col-span-1 md:col-span-2 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 items-start">
                       <div>
                           <label className="block text-sm font-bold text-slate-700 mb-2">フェイス数</label>
@@ -1620,7 +1620,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         </div>
 
         <section className="mb-5 sm:mb-6 mt-4 sm:mt-0 pr-12 sm:pr-14">
-          <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3 sm:p-4">
+          <div className="rounded-lg border border-slate-200 bg-white p-3 sm:p-4">
             <div className="flex items-center gap-2 mb-2.5">
               <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white text-slate-500 border border-slate-200">
                 <Search size={11} />
@@ -1707,7 +1707,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      />
                 </div>
                  {/* Product Image - Prominent */}
-                 <div className="md:col-span-2 bg-slate-50 p-4 sm:p-6 rounded-xl border border-slate-200 mb-2">
+                 <div className="md:col-span-2 bg-white p-4 sm:p-6 rounded-xl border border-slate-200 mb-2">
                     <label className="block text-base font-bold text-slate-700 mb-3">
                         商品画像 <span className="text-danger font-bold">*</span>
                     </label>
@@ -2047,7 +2047,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
           <span className="w-1 h-5 bg-sky-500 rounded-full"></span>
           紐づくクリエイティブ
         </h4>
-        <div className="mb-8 rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div className="mb-8 rounded-xl border border-slate-200 bg-white p-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               {linkedCreative ? (
