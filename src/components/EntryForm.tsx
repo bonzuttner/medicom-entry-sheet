@@ -1355,10 +1355,10 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     />
                 </div>
                 <div className="col-span-1 md:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-2">案件</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">案件 <span className="text-danger font-bold">*</span></label>
                     <div className={compactSelectWrapperClass}>
                       <select
-                          className={compactSelectClass()}
+                          className={compactSelectClass(!hasText(formData.caseName))}
                           value={formData.caseName || ''}
                           onChange={(e) => handleHeaderChange('caseName', e.target.value)}
                       >
