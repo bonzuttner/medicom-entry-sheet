@@ -1297,7 +1297,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     <div className="p-3 bg-slate-100 rounded-lg text-slate-700">{formData.manufacturerName}</div>
                 </div>
                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">作成者 <span className="text-danger">*</span></label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">作成者 <span className="text-danger font-bold">*</span></label>
                     <input 
                         type="text" 
                         value={formData.creatorName} 
@@ -1306,7 +1306,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">作成者メール <span className="text-danger">*</span></label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">作成者メール <span className="text-danger font-bold">*</span></label>
                     <input 
                         type="email" 
                         value={formData.email} 
@@ -1315,7 +1315,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">作成者電話番号 <span className="text-danger">*</span></label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">作成者電話番号 <span className="text-danger font-bold">*</span></label>
                     <input 
                         type="tel" 
                         value={formData.phoneNumber} 
@@ -1333,7 +1333,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <div className="col-span-1 md:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-2">棚割名 <span className="text-danger">*</span></label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">棚割名 <span className="text-danger font-bold">*</span></label>
                     <div className={compactSelectWrapperClass}>
                       <select
                           className={compactSelectClass(!hasText(formData.shelfName))}
@@ -1345,7 +1345,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     </div>
                 </div>
                 <div className="col-span-1 md:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-2">タイトル <span className="text-danger">*</span></label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">タイトル <span className="text-danger font-bold">*</span></label>
                     <input 
                         type="text" 
                         value={formData.title} 
@@ -1685,7 +1685,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                  <div>
-                     <label className="block text-sm font-bold text-slate-700 mb-2">JANコード <span className="text-danger">*</span> <span className="text-xs font-normal text-slate-500">(8, 13, 16桁)</span></label>
+                     <label className="block text-sm font-bold text-slate-700 mb-2">JANコード <span className="text-danger font-bold">*</span> <span className="text-xs font-normal text-slate-500">(8, 13, 16桁)</span></label>
                      <input 
                         type="text" 
                         className={`${getFieldClass(!hasText(activeProduct.janCode))} font-mono`}
@@ -1696,7 +1696,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      />
                 </div>
                  <div className="md:col-span-2">
-                     <label className="block text-sm font-bold text-slate-700 mb-2">商品名 <span className="text-danger">*</span></label>
+                     <label className="block text-sm font-bold text-slate-700 mb-2">商品名 <span className="text-danger font-bold">*</span></label>
                      <input 
                         type="text" 
                         className={getFieldClass(!hasText(activeProduct.productName))}
@@ -1709,7 +1709,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                  {/* Product Image - Prominent */}
                  <div className="md:col-span-2 bg-slate-50 p-4 sm:p-6 rounded-xl border border-slate-200 mb-2">
                     <label className="block text-base font-bold text-slate-700 mb-3">
-                        商品画像 <span className="text-danger">*</span>
+                        商品画像 <span className="text-danger font-bold">*</span>
                     </label>
                     <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start">
                         <div 
@@ -1744,7 +1744,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             </div>
         </section>
 
-        <hr className="my-8 border-slate-100" />
+        <hr className="my-8 border-slate-200" />
 
         {/* Product: Dimensions */}
         <section className="mb-10">
@@ -1752,9 +1752,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                 <span className="w-1 h-6 bg-teal-500 rounded-full"></span>
                 棚割り情報（商品サイズ）
             </h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                  <div>
-                     <label className="block text-xs font-bold text-slate-500 mb-1">幅 (mm) <span className="text-danger">*</span></label>
+                     <label className="block text-xs font-bold text-slate-500 mb-1">幅 (mm) <span className="text-danger font-bold">*</span></label>
                      <input 
                         type="number" 
                         className={getFieldClass(!(Number(activeProduct.width) > 0))}
@@ -1763,7 +1763,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      />
                 </div>
                 <div>
-                     <label className="block text-xs font-bold text-slate-500 mb-1">高さ (mm) <span className="text-danger">*</span></label>
+                     <label className="block text-xs font-bold text-slate-500 mb-1">高さ (mm) <span className="text-danger font-bold">*</span></label>
                      <input 
                         type="number" 
                         className={getFieldClass(!(Number(activeProduct.height) > 0))}
@@ -1772,7 +1772,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      />
                 </div>
                 <div>
-                     <label className="block text-xs font-bold text-slate-500 mb-1">奥行 (mm) <span className="text-danger">*</span></label>
+                     <label className="block text-xs font-bold text-slate-500 mb-1">奥行 (mm) <span className="text-danger font-bold">*</span></label>
                      <input 
                         type="number" 
                         className={getFieldClass(!(Number(activeProduct.depth) > 0))}
@@ -1781,7 +1781,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      />
                 </div>
                 <div>
-                     <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">フェイシング数 <span className="text-danger">*</span></label>
+                     <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">フェイシング数 <span className="text-danger font-bold">*</span></label>
                      <input 
                         type="number" 
                         className={getFieldClass(!(Number(activeProduct.facingCount) > 0))}
@@ -1792,7 +1792,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             </div>
         </section>
 
-        <hr className="my-8 border-slate-100" />
+        <hr className="my-8 border-slate-200" />
 
         {/* Product: Risk & Ingredients */}
         <section className="mb-10">
@@ -1802,7 +1802,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                     <label className="block text-sm font-bold text-slate-700 mb-2">リスク分類 <span className="text-danger">*</span></label>
+                     <label className="block text-sm font-bold text-slate-700 mb-2">リスク分類 <span className="text-danger font-bold">*</span></label>
                     <select 
                         className={getSelectClass(!hasText(activeProduct.riskClassification))}
                         value={activeProduct.riskClassification}
@@ -1830,7 +1830,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             </div>
         </section>
 
-        <hr className="my-8 border-slate-100" />
+        <hr className="my-8 border-slate-200" />
 
         {/* Product: Arrival Date */}
         <section className="mb-10">
@@ -1852,7 +1852,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             </div>
         </section>
 
-        <hr className="my-8 border-slate-100" />
+        <hr className="my-8 border-slate-200" />
 
         {/* Product: Sales Points */}
         <section className="mb-10">
@@ -1874,7 +1874,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             </div>
         </section>
 
-        <hr className="my-8 border-slate-100" />
+        <hr className="my-8 border-slate-200" />
 
         {/* Product: Promotion Info */}
         <section className="mb-6">
@@ -1885,7 +1885,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                  <div>
-                     <label className="block text-sm font-bold text-slate-700 mb-2">販促物の有無 <span className="text-danger">*</span></label>
+                     <label className="block text-sm font-bold text-slate-700 mb-2">販促物の有無 <span className="text-danger font-bold">*</span></label>
                     <select 
                         className={getSelectClass()}
                         value={activeProduct.hasPromoMaterial}
@@ -1928,7 +1928,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                         </div>
 
                          <div className="md:col-span-2">
-                             <label className="block text-sm font-bold text-slate-700 mb-2">販促物サイズ (mm) <span className="text-danger">*</span></label>
+                             <label className="block text-sm font-bold text-slate-700 mb-2">販促物サイズ (mm) <span className="text-danger font-bold">*</span></label>
                              <div className="grid grid-cols-3 gap-2 sm:gap-4">
                                 <input 
                                     type="number" placeholder="幅" className={getFieldClass(!(Number(activeProduct.promoWidth) > 0))}
@@ -1949,7 +1949,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                         </div>
 
                          <div className="md:col-span-2">
-                            <label className="block text-sm font-bold text-slate-700 mb-2">販促物画像 <span className="text-danger">*</span></label>
+                            <label className="block text-sm font-bold text-slate-700 mb-2">販促物画像 <span className="text-danger font-bold">*</span></label>
                             <div className={`flex flex-col sm:flex-row gap-4 items-start sm:items-center rounded-lg p-3 ${activeProduct.promoImage ? 'bg-slate-100' : 'bg-amber-100/70'}`}>
                                 <button 
                                     onClick={() => handleImageUpload(activeTab, 'promoImage')}
@@ -1976,7 +1976,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             )}
         </section>
 
-        <hr className="my-8 border-slate-100" />
+        <hr className="my-8 border-slate-200" />
 
         {/* Product: Other Info */}
         <section className="mb-6">
