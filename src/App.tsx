@@ -115,6 +115,7 @@ const toComparableSheetCore = (sheet: EntrySheet) => ({
   entryStatus: sheet.entryStatus || sheet.status,
   creativeStatus: sheet.creativeStatus || 'none',
   currentAssignee: sheet.currentAssignee || 'none',
+  assigneeUserId: normalizeOptionalString(sheet.assigneeUserId),
   returnReason: normalizeOptionalString(sheet.returnReason),
   products: toComparableProducts(sheet.products),
   attachments: toComparableAttachments(sheet.attachments),
@@ -619,6 +620,7 @@ const App: React.FC = () => {
           version: sheet.version,
           creativeStatus: sheet.creativeStatus,
           currentAssignee: sheet.currentAssignee,
+          assigneeUserId: sheet.assigneeUserId,
           returnReason: sheet.returnReason,
         }
       );
@@ -638,6 +640,7 @@ const App: React.FC = () => {
               version: sheet.version,
               creativeStatus: sheet.creativeStatus,
               currentAssignee: sheet.currentAssignee,
+              assigneeUserId: sheet.assigneeUserId,
               returnReason: sheet.returnReason,
             },
             { forceOverwrite: true }
@@ -660,6 +663,7 @@ const App: React.FC = () => {
       refreshFirstSheetsPage();
     } catch (error) {
       console.error('Failed to delete sheet:', error);
+      alert(error instanceof Error ? error.message : 'エントリーシートの削除に失敗しました。');
     }
   };
 
@@ -827,6 +831,7 @@ const App: React.FC = () => {
           initialData={editingSheet}
           initialActiveTab={initialProductIndex}
           masterData={masterData}
+          users={visibleUsers}
           reusableProductTemplates={reusableProductTemplates}
           revisions={editingSheetRevisions}
           currentUser={currentUser}

@@ -1,5 +1,5 @@
-import React, { useMemo, useRef, useState } from 'react';
-import { ArrowUpDown, Edit, Image as ImageIcon, Plus, Search, Trash2, Upload, X } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Edit, Image as ImageIcon, Plus, Search, Trash2, Upload, X } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { apiClient } from '../services/apiClient';
 import { Creative, CreativeLinkedSheet, EntrySheet, User } from '../types';
@@ -35,6 +35,9 @@ const getSummaryText = (values: string[]): string => {
 };
 
 const normalizeSearchText = (value: string): string => value.normalize('NFKC').trim().toLowerCase();
+const canModifyCreativeLinkage = (sheet: EntrySheet): boolean =>
+  (sheet.entryStatus || sheet.status) !== 'draft' &&
+  ((sheet.creativeStatus || 'none') === 'none' || (sheet.creativeStatus || 'none') === 'in_progress');
 
 const toDataUrl = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -53,14 +56,48 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
   isLoading = false,
 }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const dropZoneRef = useRef<HTMLDivElement | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('updatedAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [sheetSearchTerm, setSheetSearchTerm] = useState('');
   const [editingCreative, setEditingCreative] = useState<CreativeDraft | null>(null);
+  const [originalCreative, setOriginalCreative] = useState<CreativeDraft | null>(null);
   const [validationError, setValidationError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Creative | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  // Check if form has unsaved changes
+  const isDirty = useMemo(() => {
+    if (!editingCreative || !originalCreative) return false;
+    return (
+      editingCreative.name !== originalCreative.name ||
+      editingCreative.imageUrl !== originalCreative.imageUrl ||
+      editingCreative.memo !== originalCreative.memo ||
+      JSON.stringify(editingCreative.selectedSheetIds.sort()) !== JSON.stringify(originalCreative.selectedSheetIds.sort())
+    );
+  }, [editingCreative, originalCreative]);
+
+  // Browser back/reload warning
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDirty]);
+
+  const confirmDiscardChanges = useCallback(() => {
+    if (!isDirty) return true;
+    return window.confirm('編集内容が保存されていません。破棄してよろしいですか？');
+  }, [isDirty]);
 
   const sheetById = useMemo(
     () => new Map(sheets.map((sheet) => [sheet.id, sheet])),
@@ -131,6 +168,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
   const candidateSheets = useMemo(() => {
     const normalizedQuery = normalizeSearchText(sheetSearchTerm);
     return [...sheets]
+      .filter((sheet) => canModifyCreativeLinkage(sheet))
       .filter((sheet) => {
         if (!normalizedQuery) return true;
         const fields = [
@@ -146,7 +184,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
   }, [sheetSearchTerm, sheets]);
 
   const startNewCreative = () => {
-    setEditingCreative({
+    const newDraft: CreativeDraft = {
       id: uuidv4(),
       version: 1,
       manufacturerName: currentUser.manufacturerName || '',
@@ -159,16 +197,20 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
       updatedAt: new Date().toISOString(),
       linkedSheets: [],
       selectedSheetIds: [],
-    });
+    };
+    setEditingCreative(newDraft);
+    setOriginalCreative(newDraft);
     setSheetSearchTerm('');
     setValidationError('');
   };
 
   const editCreative = (creative: Creative) => {
-    setEditingCreative({
+    const draft: CreativeDraft = {
       ...creative,
       selectedSheetIds: creative.linkedSheets.map((sheet) => sheet.id),
-    });
+    };
+    setEditingCreative(draft);
+    setOriginalCreative(draft);
     setSheetSearchTerm('');
     setValidationError('');
   };
@@ -180,6 +222,17 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
     }
     setSortKey(nextKey);
     setSortOrder(nextKey === 'updatedAt' ? 'desc' : 'asc');
+  };
+
+  const renderSortIcon = (key: SortKey) => {
+    if (sortKey !== key) {
+      return <ArrowUpDown size={14} className="text-slate-400" />;
+    }
+    return sortOrder === 'asc' ? (
+      <ArrowUp size={14} className="text-primary" />
+    ) : (
+      <ArrowDown size={14} className="text-primary" />
+    );
   };
 
   const setSelectedSheetIds = (sheetIds: string[]) => {
@@ -224,6 +277,18 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
 
   const handleImageSelect = async (file: File) => {
     if (!editingCreative) return;
+    // Validate file type
+    const validTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp'];
+    if (!validTypes.includes(file.type)) {
+      setValidationError('対応していない画像形式です。PNG, JPEG, WebP, GIF, BMP形式の画像を選択してください。');
+      return;
+    }
+    // Validate file size (10MB limit)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setValidationError('画像サイズが大きすぎます。10MB以下の画像を選択してください。');
+      return;
+    }
     try {
       setIsUploadingImage(true);
       const dataUrl = await toDataUrl(file);
@@ -241,6 +306,28 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
       setValidationError(error instanceof Error ? error.message : '画像のアップロードに失敗しました。');
     } finally {
       setIsUploadingImage(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      void handleImageSelect(file);
     }
   };
 
@@ -271,19 +358,57 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
         manufacturerName: editingCreative.linkedSheets[0]?.manufacturerName || editingCreative.manufacturerName,
         linkedSheets: editingCreative.linkedSheets,
       });
-      setEditingCreative(null);
-      setValidationError('');
+      closeEditor(true); // Skip confirmation since we just saved
     } catch (error) {
-      setValidationError(error instanceof Error ? error.message : '保存に失敗しました。');
+      const message = error instanceof Error ? error.message : '';
+      // Provide user-friendly error messages
+      if (message === 'VERSION_CONFLICT') {
+        setValidationError('他のユーザーが更新しました。画面を再読み込みして最新データを取得してください。');
+      } else if (message === 'CREATIVE_REQUIRED_FIELDS') {
+        setValidationError('必須項目を入力してください。');
+      } else if (message === 'MANUFACTURER_NOT_FOUND') {
+        setValidationError('指定されたメーカーが見つかりません。');
+      } else if (message === 'SHEET_NOT_FOUND') {
+        setValidationError('紐づけ先のエントリーシートが見つかりません。');
+      } else if (message === 'SHEET_ALREADY_LINKED') {
+        setValidationError('選択したシートは既に他のクリエイティブに紐づいています。');
+      } else if (message === 'SHEET_MANUFACTURER_MISMATCH') {
+        setValidationError('シートのメーカーとクリエイティブのメーカーが一致しません。');
+      } else if (message === 'SHEET_WORKFLOW_LOCKED') {
+        setValidationError('確認待ち・差し戻し・承認済みのシートに紐づくクリエイティブは、シート詳細で制作に戻してから変更してください。');
+      } else {
+        setValidationError(message || '保存に失敗しました。');
+      }
     } finally {
       setIsSaving(false);
     }
   };
 
-  const closeEditor = () => {
+  const closeEditor = (skipConfirm = false) => {
+    if (!skipConfirm && !confirmDiscardChanges()) return;
     setEditingCreative(null);
+    setOriginalCreative(null);
     setValidationError('');
     setSheetSearchTerm('');
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget || isDeleting) return;
+    try {
+      setIsDeleting(true);
+      setDeleteError('');
+      await onDeleteCreative(deleteTarget.id);
+      setDeleteTarget(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      if (message === 'CREATIVE_STILL_LINKED') {
+        setDeleteError(`このクリエイティブは${deleteTarget.linkedSheets.length}件のシートに紐づいています。先に紐づけを解除してから削除してください。`);
+      } else {
+        setDeleteError(message || '削除に失敗しました。');
+      }
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -337,7 +462,17 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
             <div>
               <div>
                 <label className="mb-2 block text-sm font-bold text-slate-700">クリエイティブ画像 <span className="text-danger">*</span></label>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div
+                  ref={dropZoneRef}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`rounded-xl border-2 border-dashed p-4 transition-colors ${
+                    isDraggingOver
+                      ? 'border-primary bg-sky-50'
+                      : 'border-slate-200 bg-slate-50'
+                  }`}
+                >
                   <div className="mb-4 flex h-52 items-center justify-center overflow-hidden rounded-lg bg-white">
                     {editingCreative.imageUrl ? (
                       <img src={editingCreative.imageUrl} alt="" className="h-full w-full object-contain" />
@@ -345,6 +480,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                       <div className="flex flex-col items-center gap-2 text-slate-400">
                         <ImageIcon size={32} />
                         <span className="text-sm">画像未登録</span>
+                        <span className="text-xs">ドラッグ&ドロップまたはボタンで選択</span>
                       </div>
                     )}
                   </div>
@@ -370,6 +506,9 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                     <Upload size={18} />
                     {isUploadingImage ? 'アップロード中...' : '画像を選択'}
                   </button>
+                  <p className="mt-2 text-center text-xs text-slate-500">
+                    PNG, JPEG, WebP, GIF, BMP（10MB以下）
+                  </p>
                 </div>
               </div>
             </div>
@@ -384,7 +523,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                       name: event.target.value,
                     })
                   }
-                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
                 />
               </div>
 
@@ -403,7 +542,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                       memo: event.target.value,
                     })
                   }
-                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
                 />
               </div>
             </div>
@@ -423,7 +562,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                   value={sheetSearchTerm}
                   onChange={(event) => setSheetSearchTerm(event.target.value)}
                   placeholder="ID / シート名 / メーカー名 / 棚割り名 / 案件名で検索"
-                  className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm shadow-sm"
+                  className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm shadow-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
                 />
               </div>
 
@@ -475,30 +614,40 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                 <p className="mt-3 text-sm text-slate-500">まだ選択されていません。</p>
               ) : (
                 <div className="mt-3 space-y-2">
-                  {editingCreative.linkedSheets.map((sheet) => (
-                    <div key={sheet.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold text-slate-800">
-                          {(sheet.sheetCode || sheet.id.slice(0, 8))} | {sheet.title}
+                  {editingCreative.linkedSheets.map((sheet) => {
+                    const sourceSheet = sheetById.get(sheet.id);
+                    const canUnlink = sourceSheet ? canModifyCreativeLinkage(sourceSheet) : false;
+                    return (
+                      <div key={sheet.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-slate-800">
+                            {(sheet.sheetCode || sheet.id.slice(0, 8))} | {sheet.title}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            {sheet.manufacturerName} | {sheet.shelfName || '棚割り未設定'} | {sheet.caseName || '案件未設定'}
+                          </div>
+                          {!canUnlink && (
+                            <div className="mt-1 text-xs font-semibold text-slate-500">
+                              シート詳細で制作に戻してから変更してください
+                            </div>
+                          )}
                         </div>
-                        <div className="mt-1 text-xs text-slate-500">
-                          {sheet.manufacturerName} | {sheet.shelfName || '棚割り未設定'} | {sheet.caseName || '案件未設定'}
-                        </div>
+                        <button
+                          type="button"
+                          disabled={!canUnlink}
+                          onClick={() =>
+                            setSelectedSheetIds(
+                              editingCreative.selectedSheetIds.filter((id) => id !== sheet.id)
+                            )
+                          }
+                          className={`rounded-full p-2 ${canUnlink ? 'text-slate-400 hover:bg-white hover:text-danger' : 'cursor-not-allowed text-slate-300'}`}
+                          title={canUnlink ? '解除' : 'この状態のシートはここでは解除できません'}
+                        >
+                          <X size={16} />
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSelectedSheetIds(
-                            editingCreative.selectedSheetIds.filter((id) => id !== sheet.id)
-                          )
-                        }
-                        className="rounded-full p-2 text-slate-400 hover:bg-white hover:text-danger"
-                        title="解除"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -519,7 +668,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                 void handleSave();
               }}
               disabled={isSaving || isUploadingImage}
-              className="rounded-lg bg-primary px-5 py-3 font-bold text-white shadow-lg shadow-sky-200 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg bg-primary px-5 py-3 font-bold text-white shadow-lg shadow-sky-200 transition-all hover:bg-sky-600 hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-lg"
             >
               {isSaving ? '保存中...' : '保存'}
             </button>
@@ -536,14 +685,82 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="クリエイティブ名 / シート名 / ID / メーカー名 / 棚割り名 / 案件名 / メモで検索"
-                className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm shadow-sm"
+                className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm shadow-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
               />
             </div>
           </div>
 
-          {!isLoading && filteredCreatives.length === 0 ? (
-            <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-slate-500 shadow-sm">
-              クリエイティブが見つかりません
+          {isLoading ? (
+            <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+              {/* Skeleton loading */}
+              <div className="hidden md:block">
+                <div className="bg-slate-50 border-b border-slate-200 px-4 py-3">
+                  <div className="h-4 w-full bg-slate-200 rounded animate-pulse" />
+                </div>
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="flex items-center gap-4 border-b border-slate-100 px-4 py-4">
+                    <div className="h-16 w-24 bg-slate-200 rounded-lg animate-pulse" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 w-1/3 bg-slate-200 rounded animate-pulse" />
+                      <div className="h-3 w-1/4 bg-slate-100 rounded animate-pulse" />
+                    </div>
+                    <div className="h-4 w-24 bg-slate-200 rounded animate-pulse" />
+                    <div className="h-4 w-20 bg-slate-200 rounded animate-pulse" />
+                    <div className="h-4 w-20 bg-slate-200 rounded animate-pulse" />
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-4 p-4 md:hidden">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="flex gap-4 rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="h-20 w-24 shrink-0 bg-slate-200 rounded-lg animate-pulse" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 w-2/3 bg-slate-200 rounded animate-pulse" />
+                      <div className="h-3 w-1/2 bg-slate-100 rounded animate-pulse" />
+                      <div className="h-3 w-1/3 bg-slate-100 rounded animate-pulse" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : filteredCreatives.length === 0 ? (
+            <div className="rounded-xl border border-slate-200 bg-white p-12 text-center shadow-sm">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100">
+                <ImageIcon size={32} className="text-slate-400" />
+              </div>
+              {searchTerm ? (
+                <>
+                  <p className="text-lg font-semibold text-slate-700">検索結果がありません</p>
+                  <p className="mt-2 text-sm text-slate-500">
+                    「{searchTerm}」に一致するクリエイティブが見つかりませんでした。<br />
+                    別のキーワードで検索してみてください。
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="mt-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
+                  >
+                    <X size={16} />
+                    検索をクリア
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="text-lg font-semibold text-slate-700">クリエイティブがありません</p>
+                  <p className="mt-2 text-sm text-slate-500">
+                    まだクリエイティブが登録されていません。<br />
+                    新規登録ボタンから最初のクリエイティブを作成しましょう。
+                  </p>
+                  <button
+                    type="button"
+                    onClick={startNewCreative}
+                    className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 font-bold text-white shadow-lg shadow-sky-200 transition-all hover:bg-sky-600 hover:-translate-y-0.5"
+                  >
+                    <Plus size={18} />
+                    新規登録
+                  </button>
+                </>
+              )}
             </div>
           ) : (
             <>
@@ -563,34 +780,34 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                     <thead className="bg-slate-50 border-b border-slate-200">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">画像</th>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">
-                          <button type="button" onClick={() => toggleSort('name')} className="inline-flex items-center gap-1">
-                            クリエイティブ名 <ArrowUpDown size={14} />
+                        <th className={`px-4 py-3 text-left text-xs font-bold ${sortKey === 'name' ? 'text-primary bg-sky-50' : 'text-slate-500'}`}>
+                          <button type="button" onClick={() => toggleSort('name')} className="inline-flex items-center gap-1 hover:text-primary transition-colors">
+                            クリエイティブ名 {renderSortIcon('name')}
                           </button>
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">
-                          <button type="button" onClick={() => toggleSort('sheetCode')} className="inline-flex items-center gap-1">
-                            エントリーシート <ArrowUpDown size={14} />
+                        <th className={`px-4 py-3 text-left text-xs font-bold ${sortKey === 'sheetCode' ? 'text-primary bg-sky-50' : 'text-slate-500'}`}>
+                          <button type="button" onClick={() => toggleSort('sheetCode')} className="inline-flex items-center gap-1 hover:text-primary transition-colors">
+                            エントリーシート {renderSortIcon('sheetCode')}
                           </button>
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">
-                          <button type="button" onClick={() => toggleSort('manufacturerName')} className="inline-flex items-center gap-1">
-                            メーカー名 <ArrowUpDown size={14} />
+                        <th className={`px-4 py-3 text-left text-xs font-bold ${sortKey === 'manufacturerName' ? 'text-primary bg-sky-50' : 'text-slate-500'}`}>
+                          <button type="button" onClick={() => toggleSort('manufacturerName')} className="inline-flex items-center gap-1 hover:text-primary transition-colors">
+                            メーカー名 {renderSortIcon('manufacturerName')}
                           </button>
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">
-                          <button type="button" onClick={() => toggleSort('shelfName')} className="inline-flex items-center gap-1">
-                            棚割り名 <ArrowUpDown size={14} />
+                        <th className={`px-4 py-3 text-left text-xs font-bold ${sortKey === 'shelfName' ? 'text-primary bg-sky-50' : 'text-slate-500'}`}>
+                          <button type="button" onClick={() => toggleSort('shelfName')} className="inline-flex items-center gap-1 hover:text-primary transition-colors">
+                            棚割り名 {renderSortIcon('shelfName')}
                           </button>
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">
-                          <button type="button" onClick={() => toggleSort('caseName')} className="inline-flex items-center gap-1">
-                            案件名 <ArrowUpDown size={14} />
+                        <th className={`px-4 py-3 text-left text-xs font-bold ${sortKey === 'caseName' ? 'text-primary bg-sky-50' : 'text-slate-500'}`}>
+                          <button type="button" onClick={() => toggleSort('caseName')} className="inline-flex items-center gap-1 hover:text-primary transition-colors">
+                            案件名 {renderSortIcon('caseName')}
                           </button>
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">
-                          <button type="button" onClick={() => toggleSort('updatedAt')} className="inline-flex items-center gap-1">
-                            最終更新日 <ArrowUpDown size={14} />
+                        <th className={`px-4 py-3 text-left text-xs font-bold ${sortKey === 'updatedAt' ? 'text-primary bg-sky-50' : 'text-slate-500'}`}>
+                          <button type="button" onClick={() => toggleSort('updatedAt')} className="inline-flex items-center gap-1 hover:text-primary transition-colors">
+                            最終更新日 {renderSortIcon('updatedAt')}
                           </button>
                         </th>
                         <th className="px-4 py-3 text-right text-xs font-bold text-slate-500">操作</th>
@@ -600,7 +817,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                       {filteredCreatives.map((creative) => {
                         const firstLinkedSheet = getFirstLinkedSheet(creative);
                         return (
-                          <tr key={creative.id} className="group border-b border-slate-100 last:border-0 hover:bg-sky-50 transition-colors cursor-pointer" onClick={() => editCreative(creative)}>
+                          <tr key={creative.id} className="group border-b border-slate-100 last:border-0 hover:bg-gradient-to-r hover:from-sky-50 hover:to-white transition-all duration-200 cursor-pointer hover:shadow-sm" onClick={() => editCreative(creative)}>
                             <td className="px-4 py-4">
                               <div className="flex h-16 w-24 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
                                 <img src={creative.imageUrl} alt="" className="h-full w-full object-cover" />
@@ -672,9 +889,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (window.confirm('本当に削除しますか？')) {
-                                      void onDeleteCreative(creative.id);
-                                    }
+                                    setDeleteTarget(creative);
                                   }}
                                   title="削除"
                                   aria-label="削除"
@@ -734,11 +949,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
-                            if (window.confirm('本当に削除しますか？')) {
-                              void onDeleteCreative(creative.id);
-                            }
-                          }}
+                          onClick={() => setDeleteTarget(creative)}
                           className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-danger bg-red-50 hover:bg-red-100 transition-colors"
                         >
                           <Trash2 size={14} />
@@ -752,6 +963,73 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
             </>
           )}
         </>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-[fadeIn_150ms_ease-out]"
+          onClick={() => !isDeleting && setDeleteTarget(null)}
+          style={{ animation: 'fadeIn 150ms ease-out' }}
+        >
+          <div
+            className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl animate-[slideUp_200ms_ease-out]"
+            onClick={(e) => e.stopPropagation()}
+            style={{ animation: 'slideUp 200ms ease-out' }}
+          >
+            <h3 className="text-lg font-bold text-slate-800">クリエイティブの削除</h3>
+            <div className="mt-4">
+              <div className="flex items-start gap-4">
+                <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                  <img src={deleteTarget.imageUrl} alt="" className="h-full w-full object-cover" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-slate-800">{deleteTarget.name}</div>
+                  <div className="mt-1 text-sm text-slate-500">
+                    紐づきシート: {deleteTarget.linkedSheets.length}件
+                  </div>
+                </div>
+              </div>
+              {deleteTarget.linkedSheets.length > 0 && (
+                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  このクリエイティブには{deleteTarget.linkedSheets.length}件のシートが紐づいています。
+                  削除するには先に紐づけを解除してください。
+                </div>
+              )}
+              {deleteTarget.linkedSheets.length === 0 && (
+                <p className="mt-4 text-sm text-slate-600">
+                  このクリエイティブを削除してもよろしいですか？この操作は取り消せません。
+                </p>
+              )}
+              {deleteError && (
+                <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                  {deleteError}
+                </div>
+              )}
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteTarget(null);
+                  setDeleteError('');
+                }}
+                disabled={isDeleting}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-60"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDelete()}
+                disabled={isDeleting || deleteTarget.linkedSheets.length > 0}
+                className="rounded-lg bg-danger px-4 py-2.5 font-bold text-white shadow-sm hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isDeleting ? '削除中...' : '削除する'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

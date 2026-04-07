@@ -27,6 +27,14 @@ interface CreativeLinkedSheetRow {
   case_name: string | null;
 }
 
+interface CreativeWorkflowSheetRow {
+  id: string;
+  manufacturer_name: string;
+  status: string;
+  entry_status: string | null;
+  creative_status: string | null;
+}
+
 let ensureCreativeTablesPromise: Promise<void> | null = null;
 let pruneRetentionIfDuePromise: Promise<{ deletedCreatives: number }> | null = null;
 let lastCreativeRetentionRunAt = 0;
@@ -154,6 +162,50 @@ const listLinkedSheets = async (creativeIds: string[]): Promise<Map<string, Crea
   return map;
 };
 
+const normalizeEntryStatus = (status: string, entryStatus: string | null): 'draft' | 'completed' | 'completed_no_image' => {
+  if (entryStatus === 'completed') return 'completed';
+  if (entryStatus === 'completed_no_image') return 'completed_no_image';
+  if (status === 'completed') return 'completed';
+  if (status === 'completed_no_image') return 'completed_no_image';
+  return 'draft';
+};
+
+const normalizeCreativeStatus = (
+  creativeStatus: string | null
+): 'none' | 'in_progress' | 'confirmation_pending' | 'returned' | 'approved' => {
+  if (creativeStatus === 'in_progress') return 'in_progress';
+  if (creativeStatus === 'confirmation_pending') return 'confirmation_pending';
+  if (creativeStatus === 'returned') return 'returned';
+  if (creativeStatus === 'approved') return 'approved';
+  return 'none';
+};
+
+const canModifyCreativeLinkage = (row: Pick<CreativeWorkflowSheetRow, 'status' | 'entry_status' | 'creative_status'>): boolean =>
+  normalizeEntryStatus(row.status, row.entry_status) !== 'draft' &&
+  (normalizeCreativeStatus(row.creative_status) === 'none' ||
+    normalizeCreativeStatus(row.creative_status) === 'in_progress');
+
+const assertWorkflowEditableSheets = async (sheetIds: string[]): Promise<void> => {
+  if (sheetIds.length === 0) return;
+
+  const result = await db.query<CreativeWorkflowSheetRow>(
+    `
+    SELECT es.id, m.name AS manufacturer_name, es.status, es.entry_status, es.creative_status
+    FROM entry_sheets es
+    JOIN manufacturers m ON m.id = es.manufacturer_id
+    WHERE es.id = ANY($1)
+    `,
+    [sheetIds]
+  );
+
+  if (result.rows.length !== sheetIds.length) {
+    throw new Error('SHEET_NOT_FOUND');
+  }
+  if (result.rows.some((row) => !canModifyCreativeLinkage(row))) {
+    throw new Error('SHEET_WORKFLOW_LOCKED');
+  }
+};
+
 const assertLinkableSheets = async (
   sheetIds: string[],
   manufacturerName: string,
@@ -161,9 +213,9 @@ const assertLinkableSheets = async (
 ): Promise<void> => {
   if (sheetIds.length === 0) return;
 
-  const result = await db.query<{ id: string; manufacturer_name: string }>(
+  const result = await db.query<CreativeWorkflowSheetRow>(
     `
-    SELECT es.id, m.name AS manufacturer_name
+    SELECT es.id, m.name AS manufacturer_name, es.status, es.entry_status, es.creative_status
     FROM entry_sheets es
     JOIN manufacturers m ON m.id = es.manufacturer_id
     WHERE es.id = ANY($1)
@@ -176,6 +228,9 @@ const assertLinkableSheets = async (
   }
   if (result.rows.some((row) => row.manufacturer_name !== manufacturerName)) {
     throw new Error('SHEET_MANUFACTURER_MISMATCH');
+  }
+  if (result.rows.some((row) => !canModifyCreativeLinkage(row))) {
+    throw new Error('SHEET_WORKFLOW_LOCKED');
   }
 
   const linked = await db.query<{ sheet_id: string }>(
@@ -307,12 +362,14 @@ export const upsert = async (
     }
 
     const linkedSheetIds = [...new Set(normalizedCreative.linkedSheets.map((sheet) => sheet.id).filter(Boolean))];
-    await assertLinkableSheets(linkedSheetIds, normalizedCreative.manufacturerName, normalizedCreative.id);
     const existingLinkedRows = await db.query<{ sheet_id: string }>(
       `SELECT sheet_id FROM creative_entry_sheets WHERE creative_id = $1 FOR UPDATE`,
       [normalizedCreative.id]
     );
     const previousLinkedSheetIds = existingLinkedRows.rows.map((row) => row.sheet_id);
+    const touchedSheetIds = [...new Set([...previousLinkedSheetIds, ...linkedSheetIds])];
+    await assertWorkflowEditableSheets(touchedSheetIds);
+    await assertLinkableSheets(linkedSheetIds, normalizedCreative.manufacturerName, normalizedCreative.id);
 
     const existing = await db.queryOne<{ version: number }>(
       `SELECT version FROM creatives WHERE id = $1 FOR UPDATE`,
@@ -378,18 +435,12 @@ export const upsert = async (
       );
     }
 
-    const affectedSheetIds = [...new Set([...previousLinkedSheetIds, ...linkedSheetIds])];
+    const affectedSheetIds = touchedSheetIds;
     if (affectedSheetIds.length > 0) {
       await db.query(
         `
         UPDATE entry_sheets es
         SET
-          creative_status = CASE
-            WHEN EXISTS (
-              SELECT 1 FROM creative_entry_sheets ces WHERE ces.sheet_id = es.id
-            ) THEN 'in_progress'
-            ELSE 'none'
-          END,
           creative_name_snapshot = CASE
             WHEN EXISTS (
               SELECT 1 FROM creative_entry_sheets ces WHERE ces.sheet_id = es.id
@@ -425,19 +476,6 @@ export const upsert = async (
               LIMIT 1
             )
             ELSE NULL
-          END,
-          current_assignee = CASE
-            WHEN EXISTS (
-              SELECT 1 FROM creative_entry_sheets ces WHERE ces.sheet_id = es.id
-            ) THEN 'admin'
-            WHEN COALESCE(es.entry_status, es.status) = 'draft' THEN 'manufacturer_user'
-            ELSE 'admin'
-          END,
-          return_reason = CASE
-            WHEN EXISTS (
-              SELECT 1 FROM creative_entry_sheets ces WHERE ces.sheet_id = es.id
-            ) THEN NULL
-            ELSE es.return_reason
           END,
           updated_at = NOW()
         WHERE es.id = ANY($1)
@@ -494,9 +532,9 @@ export const relinkSheetToCreative = async (
       throw new Error('TARGET_CREATIVE_NOT_FOUND');
     }
 
-    const sheetRow = await db.queryOne<{ id: string; manufacturer_name: string }>(
+    const sheetRow = await db.queryOne<CreativeWorkflowSheetRow>(
       `
-      SELECT es.id, m.name AS manufacturer_name
+      SELECT es.id, m.name AS manufacturer_name, es.status, es.entry_status, es.creative_status
       FROM entry_sheets es
       JOIN manufacturers m ON m.id = es.manufacturer_id
       WHERE es.id = $1
@@ -509,6 +547,9 @@ export const relinkSheetToCreative = async (
     }
     if (sheetRow.manufacturer_name !== targetCreativeRow.manufacturer_name) {
       throw new Error('SHEET_MANUFACTURER_MISMATCH');
+    }
+    if (!canModifyCreativeLinkage(sheetRow)) {
+      throw new Error('SHEET_WORKFLOW_LOCKED');
     }
 
     const currentLink = await db.queryOne<{ creative_id: string }>(
@@ -550,12 +591,9 @@ export const relinkSheetToCreative = async (
       `
       UPDATE entry_sheets
       SET
-        creative_status = 'in_progress',
         creative_name_snapshot = $2,
         creative_image_url_snapshot = $3,
         creative_updated_at_snapshot = NOW(),
-        current_assignee = 'admin',
-        return_reason = NULL,
         updated_at = NOW()
       WHERE id = $1
       `,

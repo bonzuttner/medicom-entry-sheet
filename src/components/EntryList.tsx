@@ -68,6 +68,10 @@ export const EntryList: React.FC<EntryListProps> = ({
       normalizeManufacturerKey(currentUser.manufacturerName)
     );
   };
+  const canDeleteSheet = (sheet: EntrySheet): boolean =>
+    canModifySheet(sheet) &&
+    (sheet.entryStatus || sheet.status) === 'draft' &&
+    (sheet.creativeStatus || 'none') === 'none';
 
   const formatYearMonth = (year: number, month: number): string => `${year}/${month}`;
   const computeAutoEndMonth = (startMonth: number | undefined): number | undefined => {
@@ -702,9 +706,9 @@ export const EntryList: React.FC<EntryListProps> = ({
                                     onClick={() => {
                                         if(window.confirm('本当に削除しますか？')) onDelete(sheet.id);
                                     }}
-                                    disabled={!canModifySheet(sheet)}
-                                    className={`p-2 rounded-full border border-transparent shadow-sm ${canModifySheet(sheet) ? 'text-slate-400 hover:text-danger hover:bg-white hover:border-slate-200' : 'text-slate-300 cursor-not-allowed'}`}
-                                    title={canModifySheet(sheet) ? "削除" : "削除権限がありません"}
+                                    disabled={!canDeleteSheet(sheet)}
+                                    className={`p-2 rounded-full border border-transparent shadow-sm ${canDeleteSheet(sheet) ? 'text-slate-400 hover:text-danger hover:bg-white hover:border-slate-200' : 'text-slate-300 cursor-not-allowed'}`}
+                                    title={canDeleteSheet(sheet) ? "削除" : "下書きのみ削除できます"}
                                 >
                                     <Trash2 size={18} />
                                 </button>
@@ -865,9 +869,9 @@ export const EntryList: React.FC<EntryListProps> = ({
                                           onDelete(sheet.id);
                                       }
                                   }}
-                                  disabled={!canModifySheet(sheet)}
-                                  className={`p-2 rounded ${canModifySheet(sheet) ? 'text-slate-400 hover:text-danger hover:bg-red-50' : 'text-slate-300 cursor-not-allowed'}`}
-                                  title={canModifySheet(sheet) ? "削除" : "削除権限がありません"}
+                                  disabled={!canDeleteSheet(sheet)}
+                                  className={`p-2 rounded ${canDeleteSheet(sheet) ? 'text-slate-400 hover:text-danger hover:bg-red-50' : 'text-slate-300 cursor-not-allowed'}`}
+                                  title={canDeleteSheet(sheet) ? "削除" : "下書きのみ削除できます"}
                               >
                                   <Trash2 size={18} />
                               </button>

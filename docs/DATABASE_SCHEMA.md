@@ -50,6 +50,7 @@
   - `entry_status`: エントリーシート本体の進行状態
   - `creative_status`: クリエイティブ工程の進行状態（`none` / `in_progress` / `confirmation_pending` / `returned` / `approved`）
   - `current_assignee`: 現在担当（`admin` / `manufacturer_user` / `none`）
+  - `assignee_user_id`: 実担当者（`users.id`。`ON DELETE SET NULL`）
   - `return_reason`: 差し戻し理由
   - `created_at`, `updated_at`
 
@@ -269,6 +270,7 @@
 
 - DB制約:
   - `creator_id`: `NULL許容`, `FK`（ユーザー削除時は `NULL`）
+  - `assignee_user_id`: `NULL許容`, `FK`（ユーザー削除時は `NULL`）
   - `manufacturer_id`: `NOT NULL`, `FK`
   - `sheet_code`: `UNIQUE`, `VARCHAR(8)`
   - `title`: `NOT NULL`, `VARCHAR(500)`
@@ -286,7 +288,7 @@
   - Adminメモのみ変更時:
     - `entry_sheet_admin_memos` のみ更新する
     - `entry_sheet_revisions` は追加しない
-  - 通常項目またはワークフロー項目（`entryStatus` / `creativeStatus` / `currentAssignee` / `returnReason`）も変更された場合:
+  - 通常項目またはワークフロー項目（`entryStatus` / `creativeStatus` / `currentAssignee` / `assigneeUserId` / `returnReason`）も変更された場合:
     - 通常のシート保存として扱う
 
 ### 13.3 `manufacturer_products`

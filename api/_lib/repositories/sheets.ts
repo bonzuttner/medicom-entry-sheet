@@ -20,6 +20,8 @@ interface SheetRow {
   sheet_code: string | null;
   version: number;
   creator_id: string | null;
+  assignee_user_id: string | null;
+  assignee_username: string | null;
   creator_name: string;
   manufacturer_id: string;
   manufacturer_name: string;
@@ -413,6 +415,10 @@ const ensureWorkflowColumns = async (): Promise<void> => {
       await db.query(
         `ALTER TABLE entry_sheets
          ADD COLUMN IF NOT EXISTS return_reason TEXT`
+      );
+      await db.query(
+        `ALTER TABLE entry_sheets
+         ADD COLUMN IF NOT EXISTS assignee_user_id UUID REFERENCES users(id) ON DELETE SET NULL`
       );
       await db.query(
         `
@@ -823,6 +829,8 @@ const rowsToSheet = (
     entryStatus: (sheetRow.entry_status || sheetRow.status) as 'draft' | 'completed' | 'completed_no_image',
     creativeStatus: (sheetRow.creative_status || 'none') as 'none' | 'in_progress' | 'confirmation_pending' | 'returned' | 'approved',
     currentAssignee: (sheetRow.current_assignee || 'none') as 'admin' | 'manufacturer_user' | 'none',
+    assigneeUserId: sheetRow.assignee_user_id || undefined,
+    assigneeUsername: sheetRow.assignee_username || undefined,
     returnReason: sheetRow.return_reason || undefined,
     createdAt: toIsoString(sheetRow.created_at),
     updatedAt: toIsoString(sheetRow.updated_at),
@@ -1116,17 +1124,19 @@ export const findAll = async (limit?: number, offset: number = 0): Promise<Entry
   const sheetQuery = `
     SELECT
       s.id, s.sheet_code, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
-      s.entry_status, s.creative_status, s.current_assignee, s.return_reason,
+      s.entry_status, s.creative_status, s.current_assignee, s.assignee_user_id, s.return_reason,
       s.creative_name_snapshot, s.creative_image_url_snapshot, s.creative_updated_at_snapshot,
       s.shelf_name, s.case_name, s.deployment_start_month, s.deployment_end_month,
       s.face_label, s.face_max_width,
       s.created_at, s.updated_at,
+      assignee_u.username as assignee_username,
       COALESCE(s.creator_name_snapshot, u.display_name, '') as creator_name,
       COALESCE(s.creator_email_snapshot, u.email, '') as creator_email,
       COALESCE(s.creator_phone_snapshot, u.phone_number, '') as creator_phone,
       m.name as manufacturer_name
     FROM entry_sheets s
     LEFT JOIN users u ON s.creator_id = u.id
+    LEFT JOIN users assignee_u ON s.assignee_user_id = assignee_u.id
     JOIN manufacturers m ON s.manufacturer_id = m.id
     ORDER BY s.created_at DESC
     ${hasPaging ? 'LIMIT $1 OFFSET $2' : ''}
@@ -1220,17 +1230,19 @@ export const findByManufacturerId = async (
   const sheetQuery = `
     SELECT
       s.id, s.sheet_code, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
-      s.entry_status, s.creative_status, s.current_assignee, s.return_reason,
+      s.entry_status, s.creative_status, s.current_assignee, s.assignee_user_id, s.return_reason,
       s.creative_name_snapshot, s.creative_image_url_snapshot, s.creative_updated_at_snapshot,
       s.shelf_name, s.case_name, s.deployment_start_month, s.deployment_end_month,
       s.face_label, s.face_max_width,
       s.created_at, s.updated_at,
+      assignee_u.username as assignee_username,
       COALESCE(s.creator_name_snapshot, u.display_name, '') as creator_name,
       COALESCE(s.creator_email_snapshot, u.email, '') as creator_email,
       COALESCE(s.creator_phone_snapshot, u.phone_number, '') as creator_phone,
       m.name as manufacturer_name
     FROM entry_sheets s
     LEFT JOIN users u ON s.creator_id = u.id
+    LEFT JOIN users assignee_u ON s.assignee_user_id = assignee_u.id
     JOIN manufacturers m ON s.manufacturer_id = m.id
     WHERE s.manufacturer_id = $1
     ORDER BY s.created_at DESC
@@ -1336,17 +1348,19 @@ export const findById = async (sheetId: string): Promise<EntrySheet | null> => {
     `
     SELECT
       s.id, s.sheet_code, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
-      s.entry_status, s.creative_status, s.current_assignee, s.return_reason,
+      s.entry_status, s.creative_status, s.current_assignee, s.assignee_user_id, s.return_reason,
       s.creative_name_snapshot, s.creative_image_url_snapshot, s.creative_updated_at_snapshot,
       s.shelf_name, s.case_name, s.deployment_start_month, s.deployment_end_month,
       s.face_label, s.face_max_width,
       s.created_at, s.updated_at,
+      assignee_u.username as assignee_username,
       COALESCE(s.creator_name_snapshot, u.display_name, '') as creator_name,
       COALESCE(s.creator_email_snapshot, u.email, '') as creator_email,
       COALESCE(s.creator_phone_snapshot, u.phone_number, '') as creator_phone,
       m.name as manufacturer_name
     FROM entry_sheets s
     LEFT JOIN users u ON s.creator_id = u.id
+    LEFT JOIN users assignee_u ON s.assignee_user_id = assignee_u.id
     JOIN manufacturers m ON s.manufacturer_id = m.id
     WHERE s.id = $1
     `,
@@ -1496,6 +1510,8 @@ export const upsert = async (
           : sheet.status === 'draft'
             ? 'manufacturer_user'
             : 'admin',
+      assigneeUserId: String(sheet.assigneeUserId || '').trim() || undefined,
+      assigneeUsername: String(sheet.assigneeUsername || '').trim() || undefined,
       returnReason: String(sheet.returnReason || '').trim() || undefined,
       creative:
         sheet.creative?.name && sheet.creative?.imageUrl
@@ -1596,9 +1612,9 @@ export const upsert = async (
         creator_name_snapshot, creator_email_snapshot, creator_phone_snapshot,
         creative_name_snapshot, creative_image_url_snapshot, creative_updated_at_snapshot,
         title, case_name, notes, shelf_name, deployment_start_month, deployment_end_month,
-        face_label, face_max_width, status, entry_status, creative_status, current_assignee, return_reason,
+        face_label, face_max_width, status, entry_status, creative_status, current_assignee, assignee_user_id, return_reason,
         created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
       ON CONFLICT (id) DO UPDATE SET
         sheet_code = COALESCE(entry_sheets.sheet_code, EXCLUDED.sheet_code),
         version = EXCLUDED.version,
@@ -1620,6 +1636,7 @@ export const upsert = async (
         entry_status = EXCLUDED.entry_status,
         creative_status = EXCLUDED.creative_status,
         current_assignee = EXCLUDED.current_assignee,
+        assignee_user_id = EXCLUDED.assignee_user_id,
         return_reason = EXCLUDED.return_reason,
         updated_at = EXCLUDED.updated_at
       `,
@@ -1647,6 +1664,7 @@ export const upsert = async (
         normalizedSheet.entryStatus,
         normalizedSheet.creativeStatus,
         normalizedSheet.currentAssignee,
+        normalizedSheet.assigneeUserId || null,
         normalizedSheet.returnReason || null,
         normalizedSheet.createdAt,
         normalizedSheet.updatedAt,

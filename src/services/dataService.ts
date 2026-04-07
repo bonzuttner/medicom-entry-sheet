@@ -27,7 +27,7 @@ export interface DataService {
   ) => Promise<EntrySheet>;
   saveSheetWorkflow: (
     sheetId: string,
-    workflow: Pick<EntrySheet, 'version' | 'creativeStatus' | 'currentAssignee' | 'returnReason'>,
+    workflow: Pick<EntrySheet, 'version' | 'creativeStatus' | 'currentAssignee' | 'assigneeUserId' | 'returnReason'>,
     options?: { forceOverwrite?: boolean }
   ) => Promise<EntrySheet>;
   deleteSheet: (id: string) => Promise<void>;

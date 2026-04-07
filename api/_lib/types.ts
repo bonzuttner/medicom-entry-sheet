@@ -98,6 +98,8 @@ export interface EntrySheet {
   entryStatus?: EntryStatus;
   creativeStatus?: CreativeStatus;
   currentAssignee?: CurrentAssignee;
+  assigneeUserId?: string;
+  assigneeUsername?: string;
   returnReason?: string;
   adminMemo?: EntrySheetAdminMemo;
   creative?: CreativeSummary;

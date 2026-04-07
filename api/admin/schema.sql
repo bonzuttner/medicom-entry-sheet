@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS entry_sheets (
   entry_status VARCHAR(30) CHECK (entry_status IN ('draft', 'completed', 'completed_no_image')),
   creative_status VARCHAR(30) NOT NULL DEFAULT 'none' CHECK (creative_status IN ('none', 'in_progress', 'confirmation_pending', 'returned', 'approved')),
   current_assignee VARCHAR(30) DEFAULT 'none' CHECK (current_assignee IN ('admin', 'manufacturer_user', 'none')),
+  assignee_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
   return_reason TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -123,6 +124,9 @@ ALTER TABLE entry_sheets
   ADD COLUMN IF NOT EXISTS current_assignee VARCHAR(30) DEFAULT 'none';
 
 ALTER TABLE entry_sheets
+  ADD COLUMN IF NOT EXISTS assignee_user_id UUID REFERENCES users(id) ON DELETE SET NULL;
+
+ALTER TABLE entry_sheets
   ADD COLUMN IF NOT EXISTS return_reason TEXT;
 
 ALTER TABLE entry_sheets
@@ -178,6 +182,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_sheets_sheet_code
 CREATE INDEX IF NOT EXISTS idx_sheets_entry_status ON entry_sheets(entry_status);
 CREATE INDEX IF NOT EXISTS idx_sheets_creative_status ON entry_sheets(creative_status);
 CREATE INDEX IF NOT EXISTS idx_sheets_current_assignee ON entry_sheets(current_assignee);
+CREATE INDEX IF NOT EXISTS idx_sheets_assignee_user ON entry_sheets(assignee_user_id);
 
 CREATE TABLE IF NOT EXISTS sheet_code_sequences (
   manufacturer_code VARCHAR(3) PRIMARY KEY,

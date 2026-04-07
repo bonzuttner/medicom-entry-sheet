@@ -3,12 +3,13 @@ import { getMethod, methodNotAllowed, readJsonBody, sendError, sendJson } from '
 import { deleteUnusedManagedBlobUrls, normalizeSheetMedia } from '../_lib/media.js';
 import { EntrySheet, EntrySheetAdminMemo } from '../_lib/types.js';
 import * as SheetRepository from '../_lib/repositories/sheets.js';
+import * as UserRepository from '../_lib/repositories/users.js';
 
 interface PutSheetBody {
   sheet?: EntrySheet;
   mode?: 'admin_memo' | 'workflow';
   adminMemo?: EntrySheetAdminMemo;
-  workflow?: Pick<EntrySheet, 'version' | 'creativeStatus' | 'currentAssignee' | 'returnReason'>;
+  workflow?: Pick<EntrySheet, 'version' | 'creativeStatus' | 'currentAssignee' | 'assigneeUserId' | 'returnReason'>;
   forceOverwrite?: boolean;
   forceJanOverwrite?: boolean;
 }
@@ -49,6 +50,90 @@ const normalizeCurrentAssignee = (
   if (value === 'manufacturer_user') return 'manufacturer_user';
   return 'none';
 };
+
+const normalizeAssigneeUserId = (value: string | undefined): string | undefined => {
+  const normalized = String(value || '').trim();
+  return normalized || undefined;
+};
+
+const resolveWorkflowCurrentAssignee = (
+  entryStatus: EntrySheet['entryStatus'] | EntrySheet['status'] | undefined,
+  currentCreativeStatus: EntrySheet['creativeStatus'] | undefined,
+  nextCreativeStatus: EntrySheet['creativeStatus'] | undefined
+): 'admin' | 'manufacturer_user' | 'none' => {
+  const normalizedCurrentCreativeStatus = normalizeCreativeStatus(currentCreativeStatus);
+  const normalizedNextCreativeStatus = normalizeCreativeStatus(nextCreativeStatus);
+
+  if (normalizedNextCreativeStatus === 'approved') return 'none';
+  if (normalizedNextCreativeStatus === 'confirmation_pending') return 'manufacturer_user';
+  if (normalizedNextCreativeStatus === 'in_progress') return 'admin';
+  if (normalizedNextCreativeStatus === 'returned') {
+    return normalizedCurrentCreativeStatus === 'confirmation_pending' ? 'admin' : 'manufacturer_user';
+  }
+  return normalizeStatus(entryStatus) === 'draft' ? 'manufacturer_user' : 'admin';
+};
+
+const isAllowedWorkflowTransition = (
+  changedByRole: 'ADMIN' | 'STAFF',
+  entryStatus: EntrySheet['entryStatus'] | EntrySheet['status'] | undefined,
+  currentCreativeStatus: EntrySheet['creativeStatus'] | undefined,
+  nextCreativeStatus: EntrySheet['creativeStatus'] | undefined
+): boolean => {
+  const normalizedCurrentCreativeStatus = normalizeCreativeStatus(currentCreativeStatus);
+  const normalizedNextCreativeStatus = normalizeCreativeStatus(nextCreativeStatus);
+
+  if (normalizedCurrentCreativeStatus === normalizedNextCreativeStatus) {
+    return true;
+  }
+
+  if (changedByRole === 'ADMIN') {
+    if (normalizedCurrentCreativeStatus === 'none') {
+      return (
+        normalizeStatus(entryStatus) !== 'draft' &&
+        (normalizedNextCreativeStatus === 'in_progress' ||
+          normalizedNextCreativeStatus === 'returned')
+      );
+    }
+    if (normalizedCurrentCreativeStatus === 'in_progress') {
+      return (
+        normalizedNextCreativeStatus === 'confirmation_pending' ||
+        normalizedNextCreativeStatus === 'returned'
+      );
+    }
+    if (normalizedCurrentCreativeStatus === 'confirmation_pending') {
+      return normalizedNextCreativeStatus === 'in_progress';
+    }
+    if (normalizedCurrentCreativeStatus === 'returned') {
+      return normalizedNextCreativeStatus === 'in_progress';
+    }
+    if (normalizedCurrentCreativeStatus === 'approved') {
+      return normalizedNextCreativeStatus === 'in_progress';
+    }
+    return false;
+  }
+
+  return (
+    normalizedCurrentCreativeStatus === 'confirmation_pending' &&
+    (normalizedNextCreativeStatus === 'approved' || normalizedNextCreativeStatus === 'returned')
+  );
+};
+
+const isEligibleWorkflowAssignee = (
+  assignee: 'admin' | 'manufacturer_user' | 'none',
+  user: Awaited<ReturnType<typeof UserRepository.findById>> | null,
+  manufacturerName: string
+): boolean => {
+  if (!user) return false;
+  if (assignee === 'admin') return user.role === 'ADMIN';
+  if (assignee === 'manufacturer_user') return user.manufacturerName === manufacturerName;
+  return false;
+};
+
+const isDraftSheet = (
+  entryStatus: EntrySheet['entryStatus'] | EntrySheet['status'] | undefined,
+  creativeStatus: EntrySheet['creativeStatus'] | undefined
+): boolean =>
+  normalizeStatus(entryStatus) === 'draft' && normalizeCreativeStatus(creativeStatus) === 'none';
 
 const normalizeProducts = (
   incoming: EntrySheet['products'] | undefined,
@@ -321,6 +406,8 @@ const buildWorkflowSummary = (
   after: EntrySheet
 ): string => {
   const changes: string[] = [];
+  const beforeAssigneeName = before.assigneeUsername || 'なし';
+  const afterAssigneeName = after.assigneeUsername || 'なし';
   if ((before.creativeStatus || 'none') !== (after.creativeStatus || 'none')) {
     changes.push(
       `進行状態: ${getWorkflowStatusLabel(before)} → ${getWorkflowStatusLabel(after)}`
@@ -330,6 +417,9 @@ const buildWorkflowSummary = (
     changes.push(
       `担当: ${getAssigneeLabel(before.currentAssignee)} → ${getAssigneeLabel(after.currentAssignee)}`
     );
+  }
+  if ((before.assigneeUserId || '') !== (after.assigneeUserId || '')) {
+    changes.push(`担当者: ${beforeAssigneeName} → ${afterAssigneeName}`);
   }
   if ((before.returnReason || '') !== (after.returnReason || '')) {
     changes.push('差し戻し理由を更新');
@@ -451,29 +541,53 @@ export default async function handler(req: any, res: any) {
         return;
       }
 
+      const currentEntryStatus = normalizeStatus(existingSheet.entryStatus || existingSheet.status);
       const currentCreativeStatus = normalizeCreativeStatus(existingSheet.creativeStatus);
       const nextCreativeStatus = normalizeCreativeStatus(body.workflow?.creativeStatus);
-      const nextCurrentAssignee = normalizeCurrentAssignee(body.workflow?.currentAssignee);
+      const hasAssigneeUserIdInPayload =
+        body.workflow != null &&
+        Object.prototype.hasOwnProperty.call(body.workflow, 'assigneeUserId');
+      const requestedAssigneeUserId = hasAssigneeUserIdInPayload
+        ? normalizeAssigneeUserId(body.workflow?.assigneeUserId)
+        : existingSheet.assigneeUserId;
       const nextReturnReason =
         nextCreativeStatus === 'returned'
           ? String(body.workflow?.returnReason || '').trim()
           : undefined;
 
-      if (!isAdmin(currentUser)) {
-        const allowedWorkflowTransition =
-          nextCreativeStatus === currentCreativeStatus ||
-          (currentCreativeStatus === 'confirmation_pending' &&
-            (nextCreativeStatus === 'approved' || nextCreativeStatus === 'returned'));
-        if (!allowedWorkflowTransition) {
-          sendError(res, 403, 'You cannot modify this workflow status');
-          return;
-        }
+      if (!isAllowedWorkflowTransition(currentUser.role, currentEntryStatus, currentCreativeStatus, nextCreativeStatus)) {
+        sendError(res, 403, 'You cannot modify this workflow status');
+        return;
       }
 
       if (nextCreativeStatus === 'returned' && !nextReturnReason) {
         sendError(res, 400, '差し戻し理由を入力してください。');
         return;
       }
+
+      const nextCurrentAssignee =
+        nextCreativeStatus === currentCreativeStatus
+          ? normalizeCurrentAssignee(existingSheet.currentAssignee)
+          : resolveWorkflowCurrentAssignee(
+              currentEntryStatus,
+              currentCreativeStatus,
+              nextCreativeStatus
+            );
+      const canEditAssigneeUserId =
+        isAdmin(currentUser) || nextCurrentAssignee === 'manufacturer_user';
+      const candidateAssigneeUserId = canEditAssigneeUserId
+        ? requestedAssigneeUserId
+        : existingSheet.assigneeUserId;
+      const candidateAssigneeUser = candidateAssigneeUserId
+        ? await UserRepository.findById(candidateAssigneeUserId)
+        : null;
+      const nextAssigneeUserId = isEligibleWorkflowAssignee(
+        nextCurrentAssignee,
+        candidateAssigneeUser,
+        existingSheet.manufacturerName
+      )
+        ? candidateAssigneeUserId
+        : undefined;
 
       const workflowSheet: EntrySheet = {
         ...existingSheet,
@@ -483,6 +597,9 @@ export default async function handler(req: any, res: any) {
             : existingSheet.version,
         creativeStatus: nextCreativeStatus,
         currentAssignee: nextCurrentAssignee,
+        assigneeUserId: nextAssigneeUserId,
+        assigneeUsername:
+          nextAssigneeUserId && candidateAssigneeUser ? candidateAssigneeUser.username : undefined,
         returnReason: nextReturnReason,
         updatedAt: new Date().toISOString(),
       };
@@ -556,6 +673,8 @@ export default async function handler(req: any, res: any) {
       creatorName: String(sheet.creatorName || existingSheet?.creatorName || currentUser.displayName || '').trim(),
       email: String(sheet.email || existingSheet?.email || currentUser.email || '').trim(),
       phoneNumber: String(sheet.phoneNumber || existingSheet?.phoneNumber || currentUser.phoneNumber || '').trim(),
+      assigneeUserId: sheet.assigneeUserId || existingSheet?.assigneeUserId,
+      assigneeUsername: sheet.assigneeUsername || existingSheet?.assigneeUsername,
       title: String(sheet.title || '').trim(),
       caseName: String(sheet.caseName || existingSheet?.caseName || '').trim(),
       notes: sheet.notes ? String(sheet.notes).trim() : '',
@@ -726,6 +845,10 @@ export default async function handler(req: any, res: any) {
 
   if (!canAccessManufacturer(currentUser, target.manufacturerName)) {
     sendError(res, 403, 'You cannot delete this sheet');
+    return;
+  }
+  if (!isDraftSheet(target.entryStatus || target.status, target.creativeStatus)) {
+    sendError(res, 403, 'Only draft sheets can be deleted');
     return;
   }
 

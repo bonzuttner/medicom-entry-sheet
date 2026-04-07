@@ -9,6 +9,7 @@ interface EntryFormProps {
   initialData: EntrySheet;
   initialActiveTab?: number;
   masterData: MasterData;
+  users: User[];
   reusableProductTemplates: Record<string, ProductEntry>;
   revisions: EntrySheetRevision[];
   currentUser: User;
@@ -35,6 +36,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   initialData,
   initialActiveTab = 0,
   masterData,
+  users,
   reusableProductTemplates,
   revisions,
   currentUser,
@@ -357,10 +359,23 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const isEligibleAssignee = (
+    assigneeType: EntrySheet['currentAssignee'],
+    user: User | undefined
+  ): boolean => {
+    if (!user) return false;
+    if (assigneeType === 'admin') return user.role === UserRole.ADMIN;
+    if (assigneeType === 'manufacturer_user') {
+      return user.manufacturerName === formData.manufacturerName;
+    }
+    return false;
+  };
+
   const saveWorkflowChange = async (
     nextCreativeStatus: EntrySheet['creativeStatus'],
     nextCurrentAssignee?: EntrySheet['currentAssignee'],
-    nextReturnReason?: string
+    nextReturnReason?: string,
+    nextAssigneeUserId?: string
   ) => {
     if (isSaving) return;
 
@@ -375,11 +390,18 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       nextCreativeStatus === 'returned'
         ? String(nextReturnReason || '').trim()
         : undefined;
+    const candidateAssigneeUserId = nextAssigneeUserId ?? formData.assigneeUserId;
+    const candidateAssigneeUser = users.find((user) => user.id === candidateAssigneeUserId);
+    const resolvedAssigneeUserId =
+      resolvedAssignee === 'none' || !isEligibleAssignee(resolvedAssignee, candidateAssigneeUser)
+        ? undefined
+        : candidateAssigneeUserId;
     const workflowPayload: EntrySheet = {
       ...formData,
       updatedAt: new Date().toISOString(),
       creativeStatus: nextCreativeStatus,
       currentAssignee: resolvedAssignee,
+      assigneeUserId: resolvedAssigneeUserId,
       returnReason: normalizedReturnReason,
     };
 
@@ -422,7 +444,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     void saveWorkflowChange(
       'returned',
       resolveAssigneeFromWorkflow(formData.entryStatus || formData.status, 'returned', currentUser.role),
-      formData.returnReason
+      formData.returnReason,
+      formData.assigneeUserId
     );
   };
 
@@ -924,6 +947,11 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     const nextCurrentAssignee = shouldResetReturnedWorkflow
       ? resolveAssigneeFromWorkflow(finalStatus, nextCreativeStatus, currentUser.role)
       : formData.currentAssignee;
+    const nextAssigneeUser = users.find((user) => user.id === formData.assigneeUserId);
+    const nextAssigneeUserId =
+      nextCurrentAssignee === 'none' || !isEligibleAssignee(nextCurrentAssignee, nextAssigneeUser)
+        ? undefined
+        : formData.assigneeUserId;
     const nextReturnReason = shouldResetReturnedWorkflow ? undefined : formData.returnReason;
 
     setIsSaving(true);
@@ -934,6 +962,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         entryStatus: finalStatus,
         creativeStatus: nextCreativeStatus,
         currentAssignee: nextCurrentAssignee,
+        assigneeUserId: nextAssigneeUserId,
         returnReason: nextReturnReason,
       });
     } finally {
@@ -1028,9 +1057,24 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   }, 0);
   const isShelfWidthOver = selectedFaceMaxWidth ? shelfWidthTotal > selectedFaceMaxWidth : false;
   const workflowStatus = getWorkflowStatusView(formData);
-  const assigneeLabel = getCurrentAssigneeLabel(formData.currentAssignee);
   const currentCreativeStatus = formData.creativeStatus || 'none';
   const currentEntryStatus = formData.entryStatus || formData.status;
+  const resolvedCurrentAssignee =
+    formData.currentAssignee ||
+    resolveAssigneeFromWorkflow(
+      formData.entryStatus || formData.status,
+      formData.creativeStatus,
+      currentUser.role
+    );
+  const assigneeLabel = getCurrentAssigneeLabel(resolvedCurrentAssignee);
+  const assigneeCandidates = users.filter((user) =>
+    isEligibleAssignee(resolvedCurrentAssignee, user)
+  );
+  const selectedAssigneeUser = assigneeCandidates.find((user) => user.id === formData.assigneeUserId);
+  const canRelinkCreative =
+    isAdminUser &&
+    currentEntryStatus !== 'draft' &&
+    (currentCreativeStatus === 'none' || currentCreativeStatus === 'in_progress');
   const filteredCreativeOptions = creativeOptions.filter((creative) => {
     if (creative.manufacturerName !== formData.manufacturerName) return false;
     const query = normalizeSearchText(creativePickerQuery);
@@ -1055,6 +1099,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         updatedAt: result.sheet.updatedAt,
         creativeStatus: result.sheet.creativeStatus,
         currentAssignee: result.sheet.currentAssignee,
+        assigneeUserId: result.sheet.assigneeUserId,
+        assigneeUsername: result.sheet.assigneeUsername,
         returnReason: result.sheet.returnReason,
       }));
       setCreativePickerOpen(false);
@@ -1261,18 +1307,38 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             </span>
             <div className="flex items-center gap-1.5 text-xs">
               <span className="text-slate-500">担当:</span>
+              <span className="rounded bg-slate-100 px-2 py-1 font-medium text-slate-700">
+                {assigneeLabel}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className="text-slate-500">担当者:</span>
               <select
-                value={formData.currentAssignee || resolveAssigneeFromWorkflow(formData.entryStatus || formData.status, formData.creativeStatus, currentUser.role)}
+                value={selectedAssigneeUser?.id || ''}
                 onChange={(event) => {
-                  const nextAssignee = event.target.value as EntrySheet['currentAssignee'];
-                  setFormData((prev) => ({ ...prev, currentAssignee: nextAssignee }));
-                  void saveWorkflowChange(currentCreativeStatus, nextAssignee, currentCreativeStatus === 'returned' ? formData.returnReason : undefined);
+                  const nextAssigneeUserId = event.target.value || undefined;
+                  const nextAssigneeUser = assigneeCandidates.find((user) => user.id === nextAssigneeUserId);
+                  setFormData((prev) => ({
+                    ...prev,
+                    assigneeUserId: nextAssigneeUserId,
+                    assigneeUsername: nextAssigneeUser?.username,
+                  }));
+                  void saveWorkflowChange(
+                    currentCreativeStatus,
+                    resolvedCurrentAssignee,
+                    currentCreativeStatus === 'returned' ? formData.returnReason : undefined,
+                    nextAssigneeUserId
+                  );
                 }}
-                className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                disabled={isSaving || resolvedCurrentAssignee === 'none'}
+                className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:bg-slate-100 disabled:text-slate-400"
               >
-                <option value="admin">Admin</option>
-                <option value="manufacturer_user">メーカー</option>
-                <option value="none">なし</option>
+                <option value="">未割り当て</option>
+                {assigneeCandidates.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.username}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -2069,7 +2135,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                 <p className="text-sm text-slate-500">まだクリエイティブは紐づいていません。</p>
               )}
             </div>
-            {isAdminUser && onRelinkCreative && (
+            {canRelinkCreative && onRelinkCreative && (
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
@@ -2081,7 +2147,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
               </div>
             )}
           </div>
-          {isAdminUser && creativePickerOpen && onRelinkCreative && (
+          {canRelinkCreative && creativePickerOpen && onRelinkCreative && (
             <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>

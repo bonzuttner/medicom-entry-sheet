@@ -95,7 +95,8 @@ export default async function handler(req: any, res: any) {
         if (
           message === 'SHEET_NOT_FOUND' ||
           message === 'SHEET_MANUFACTURER_MISMATCH' ||
-          message === 'TARGET_CREATIVE_NOT_FOUND'
+          message === 'TARGET_CREATIVE_NOT_FOUND' ||
+          message === 'SHEET_WORKFLOW_LOCKED'
         ) {
           sendError(res, 400, message);
           return;
@@ -126,7 +127,11 @@ export default async function handler(req: any, res: any) {
         sendError(res, 409, 'SHEET_ALREADY_LINKED');
         return;
       }
-      if (message === 'SHEET_NOT_FOUND' || message === 'SHEET_MANUFACTURER_MISMATCH') {
+      if (
+        message === 'SHEET_NOT_FOUND' ||
+        message === 'SHEET_MANUFACTURER_MISMATCH' ||
+        message === 'SHEET_WORKFLOW_LOCKED'
+      ) {
         sendError(res, 400, message);
         return;
       }

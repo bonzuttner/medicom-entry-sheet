@@ -103,6 +103,8 @@
   - `version` を保持（競合制御）
   - `status`: `draft` / `completed` / `completed_no_image`
   - `entryStatus`, `creativeStatus`, `currentAssignee`, `returnReason` を保持（ワークフロー管理）
+  - `assigneeUserId` を保持（実担当者。`users.id` を参照）
+  - `assigneeUsername` を返却時に保持（表示用のログインID）
   - `adminMemo` を保持（編集は ADMIN のみ、`entry_sheet_admin_memos` に分離保存）
 - `Creative`: 画像1枚単位のクリエイティブ
   - `creatorId`, `creatorName`
@@ -267,6 +269,53 @@
 | 確認待ち | `creativeStatus=confirmation_pending` |
 | 差し戻し | `creativeStatus=returned` |
 | 承認済み | `creativeStatus=approved` |
+
+#### 6.3.3 役割と実担当者の扱い
+
+- `currentAssignee` は役割担当を表す
+  - `admin`: Admin側
+  - `manufacturer_user`: 一般ユーザー側
+  - `none`: 未割り当て
+- `assigneeUserId` は実担当者を表す
+  - `users.id` を保持する
+  - 画面表示は `assigneeUsername` を用いる
+- 実担当者候補は役割に応じて絞る
+  - `currentAssignee=admin`: Adminユーザーから選択
+  - `currentAssignee=manufacturer_user`: 対象メーカー所属ユーザーから選択
+  - `currentAssignee=none`: 実担当者は未設定
+- 実担当者は手動で未割り当てにできる
+- ユーザー削除時は `assigneeUserId` を `NULL` にし、未割り当てとして扱う
+- 変更履歴では、役割変更に加えて実担当者変更も記録する
+
+#### 6.3.4 ステータス遷移時の役割担当
+
+| 状態 | 役割担当 (`currentAssignee`) | 説明 |
+|---|---|---|
+| 下書き | `manufacturer_user` | メーカー側が入力中 |
+| エントリー完了 / エントリー完了（画像なし） | `admin` | メーカー側の提出完了後、Admin側へボールが渡る |
+| クリエイティブ作成中 | `admin` | Adminがクリエイティブを作成中 |
+| 確認待ち | `manufacturer_user` | Adminの制作完了後、一般ユーザー確認へ渡す |
+| 差し戻し | 遷移元に応じて決定 | Adminからメーカーへ返す差し戻し、または一般からAdminへ返す差し戻しの両方がある |
+| 承認済み | `none` | 完了状態 |
+
+差し戻し時の役割担当:
+
+- `エントリー完了 / エントリー完了（画像なし） -> 差し戻し`
+  - `currentAssignee=manufacturer_user`
+  - Adminがエントリー内容を確認し、メーカー側へ返す
+- `クリエイティブ作成中 -> 差し戻し`
+  - `currentAssignee=manufacturer_user`
+  - Adminが制作工程からメーカー側へ返す
+- `確認待ち -> 差し戻し`
+  - `currentAssignee=admin`
+  - 一般ユーザーが確認結果としてAdmin側へ返す
+
+#### 6.3.5 ステータス遷移時の実担当者
+
+- 役割担当が変わらない遷移では、実担当者を維持してよい
+- 役割担当が変わる遷移では、実担当者が新しい役割に属さない場合は未割り当てにする
+- `承認済み` 遷移時は、実担当者を未割り当てにする
+- 未割り当て化された後は、ユーザーが手動で再設定する
 
 ### 6.4 画像/添付
 

@@ -66,6 +66,7 @@ const parseErrorMessage = (status: number, raw: string): string => {
       'Failed to reload saved sheet':
         '保存は完了しましたが、最新データの再取得に失敗しました。画面を再読み込みして確認してください。',
       'You cannot delete this sheet': 'このエントリーシートを削除する権限がありません。',
+      'Only draft sheets can be deleted': '下書き状態のエントリーシートのみ削除できます。',
       'Only admin can access creatives': 'クリエイティブ機能を利用できるのは管理者のみです。',
       'Creative id is required': 'クリエイティブIDが不足しています。画面を再読み込みして再試行してください。',
       'creative is required': 'クリエイティブ情報が不足しています。入力内容を確認して再試行してください。',
@@ -79,6 +80,8 @@ const parseErrorMessage = (status: number, raw: string): string => {
       SHEET_NOT_FOUND: '紐づけ対象のエントリーシートが見つかりません。',
       SHEET_MANUFACTURER_MISMATCH:
         '選択したエントリーシートのメーカーが一致していません。同じメーカーのシートのみ選択してください。',
+      SHEET_WORKFLOW_LOCKED:
+        'この状態のエントリーシートは、シート詳細で制作フローを戻してからクリエイティブを変更してください。',
       CREATIVE_REQUIRED_FIELDS:
         'クリエイティブ名、画像、メーカーは必須です。',
       MANUFACTURER_NOT_FOUND: 'メーカー情報の解決に失敗しました。メーカー設定を確認してください。',
