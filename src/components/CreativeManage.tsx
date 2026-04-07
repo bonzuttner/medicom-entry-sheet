@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { ArrowUpDown, Edit, Image as ImageIcon, Plus, Search, Trash2, Upload, X } from 'lucide-react';
+import { ArrowUpDown, Copy, Edit, Image as ImageIcon, Plus, Search, Trash2, Upload, X } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { apiClient } from '../services/apiClient';
 import { Creative, CreativeLinkedSheet, EntrySheet, User } from '../types';
@@ -35,6 +35,19 @@ const getSummaryText = (values: string[]): string => {
 };
 
 const normalizeSearchText = (value: string): string => value.normalize('NFKC').trim().toLowerCase();
+
+const buildDuplicateCreativeDraft = (creative: Creative, currentUser: User): CreativeDraft => ({
+  ...creative,
+  id: uuidv4(),
+  version: 1,
+  creatorId: currentUser.id,
+  creatorName: currentUser.displayName,
+  name: `${creative.name} (コピー)`,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  linkedSheets: [],
+  selectedSheetIds: [],
+});
 
 const toDataUrl = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -169,6 +182,19 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
       ...creative,
       selectedSheetIds: creative.linkedSheets.map((sheet) => sheet.id),
     });
+    setSheetSearchTerm('');
+    setValidationError('');
+  };
+
+  const duplicateCreative = (creative: Creative) => {
+    setEditingCreative(buildDuplicateCreativeDraft(creative, currentUser));
+    setSheetSearchTerm('');
+    setValidationError('');
+  };
+
+  const duplicateEditingCreative = () => {
+    if (!editingCreative) return;
+    setEditingCreative(buildDuplicateCreativeDraft(editingCreative, currentUser));
     setSheetSearchTerm('');
     setValidationError('');
   };
@@ -507,6 +533,14 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
           <div className="mt-6 flex justify-end gap-3">
             <button
               type="button"
+              onClick={duplicateEditingCreative}
+              disabled={isSaving || isUploadingImage}
+              className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 font-semibold text-emerald-700 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              この内容で複製
+            </button>
+            <button
+              type="button"
               onClick={closeEditor}
               disabled={isSaving}
               className="rounded-lg border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700 shadow-sm"
@@ -643,6 +677,17 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    duplicateCreative(creative);
+                                  }}
+                                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                                >
+                                  <Copy size={14} />
+                                  複製
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
                                     if (window.confirm('本当に削除しますか？')) {
                                       void onDeleteCreative(creative.id);
                                     }
@@ -701,6 +746,14 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                         >
                           <Edit size={14} />
                           編集
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => duplicateCreative(creative)}
+                          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                        >
+                          <Copy size={14} />
+                          複製
                         </button>
                         <button
                           type="button"
