@@ -1340,6 +1340,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                           value={formData.shelfName || ''}
                           onChange={(e) => handleHeaderChange('shelfName', e.target.value)}
                       >
+                          <option value="">選択してください</option>
                           {getShelfOptions().map((opt) => <option key={opt} value={opt}>{opt}</option>)}
                       </select>
                     </div>
@@ -1416,7 +1417,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                                   deploymentEndMonth: Number(e.target.value) || undefined,
                                 }))
                               }
-                              className={`${getSelectClass().replace('bg-slate-100', 'bg-white')} min-w-[140px] w-auto text-center font-semibold`}
+                              className={`${getSelectClass()} min-w-[140px] w-auto text-center font-semibold`}
                             >
                               {[...Array(12)].map((_, idx) => (
                                 <option key={idx + 1} value={idx + 1}>
