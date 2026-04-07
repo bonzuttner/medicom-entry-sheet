@@ -1321,7 +1321,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                   setFormData((prev) => ({
                     ...prev,
                     assigneeUserId: nextAssigneeUserId,
-                    assigneeUsername: nextAssigneeUser?.username,
+                    assigneeUsername: nextAssigneeUser?.displayName || nextAssigneeUser?.username,
                   }));
                   void saveWorkflowChange(
                     currentCreativeStatus,
@@ -1336,7 +1336,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                 <option value="">未割り当て</option>
                 {assigneeCandidates.map((user) => (
                   <option key={user.id} value={user.id}>
-                    {user.username}
+                    {user.displayName || user.username}
                   </option>
                 ))}
               </select>

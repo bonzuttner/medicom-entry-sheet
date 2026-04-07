@@ -104,7 +104,7 @@
   - `status`: `draft` / `completed` / `completed_no_image`
   - `entryStatus`, `creativeStatus`, `currentAssignee`, `returnReason` を保持（ワークフロー管理）
   - `assigneeUserId` を保持（実担当者。`users.id` を参照）
-  - `assigneeUsername` を返却時に保持（表示用のログインID）
+  - `assigneeUsername` を返却時に保持（表示用の担当者名。内部的には `displayName` を優先し、未設定時は `username` を用いる）
   - `adminMemo` を保持（編集は ADMIN のみ、`entry_sheet_admin_memos` に分離保存）
 - `Creative`: 画像1枚単位のクリエイティブ
   - `creatorId`, `creatorName`
@@ -279,6 +279,7 @@
 - `assigneeUserId` は実担当者を表す
   - `users.id` を保持する
   - 画面表示は `assigneeUsername` を用いる
+  - `assigneeUsername` は表示用文字列であり、担当者名を優先して返す
 - 実担当者候補は役割に応じて絞る
   - `currentAssignee=admin`: Adminユーザーから選択
   - `currentAssignee=manufacturer_user`: 対象メーカー所属ユーザーから選択

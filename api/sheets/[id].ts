@@ -599,7 +599,9 @@ export default async function handler(req: any, res: any) {
         currentAssignee: nextCurrentAssignee,
         assigneeUserId: nextAssigneeUserId,
         assigneeUsername:
-          nextAssigneeUserId && candidateAssigneeUser ? candidateAssigneeUser.username : undefined,
+          nextAssigneeUserId && candidateAssigneeUser
+            ? candidateAssigneeUser.displayName || candidateAssigneeUser.username
+            : undefined,
         returnReason: nextReturnReason,
         updatedAt: new Date().toISOString(),
       };
