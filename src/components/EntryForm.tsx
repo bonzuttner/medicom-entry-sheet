@@ -1804,11 +1804,12 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                      <label className="block text-sm font-bold text-slate-700 mb-2">リスク分類 <span className="text-danger font-bold">*</span></label>
-                    <select 
+                    <select
                         className={getSelectClass(!hasText(activeProduct.riskClassification))}
-                        value={activeProduct.riskClassification}
+                        value={activeProduct.riskClassification || ''}
                         onChange={(e) => handleProductChange(activeTab, 'riskClassification', e.target.value)}
                     >
+                        <option value="">選択してください</option>
                         {masterData.riskClassifications.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                     </select>
                 </div>
@@ -1887,11 +1888,12 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                  <div>
                      <label className="block text-sm font-bold text-slate-700 mb-2">販促物の有無 <span className="text-danger font-bold">*</span></label>
-                    <select 
-                        className={getSelectClass()}
-                        value={activeProduct.hasPromoMaterial}
+                    <select
+                        className={getSelectClass(!hasText(activeProduct.hasPromoMaterial))}
+                        value={activeProduct.hasPromoMaterial || ''}
                         onChange={(e) => handleProductChange(activeTab, 'hasPromoMaterial', e.target.value)}
                     >
+                        <option value="">選択してください</option>
                         <option value="no">無し</option>
                         <option value="yes">有り</option>
                     </select>
