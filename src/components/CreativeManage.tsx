@@ -549,7 +549,17 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
             <>
               <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm md:block">
                 <div className="overflow-x-auto">
-                  <table className="min-w-[1320px] w-full">
+                  <table className="w-full table-fixed">
+                    <colgroup>
+                      <col className="w-28" />
+                      <col className="w-[18%]" />
+                      <col className="w-[19%]" />
+                      <col className="w-[13%]" />
+                      <col className="w-[13%]" />
+                      <col className="w-[13%]" />
+                      <col className="w-32" />
+                      <col className="w-28" />
+                    </colgroup>
                     <thead className="bg-slate-50 border-b border-slate-200">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">画像</th>
@@ -597,13 +607,18 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                               </div>
                             </td>
                             <td className="px-4 py-4 align-top">
-                              <div className="font-bold text-slate-800">{creative.name}</div>
+                              <div className="truncate font-bold text-slate-800" title={creative.name}>{creative.name}</div>
                               <div className="mt-1 text-xs text-slate-500">{creative.linkedSheets.length}件紐づき</div>
                             </td>
                             <td className="px-4 py-4 align-top">
                               {firstLinkedSheet ? (
-                                <div>
-                                  <div className="font-semibold text-slate-800">{firstLinkedSheet.title || '(タイトル未設定)'}</div>
+                                <div className="min-w-0">
+                                  <div
+                                    className="truncate font-semibold text-slate-800"
+                                    title={firstLinkedSheet.title || '(タイトル未設定)'}
+                                  >
+                                    {firstLinkedSheet.title || '(タイトル未設定)'}
+                                  </div>
                                   <div className="mt-0.5 text-xs text-slate-400">ID: {firstLinkedSheet.sheetCode || firstLinkedSheet.id.slice(0, 8)}</div>
                                 </div>
                               ) : (
@@ -611,33 +626,47 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                               )}
                             </td>
                             <td className="px-4 py-4 align-top text-sm text-slate-700">
-                              {getSummaryText(
-                                creative.linkedSheets.length > 0
-                                  ? creative.linkedSheets.map((sheet) => sheet.manufacturerName)
-                                  : [creative.manufacturerName]
-                              )}
+                              <div
+                                className="truncate"
+                                title={getSummaryText(
+                                  creative.linkedSheets.length > 0
+                                    ? creative.linkedSheets.map((sheet) => sheet.manufacturerName)
+                                    : [creative.manufacturerName]
+                                )}
+                              >
+                                {getSummaryText(
+                                  creative.linkedSheets.length > 0
+                                    ? creative.linkedSheets.map((sheet) => sheet.manufacturerName)
+                                    : [creative.manufacturerName]
+                                )}
+                              </div>
                             </td>
                             <td className="px-4 py-4 align-top text-sm text-slate-700">
-                              {getSummaryText(creative.linkedSheets.map((sheet) => sheet.shelfName))}
+                              <div className="truncate" title={getSummaryText(creative.linkedSheets.map((sheet) => sheet.shelfName))}>
+                                {getSummaryText(creative.linkedSheets.map((sheet) => sheet.shelfName))}
+                              </div>
                             </td>
                             <td className="px-4 py-4 align-top text-sm text-slate-700">
-                              {getSummaryText(creative.linkedSheets.map((sheet) => sheet.caseName))}
+                              <div className="truncate" title={getSummaryText(creative.linkedSheets.map((sheet) => sheet.caseName))}>
+                                {getSummaryText(creative.linkedSheets.map((sheet) => sheet.caseName))}
+                              </div>
                             </td>
                             <td className="px-4 py-4 align-top text-sm text-slate-700">
                               {new Date(creative.updatedAt).toLocaleDateString()}
                             </td>
                             <td className="px-4 py-4">
-                              <div className="flex justify-end gap-2">
+                              <div className="flex justify-end gap-1">
                                 <button
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     editCreative(creative);
                                   }}
-                                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-primary bg-blue-50 hover:bg-blue-100 transition-colors"
+                                  title="編集"
+                                  aria-label="編集"
+                                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-primary transition-colors hover:bg-blue-100"
                                 >
-                                  <Edit size={14} />
-                                  編集
+                                  <Edit size={16} />
                                 </button>
                                 <button
                                   type="button"
@@ -647,10 +676,11 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                                       void onDeleteCreative(creative.id);
                                     }
                                   }}
-                                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-danger bg-red-50 hover:bg-red-100 transition-colors"
+                                  title="削除"
+                                  aria-label="削除"
+                                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-danger transition-colors hover:bg-red-100"
                                 >
-                                  <Trash2 size={14} />
-                                  削除
+                                  <Trash2 size={16} />
                                 </button>
                               </div>
                             </td>
