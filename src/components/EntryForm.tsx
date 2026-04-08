@@ -1,9 +1,41 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Creative, EntrySheet, EntrySheetRevision, FaceOption, MasterData, ProductEntry, User, UserRole } from '../types';
-import { Save, Plus, Trash2, AlertTriangle, Image as ImageIcon, Search, ChevronRight } from 'lucide-react';
+import { Save, Plus, Trash2, AlertTriangle, Image as ImageIcon, Search, ChevronRight, FileText, PlusCircle, RefreshCw, Package, CheckCircle, RotateCcw, Edit3 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { dataService } from '../services/dataService';
 import { getCurrentAssigneeLabel, getWorkflowStatusView } from '../lib/sheetWorkflow';
+
+// Helper to determine revision icon based on summary text
+const getRevisionIcon = (summary: string): { icon: React.ReactNode; color: string } => {
+  const s = summary.toLowerCase();
+
+  // Status/workflow changes
+  if (s.includes('ステータス') || s.includes('状態') || s.includes('→')) {
+    return { icon: <RefreshCw size={14} />, color: 'text-amber-500 bg-amber-50' };
+  }
+  // Approval/confirmation
+  if (s.includes('承認') || s.includes('確定') || s.includes('完了')) {
+    return { icon: <CheckCircle size={14} />, color: 'text-emerald-500 bg-emerald-50' };
+  }
+  // Return/reject
+  if (s.includes('差戻') || s.includes('却下') || s.includes('返却')) {
+    return { icon: <RotateCcw size={14} />, color: 'text-rose-500 bg-rose-50' };
+  }
+  // Product changes
+  if (s.includes('商品') || s.includes('product')) {
+    return { icon: <Package size={14} />, color: 'text-violet-500 bg-violet-50' };
+  }
+  // New creation
+  if (s.includes('作成') || s.includes('新規') || s.includes('追加')) {
+    return { icon: <PlusCircle size={14} />, color: 'text-sky-500 bg-sky-50' };
+  }
+  // Edit/update
+  if (s.includes('編集') || s.includes('更新') || s.includes('変更')) {
+    return { icon: <Edit3 size={14} />, color: 'text-blue-500 bg-blue-50' };
+  }
+  // Default
+  return { icon: <FileText size={14} />, color: 'text-slate-400 bg-slate-100' };
+};
 
 interface EntryFormProps {
   initialData: EntrySheet;
@@ -1619,17 +1651,27 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             <p className="text-sm text-slate-500">履歴はまだありません。</p>
           ) : (
             <ul className="max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-100">
-              {revisions.map((revision) => (
-                <li key={revision.id} className="px-3 py-2.5 hover:bg-slate-50">
-                  <div className="flex items-center gap-2 mb-1 text-[11px] text-slate-500">
-                    <span>{new Date(revision.changedAt).toLocaleString('ja-JP')}</span>
-                    <span>{revision.changedByName || '不明ユーザー'}</span>
-                  </div>
-                  <div className="text-xs text-slate-700 whitespace-pre-wrap leading-5">
-                    {revision.summary}
-                  </div>
-                </li>
-              ))}
+              {revisions.map((revision) => {
+                const { icon, color } = getRevisionIcon(revision.summary);
+                return (
+                  <li key={revision.id} className="px-3 py-2.5 hover:bg-slate-50">
+                    <div className="flex items-start gap-2.5">
+                      <div className={`flex-shrink-0 mt-0.5 p-1.5 rounded-full ${color}`}>
+                        {icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 text-[11px] text-slate-500">
+                          <span>{new Date(revision.changedAt).toLocaleString('ja-JP')}</span>
+                          <span className="font-medium">{revision.changedByName || '不明ユーザー'}</span>
+                        </div>
+                        <div className="text-xs text-slate-700 whitespace-pre-wrap leading-5">
+                          {revision.summary}
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
