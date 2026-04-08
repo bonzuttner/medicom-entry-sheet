@@ -14,8 +14,47 @@ interface EntryListProps {
   hasMore?: boolean;
   onLoadMore?: () => void;
   isLoadingMore?: boolean;
+  isLoading?: boolean;
   totalCount?: number;
 }
+
+const SkeletonPulse: React.FC<{ className?: string }> = ({ className = '' }) => (
+  <div className={`animate-pulse bg-slate-200 rounded ${className}`} />
+);
+
+const SkeletonRow: React.FC = () => (
+  <tr className="border-b border-slate-100">
+    <td className="sticky left-0 z-30 w-12 px-4 py-4 bg-white"><SkeletonPulse className="w-5 h-5 mx-auto" /></td>
+    <td className="w-24 px-2 py-4"><SkeletonPulse className="w-16 h-4" /></td>
+    <td className="px-4 py-4"><SkeletonPulse className="w-16 h-5 rounded-full" /></td>
+    <td className="px-6 py-4"><SkeletonPulse className="w-48 h-5 mb-2" /><SkeletonPulse className="w-20 h-3" /></td>
+    <td className="px-4 py-4"><SkeletonPulse className="w-24 h-4" /></td>
+    <td className="px-4 py-4"><SkeletonPulse className="w-20 h-4" /></td>
+    <td className="px-4 py-4"><SkeletonPulse className="w-24 h-4 mb-1" /><SkeletonPulse className="w-16 h-3" /></td>
+    <td className="px-4 py-4"><SkeletonPulse className="w-16 h-4" /></td>
+    <td className="px-4 py-4"><div className="flex justify-end gap-2"><SkeletonPulse className="w-8 h-8 rounded" /><SkeletonPulse className="w-8 h-8 rounded" /><SkeletonPulse className="w-8 h-8 rounded" /></div></td>
+    <td className="px-2"><SkeletonPulse className="w-5 h-5" /></td>
+  </tr>
+);
+
+const SkeletonCard: React.FC = () => (
+  <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden p-4">
+    <div className="flex gap-3">
+      <SkeletonPulse className="w-6 h-6 mt-1" />
+      <div className="flex-1 space-y-2">
+        <div className="flex justify-between"><SkeletonPulse className="w-16 h-5 rounded-full" /><SkeletonPulse className="w-20 h-4" /></div>
+        <SkeletonPulse className="w-24 h-3" />
+        <SkeletonPulse className="w-3/4 h-5" />
+        <SkeletonPulse className="w-1/2 h-4" />
+        <SkeletonPulse className="w-2/3 h-4" />
+      </div>
+    </div>
+    <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between">
+      <div className="flex gap-2"><SkeletonPulse className="w-9 h-9 rounded-full" /><SkeletonPulse className="w-9 h-9 rounded-full" /><SkeletonPulse className="w-9 h-9 rounded-full" /></div>
+      <SkeletonPulse className="w-16 h-6" />
+    </div>
+  </div>
+);
 
 export const EntryList: React.FC<EntryListProps> = ({
   sheets,
@@ -27,6 +66,7 @@ export const EntryList: React.FC<EntryListProps> = ({
   hasMore = false,
   onLoadMore,
   isLoadingMore = false,
+  isLoading = false,
   totalCount = 0,
 }) => {
   const pageTitleClass = 'text-2xl font-bold tracking-tight text-slate-800';
@@ -652,7 +692,36 @@ export const EntryList: React.FC<EntryListProps> = ({
         </div>
       </div>
 
-      {filteredSheets.length === 0 ? (
+      {isLoading ? (
+        <>
+          {/* MOBILE SKELETON */}
+          <div className="md:hidden space-y-4">
+            {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
+          </div>
+          {/* DESKTOP SKELETON */}
+          <div className="hidden md:block bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <table className="min-w-full table-fixed border-separate border-spacing-0">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="sticky left-0 top-0 z-50 w-12 border-b border-slate-200 px-4 py-3 bg-slate-50"></th>
+                  <th className="sticky top-0 z-10 w-24 border-b border-slate-200 px-2 py-3 bg-slate-50"></th>
+                  <th className="sticky top-0 z-10 w-20 border-b border-slate-200 px-4 py-3 bg-slate-50"></th>
+                  <th className="sticky top-0 z-10 w-[440px] border-b border-slate-200 px-6 py-3 bg-slate-50"></th>
+                  <th className="sticky top-0 z-10 w-28 border-b border-slate-200 px-4 py-3 bg-slate-50"></th>
+                  <th className="sticky top-0 z-10 w-32 border-b border-slate-200 px-4 py-3 bg-slate-50"></th>
+                  <th className="sticky top-0 z-10 w-36 border-b border-slate-200 px-4 py-3 bg-slate-50"></th>
+                  <th className="sticky top-0 z-10 w-24 border-b border-slate-200 px-4 py-3 bg-slate-50"></th>
+                  <th className="sticky top-0 z-10 w-32 border-b border-slate-200 px-4 py-3 bg-slate-50"></th>
+                  <th className="sticky top-0 z-10 w-10 border-b border-slate-200 bg-slate-50"></th>
+                </tr>
+              </thead>
+              <tbody className="bg-white">
+                {[...Array(6)].map((_, i) => <SkeletonRow key={i} />)}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : filteredSheets.length === 0 ? (
           <div className="bg-white shadow-sm rounded-xl border border-slate-200 p-12 text-center text-slate-500">
             <div className="inline-flex items-center justify-center p-4 bg-slate-100 rounded-full mb-4">
                 <FileWarning size={32} className="text-slate-400" />

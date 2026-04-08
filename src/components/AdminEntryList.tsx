@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { EntrySheet, EntrySheetAdminMemo } from '../types';
-import { AlertTriangle, CheckSquare, CircleOff, Download, Edit3, ExternalLink, Save, Search, Square, Trash2, X } from 'lucide-react';
+import { AlertTriangle, CheckSquare, CircleOff, Download, Edit3, ExternalLink, Info, Save, SaveAll, Search, Square, Trash2, X } from 'lucide-react';
 import { getCurrentAssigneeLabel, getWorkflowStatusView } from '../lib/sheetWorkflow';
 
 interface AdminEntryListProps {
@@ -102,6 +102,14 @@ const getDeploymentPeriodLabel = (sheet: EntrySheet): string => {
 const getShelfNames = (sheet: EntrySheet): string => sheet.shelfName?.trim() || '未設定';
 
 const isHttpUrl = (value: string): boolean => /^https?:\/\/.+/i.test(value.trim());
+// Shared input class for consistent focus states
+const adminInputClass =
+  'w-full border border-slate-300 rounded-md px-2.5 py-2 text-sm bg-white text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all';
+const adminInputSmClass =
+  'w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm bg-white text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all';
+const adminInputXsClass =
+  'border border-slate-300 rounded px-1.5 py-1 text-xs bg-white text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all text-right';
+
 export const AdminEntryList: React.FC<AdminEntryListProps> = ({
   sheets,
   hasMore = false,
@@ -115,8 +123,10 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
   const pageTitleClass = 'text-2xl font-bold tracking-tight text-slate-800';
   const toolbarAccentButtonClass =
     'flex items-center justify-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 font-semibold text-sky-700 shadow-sm transition-all hover:bg-sky-100';
+  const toolbarPrimaryButtonClass =
+    'flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 font-bold text-white shadow-lg shadow-sky-200 transition-all hover:bg-sky-600 hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:translate-y-0';
   const searchInputClass =
-    'w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary';
+    'w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30';
   const filterControlClass =
     'rounded-md border border-slate-300 bg-white px-2 py-2 text-xs text-slate-700';
   const getLegacyShortSheetId = (id: string): string => id.slice(0, 8);
@@ -251,11 +261,32 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
     return Math.floor(parsed);
   };
 
-  const isDraftDirty = (sheet: EntrySheet): boolean => {
+  const isDraftDirty = useCallback((sheet: EntrySheet): boolean => {
     const current = drafts[sheet.id] || buildDraftFromSheet(sheet);
     const initial = buildDraftFromSheet(sheet);
     return JSON.stringify(current) !== JSON.stringify(initial);
-  };
+  }, [drafts]);
+
+  const dirtySheetIds = useMemo(
+    () => sheets.filter((sheet) => isDraftDirty(sheet)).map((sheet) => sheet.id),
+    [sheets, isDraftDirty]
+  );
+
+  const hasDirtyDrafts = dirtySheetIds.length > 0;
+  const [isBulkSaving, setIsBulkSaving] = useState(false);
+
+  // Warn on page leave if there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasDirtyDrafts) {
+        e.preventDefault();
+        e.returnValue = '保存されていない変更があります。ページを離れますか？';
+        return e.returnValue;
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasDirtyDrafts]);
 
   const handleSave = async (sheetId: string) => {
     const targetSheet = sheets.find((sheet) => sheet.id === sheetId);
@@ -299,6 +330,16 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
       }));
     } finally {
       setSavingById((prev) => ({ ...prev, [sheetId]: false }));
+    }
+  };
+
+  const handleBulkSave = async () => {
+    if (isBulkSaving || dirtySheetIds.length === 0) return;
+    setIsBulkSaving(true);
+    try {
+      await Promise.all(dirtySheetIds.map((sheetId) => handleSave(sheetId)));
+    } finally {
+      setIsBulkSaving(false);
     }
   };
 
@@ -411,14 +452,30 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
           <h2 className={pageTitleClass}>エントリー履歴（Admin）</h2>
+          {hasDirtyDrafts && (
+            <p className="mt-1 text-sm text-amber-600 flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              {dirtySheetIds.length}件の未保存の変更があります
+            </p>
+          )}
         </div>
-        <button
-          onClick={() => setShowExportModal(true)}
-          className={toolbarAccentButtonClass}
-        >
-          <Download size={18} />
-          Admin CSV出力
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowExportModal(true)}
+            className={toolbarAccentButtonClass}
+          >
+            <Download size={18} />
+            CSV出力
+          </button>
+          <button
+            onClick={() => { void handleBulkSave(); }}
+            disabled={!hasDirtyDrafts || isBulkSaving}
+            className={toolbarPrimaryButtonClass}
+          >
+            <SaveAll size={18} />
+            {isBulkSaving ? '保存中...' : `一括保存${hasDirtyDrafts ? ` (${dirtySheetIds.length})` : ''}`}
+          </button>
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -473,7 +530,210 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      {/* MOBILE VIEW: Cards */}
+      <div className="md:hidden space-y-3">
+        {filteredSheets.map((sheet) => {
+          const draft = drafts[sheet.id] || buildDraftFromSheet(sheet);
+          const urlEnabled = isHttpUrl(draft.deadlineTableUrl);
+          const dirty = isDraftDirty(sheet);
+          const workflowStatus = getWorkflowStatusView(sheet);
+          const isSelected = selectedSheets.has(sheet.id);
+          return (
+            <div
+              key={sheet.id}
+              className={`bg-white rounded-xl border shadow-sm overflow-hidden ${
+                dirty ? 'border-amber-300 bg-amber-50/30' : isSelected ? 'border-primary ring-1 ring-primary' : 'border-slate-200'
+              }`}
+            >
+              {/* Card Header */}
+              <div className="p-4 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => toggleSelect(sheet.id)}
+                  className="pt-1 text-slate-400 hover:text-slate-600"
+                >
+                  {isSelected ? <CheckSquare size={20} className="text-primary" /> : <Square size={20} />}
+                </button>
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-start mb-1">
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${workflowStatus.pillClassName}`}>
+                      {workflowStatus.label}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      {dirty && (
+                        <span className="text-xs font-bold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">
+                          未保存
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-mono mb-1">ID: {getDisplaySheetId(sheet)}</div>
+                  <h3 className="text-base font-bold text-slate-900 leading-tight mb-1 line-clamp-2">{sheet.title}</h3>
+                  <div className="text-xs text-slate-500">{sheet.manufacturerName}</div>
+                  <div className="text-xs text-slate-600 mt-1">展開期間: {getDeploymentPeriodLabel(sheet)}</div>
+                  <div className="text-xs text-slate-600 mt-0.5">棚割り: {getShelfNames(sheet)}</div>
+                </div>
+              </div>
+
+              {/* Mobile Admin Fields */}
+              <div className="border-t border-slate-100 bg-slate-50/50 p-4 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">販促CD</label>
+                    <input
+                      type="text"
+                      value={draft.promoCode}
+                      onChange={(e) => setDraftValue(sheet.id, 'promoCode', e.target.value)}
+                      className={adminInputClass}
+                      placeholder="X000000"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">ボードピッキングJAN</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={draft.boardPickingJan}
+                      onChange={(e) => setDraftValue(sheet.id, 'boardPickingJan', e.target.value)}
+                      className={adminInputClass}
+                      placeholder="9999999999999"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">帯パターン</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={draft.bandPattern}
+                        onChange={(e) => setDraftValue(sheet.id, 'bandPattern', e.target.value)}
+                        className={adminInputClass}
+                      />
+                      <span className="text-sm text-slate-500">種</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">対象店舗数</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={draft.targetStoreCount}
+                        onChange={(e) => setDraftValue(sheet.id, 'targetStoreCount', e.target.value)}
+                        className={adminInputClass}
+                      />
+                      <span className="text-sm text-slate-500">店舗</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">印刷 ボード① / ②</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={draft.printBoard1Count}
+                        onChange={(e) => setDraftValue(sheet.id, 'printBoard1Count', e.target.value)}
+                        className={adminInputClass}
+                        placeholder="①"
+                      />
+                      <span className="text-slate-400">/</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={draft.printBoard2Count}
+                        onChange={(e) => setDraftValue(sheet.id, 'printBoard2Count', e.target.value)}
+                        className={adminInputClass}
+                        placeholder="②"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">印刷 帯① / ②</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={draft.printBand1Count}
+                        onChange={(e) => setDraftValue(sheet.id, 'printBand1Count', e.target.value)}
+                        className={adminInputClass}
+                        placeholder="①"
+                      />
+                      <span className="text-slate-400">/</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={draft.printBand2Count}
+                        onChange={(e) => setDraftValue(sheet.id, 'printBand2Count', e.target.value)}
+                        className={adminInputClass}
+                        placeholder="②"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card Actions Footer */}
+              <div className="bg-slate-50 border-t border-slate-100 px-4 py-3 flex items-center justify-between">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onEdit(sheet)}
+                    className="p-2 rounded-full text-primary hover:bg-sky-50"
+                    title="詳細編集"
+                  >
+                    <Edit3 size={18} />
+                  </button>
+                  {urlEnabled && (
+                    <a
+                      href={draft.deadlineTableUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 rounded-full text-slate-500 hover:bg-slate-100"
+                      title="期限表を開く"
+                    >
+                      <ExternalLink size={18} />
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget(sheet)}
+                    className="p-2 rounded-full text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                    title="削除"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+                <button
+                  onClick={() => { void handleSave(sheet.id); }}
+                  disabled={Boolean(savingById[sheet.id]) || !dirty}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                    dirty
+                      ? 'bg-primary text-white hover:bg-sky-700 shadow-sm'
+                      : 'bg-slate-200 text-slate-500'
+                  }`}
+                >
+                  <Save size={14} />
+                  {savingById[sheet.id] ? '保存中' : '保存'}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* DESKTOP VIEW: Table */}
+      <div className="hidden md:block bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div className="overflow-auto max-h-[calc(100vh-260px)]">
         <table className="min-w-[1480px] w-full table-fixed border-separate border-spacing-0">
           <thead className="bg-slate-50">
@@ -566,22 +826,33 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                     <td className="px-2 py-3 text-xs text-slate-700 whitespace-nowrap">{sheet.manufacturerName}</td>
                     <td className="px-3 py-3 text-center">
                       {urlEnabled ? (
-                        <a
-                          href={draft.deadlineTableUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center justify-center h-7 w-7 rounded-full text-primary hover:bg-sky-50 hover:text-sky-700"
-                          title="期限表を開く"
-                        >
-                          <ExternalLink size={15} />
-                        </a>
+                        <div className="group relative inline-flex">
+                          <a
+                            href={draft.deadlineTableUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center h-8 w-8 rounded-full text-primary hover:bg-sky-50 hover:text-sky-700 transition-colors"
+                          >
+                            <ExternalLink size={16} />
+                          </a>
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 bg-slate-800 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-lg">
+                            <span className="flex items-center gap-1.5">
+                              <Info size={12} />
+                              期限表を開く
+                            </span>
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-800" />
+                          </div>
+                        </div>
                       ) : (
-                        <span
-                          className="inline-flex items-center justify-center h-7 w-7 rounded-full text-slate-300 bg-slate-100"
-                          title="未設定"
-                        >
-                          <CircleOff size={15} />
-                        </span>
+                        <div className="group relative inline-flex">
+                          <span className="inline-flex items-center justify-center h-8 w-8 rounded-full text-slate-300 bg-slate-100">
+                            <CircleOff size={16} />
+                          </span>
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 bg-slate-700 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-lg">
+                            期限表URL未設定
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-700" />
+                          </div>
+                        </div>
                       )}
                     </td>
                     <td className="px-3 py-3">
@@ -589,7 +860,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                         type="text"
                         value={draft.promoCode}
                         onChange={(e) => setDraftValue(sheet.id, 'promoCode', e.target.value)}
-                        className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs bg-white text-slate-700 focus:border-slate-400 focus:ring-1 focus:ring-slate-200 transition-colors"
+                        className={adminInputSmClass}
                         placeholder="X000000"
                       />
                     </td>
@@ -600,41 +871,41 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                         pattern="[0-9]*"
                         value={draft.boardPickingJan}
                         onChange={(e) => setDraftValue(sheet.id, 'boardPickingJan', e.target.value)}
-                        className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs bg-white text-slate-700 focus:border-slate-400 focus:ring-1 focus:ring-slate-200 transition-colors"
+                        className={adminInputSmClass}
                         placeholder="9999999999999"
                       />
                     </td>
                     <td className="px-3 py-3">
-                      <label className="inline-flex items-center gap-1.5 text-xs text-slate-700">
+                      <label className="inline-flex items-center gap-1.5 text-sm text-slate-700">
                         <input
                           type="text"
                           inputMode="numeric"
                           pattern="[0-9]*"
                           value={draft.bandPattern}
                           onChange={(e) => setDraftValue(sheet.id, 'bandPattern', e.target.value)}
-                          className="w-14 border border-slate-300 rounded-md px-1.5 py-1 text-xs bg-white text-right text-slate-700 focus:border-slate-400 focus:ring-1 focus:ring-slate-200 transition-colors"
+                          className={`w-16 ${adminInputXsClass}`}
                         />
                         <span className="text-slate-500">種</span>
                       </label>
                     </td>
                     <td className="px-3 py-3">
-                      <label className="inline-flex items-center gap-1.5 text-xs text-slate-700">
+                      <label className="inline-flex items-center gap-1.5 text-sm text-slate-700">
                         <input
                           type="text"
                           inputMode="numeric"
                           pattern="[0-9]*"
                           value={draft.targetStoreCount}
                           onChange={(e) => setDraftValue(sheet.id, 'targetStoreCount', e.target.value)}
-                          className="w-14 border border-slate-300 rounded-md px-1.5 py-1 text-xs bg-white text-right text-slate-700 focus:border-slate-400 focus:ring-1 focus:ring-slate-200 transition-colors"
+                          className={`w-16 ${adminInputXsClass}`}
                         />
                         <span className="text-slate-500">店舗</span>
                       </label>
                     </td>
                     <td className="px-3 py-3 hidden md:table-cell">
-                      <div className="rounded-lg bg-white p-2 shadow-[inset_0_1px_0_0_rgba(148,163,184,0.06)]">
-                        <div className="grid grid-cols-2 gap-1.5">
-                          <label className="flex items-center justify-between gap-1 rounded-md bg-white px-1.5 py-1">
-                            <span className="text-[10px] text-slate-500">ボード①</span>
+                      <div className="rounded-lg bg-slate-50 p-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className="flex items-center justify-between gap-1.5 rounded-md bg-white px-2 py-1.5 border border-slate-100">
+                            <span className="text-xs text-slate-500 font-medium">ボード①</span>
                             <span className="flex items-center gap-1">
                               <input
                                 type="text"
@@ -642,13 +913,13 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                                 pattern="[0-9]*"
                                 value={draft.printBoard1Count}
                                 onChange={(e) => setDraftValue(sheet.id, 'printBoard1Count', e.target.value)}
-                                className="w-12 border border-slate-300 rounded px-1 py-0.5 text-[11px] bg-white text-right text-slate-700 focus:border-slate-400 focus:ring-1 focus:ring-slate-200 transition-colors"
+                                className={`w-14 ${adminInputXsClass}`}
                               />
-                              <span className="text-[10px] text-slate-400">枚</span>
+                              <span className="text-xs text-slate-400">枚</span>
                             </span>
                           </label>
-                          <label className="flex items-center justify-between gap-1 rounded-md bg-white px-1.5 py-1">
-                            <span className="text-[10px] text-slate-500">ボード②</span>
+                          <label className="flex items-center justify-between gap-1.5 rounded-md bg-white px-2 py-1.5 border border-slate-100">
+                            <span className="text-xs text-slate-500 font-medium">ボード②</span>
                             <span className="flex items-center gap-1">
                               <input
                                 type="text"
@@ -656,13 +927,13 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                                 pattern="[0-9]*"
                                 value={draft.printBoard2Count}
                                 onChange={(e) => setDraftValue(sheet.id, 'printBoard2Count', e.target.value)}
-                                className="w-12 border border-slate-300 rounded px-1 py-0.5 text-[11px] bg-white text-right text-slate-700 focus:border-slate-400 focus:ring-1 focus:ring-slate-200 transition-colors"
+                                className={`w-14 ${adminInputXsClass}`}
                               />
-                              <span className="text-[10px] text-slate-400">枚</span>
+                              <span className="text-xs text-slate-400">枚</span>
                             </span>
                           </label>
-                          <label className="flex items-center justify-between gap-1 rounded-md bg-white px-1.5 py-1">
-                            <span className="text-[10px] text-slate-500">帯①</span>
+                          <label className="flex items-center justify-between gap-1.5 rounded-md bg-white px-2 py-1.5 border border-slate-100">
+                            <span className="text-xs text-slate-500 font-medium">帯①</span>
                             <span className="flex items-center gap-1">
                               <input
                                 type="text"
@@ -670,13 +941,13 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                                 pattern="[0-9]*"
                                 value={draft.printBand1Count}
                                 onChange={(e) => setDraftValue(sheet.id, 'printBand1Count', e.target.value)}
-                                className="w-12 border border-slate-300 rounded px-1 py-0.5 text-[11px] bg-white text-right text-slate-700 focus:border-slate-400 focus:ring-1 focus:ring-slate-200 transition-colors"
+                                className={`w-14 ${adminInputXsClass}`}
                               />
-                              <span className="text-[10px] text-slate-400">枚</span>
+                              <span className="text-xs text-slate-400">枚</span>
                             </span>
                           </label>
-                          <label className="flex items-center justify-between gap-1 rounded-md bg-white px-1.5 py-1">
-                            <span className="text-[10px] text-slate-500">帯②</span>
+                          <label className="flex items-center justify-between gap-1.5 rounded-md bg-white px-2 py-1.5 border border-slate-100">
+                            <span className="text-xs text-slate-500 font-medium">帯②</span>
                             <span className="flex items-center gap-1">
                               <input
                                 type="text"
@@ -684,9 +955,9 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                                 pattern="[0-9]*"
                                 value={draft.printBand2Count}
                                 onChange={(e) => setDraftValue(sheet.id, 'printBand2Count', e.target.value)}
-                                className="w-12 border border-slate-300 rounded px-1 py-0.5 text-[11px] bg-white text-right text-slate-700 focus:border-slate-400 focus:ring-1 focus:ring-slate-200 transition-colors"
+                                className={`w-14 ${adminInputXsClass}`}
                               />
-                              <span className="text-[10px] text-slate-400">枚</span>
+                              <span className="text-xs text-slate-400">枚</span>
                             </span>
                           </label>
                         </div>
