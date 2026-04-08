@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown, Edit, Image as ImageIcon, Plus, Search, Trash2, Upload, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Copy, Edit, Image as ImageIcon, Plus, Search, Trash2, Upload, X } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { apiClient } from '../services/apiClient';
 import { Creative, CreativeLinkedSheet, EntrySheet, User } from '../types';
@@ -38,6 +38,19 @@ const normalizeSearchText = (value: string): string => value.normalize('NFKC').t
 const canModifyCreativeLinkage = (sheet: EntrySheet): boolean =>
   (sheet.entryStatus || sheet.status) !== 'draft' &&
   ((sheet.creativeStatus || 'none') === 'none' || (sheet.creativeStatus || 'none') === 'in_progress');
+
+const buildDuplicateCreativeDraft = (creative: Creative | CreativeDraft, currentUser: User): CreativeDraft => ({
+  ...creative,
+  id: uuidv4(),
+  version: 1,
+  creatorId: currentUser.id,
+  creatorName: currentUser.displayName,
+  name: `${creative.name} (コピー)`,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  linkedSheets: [],
+  selectedSheetIds: [],
+});
 
 const toDataUrl = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -209,6 +222,14 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
       ...creative,
       selectedSheetIds: creative.linkedSheets.map((sheet) => sheet.id),
     };
+    setEditingCreative(draft);
+    setOriginalCreative(draft);
+    setSheetSearchTerm('');
+    setValidationError('');
+  };
+
+  const duplicateCreative = (creative: Creative) => {
+    const draft = buildDuplicateCreativeDraft(creative, currentUser);
     setEditingCreative(draft);
     setOriginalCreative(draft);
     setSheetSearchTerm('');
@@ -889,6 +910,18 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    duplicateCreative(creative);
+                                  }}
+                                  title="複製"
+                                  aria-label="複製"
+                                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 transition-colors hover:bg-emerald-100"
+                                >
+                                  <Copy size={16} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
                                     setDeleteTarget(creative);
                                   }}
                                   title="削除"
@@ -946,6 +979,14 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                         >
                           <Edit size={14} />
                           編集
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => duplicateCreative(creative)}
+                          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                        >
+                          <Copy size={14} />
+                          複製
                         </button>
                         <button
                           type="button"

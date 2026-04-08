@@ -129,12 +129,6 @@ const isEligibleWorkflowAssignee = (
   return false;
 };
 
-const isDraftSheet = (
-  entryStatus: EntrySheet['entryStatus'] | EntrySheet['status'] | undefined,
-  creativeStatus: EntrySheet['creativeStatus'] | undefined
-): boolean =>
-  normalizeStatus(entryStatus) === 'draft' && normalizeCreativeStatus(creativeStatus) === 'none';
-
 const normalizeProducts = (
   incoming: EntrySheet['products'] | undefined,
   fallbackManufacturerName: string
@@ -849,11 +843,6 @@ export default async function handler(req: any, res: any) {
     sendError(res, 403, 'You cannot delete this sheet');
     return;
   }
-  if (!isDraftSheet(target.entryStatus || target.status, target.creativeStatus)) {
-    sendError(res, 403, 'Only draft sheets can be deleted');
-    return;
-  }
-
   // Delete from database
   await SheetRepository.deleteById(sheetId);
 

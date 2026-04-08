@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { EntrySheet, EntrySheetAdminMemo } from '../types';
-import { CheckSquare, CircleOff, Download, Edit3, ExternalLink, Save, Search, Square, X } from 'lucide-react';
+import { AlertTriangle, CheckSquare, CircleOff, Download, Edit3, ExternalLink, Save, Search, Square, Trash2, X } from 'lucide-react';
 import { getCurrentAssigneeLabel, getWorkflowStatusView } from '../lib/sheetWorkflow';
 
 interface AdminEntryListProps {
@@ -10,6 +10,7 @@ interface AdminEntryListProps {
   isLoadingMore?: boolean;
   totalCount?: number;
   onEdit: (sheet: EntrySheet) => void;
+  onDelete: (id: string) => Promise<void> | void;
   onSaveAdminMemo: (sheetId: string, memo: EntrySheetAdminMemo) => Promise<EntrySheet>;
 }
 
@@ -108,6 +109,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
   isLoadingMore = false,
   totalCount = 0,
   onEdit,
+  onDelete,
   onSaveAdminMemo,
 }) => {
   const pageTitleClass = 'text-2xl font-bold tracking-tight text-slate-800';
@@ -128,6 +130,8 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
   const [savingById, setSavingById] = useState<Record<string, boolean>>({});
   const [selectedSheets, setSelectedSheets] = useState<Set<string>>(new Set());
   const [showExportModal, setShowExportModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<EntrySheet | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     setDrafts((prev) => {
@@ -295,6 +299,24 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
       }));
     } finally {
       setSavingById((prev) => ({ ...prev, [sheetId]: false }));
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await onDelete(deleteTarget.id);
+      setSelectedSheets((prev) => {
+        const next = new Set(prev);
+        next.delete(deleteTarget.id);
+        return next;
+      });
+      setDeleteTarget(null);
+    } catch {
+      // App layer already surfaces the error.
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -510,6 +532,14 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                           title="詳細編集"
                         >
                           <Edit3 size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget(sheet)}
+                          className="inline-flex items-center justify-center rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                          title="削除"
+                        >
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     </td>
@@ -743,6 +773,73 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                   <div className="text-sm text-slate-500">{selectedCount}件 選択中</div>
                 </div>
                 <Download size={18} className={selectedCount === 0 ? 'text-slate-300' : 'text-slate-500'} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+            <div className="flex justify-between items-start gap-4 mb-4">
+              <div className="flex items-start gap-3">
+                <div className="rounded-full bg-rose-100 p-2 text-rose-600">
+                  <AlertTriangle size={18} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-slate-800">エントリーシートを削除しますか？</h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    この操作は取り消せません。関連する履歴、添付、クリエイティブ紐づけも削除されます。
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={isDeleting}
+                className="text-slate-400 hover:text-slate-600 disabled:cursor-not-allowed"
+              >
+                <X size={22} />
+              </button>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <dl className="space-y-2 text-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <dt className="text-slate-500">ID</dt>
+                  <dd className="text-right font-mono text-slate-700">{getDisplaySheetId(deleteTarget)}</dd>
+                </div>
+                <div className="flex items-start justify-between gap-4">
+                  <dt className="text-slate-500">状態</dt>
+                  <dd className="text-right text-slate-700">{getWorkflowStatusView(deleteTarget).label}</dd>
+                </div>
+                <div className="flex items-start justify-between gap-4">
+                  <dt className="text-slate-500">メーカー</dt>
+                  <dd className="text-right text-slate-700">{deleteTarget.manufacturerName}</dd>
+                </div>
+                <div className="flex items-start justify-between gap-4">
+                  <dt className="text-slate-500">タイトル</dt>
+                  <dd className="max-w-[70%] text-right text-slate-700">{deleteTarget.title || '（タイトル未設定）'}</dd>
+                </div>
+              </dl>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={isDeleting}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void handleConfirmDelete();
+                }}
+                disabled={isDeleting}
+                className="rounded-lg bg-rose-600 px-4 py-2.5 font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isDeleting ? '削除中...' : '削除する'}
               </button>
             </div>
           </div>

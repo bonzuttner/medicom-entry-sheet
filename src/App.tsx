@@ -664,6 +664,7 @@ const App: React.FC = () => {
     } catch (error) {
       console.error('Failed to delete sheet:', error);
       alert(error instanceof Error ? error.message : 'エントリーシートの削除に失敗しました。');
+      throw error instanceof Error ? error : new Error('Failed to delete sheet');
     }
   };
 
@@ -822,6 +823,7 @@ const App: React.FC = () => {
           isLoadingMore={isLoadingMoreSheets}
           totalCount={totalSheetCount}
           onEdit={handleEditSheet}
+          onDelete={handleDeleteSheet}
           onSaveAdminMemo={handleSaveSheetAdminMemo}
         />
       )}

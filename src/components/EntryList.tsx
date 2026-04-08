@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import JSZip from 'jszip';
 import { EntrySheet, User, UserRole } from '../types';
-import { Plus, Copy, Edit3, Trash2, Search, FileWarning, ChevronDown, ChevronUp, Download, CheckSquare, Square, Image as ImageIcon, X, AlertCircle, AlertTriangle, ArrowUpDown } from 'lucide-react';
+import { Plus, Copy, Edit3, Trash2, Search, FileWarning, ChevronDown, ChevronUp, Download, CheckSquare, Square, Image as ImageIcon, X, AlertCircle, AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { getCurrentAssigneeLabel, getWorkflowStatusView } from '../lib/sheetWorkflow';
 
 interface EntryListProps {
@@ -10,7 +10,7 @@ interface EntryListProps {
   onCreate: () => void;
   onEdit: (sheet: EntrySheet, productIndex?: number) => void;
   onDuplicate: (sheet: EntrySheet) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => Promise<void> | void;
   hasMore?: boolean;
   onLoadMore?: () => void;
   isLoadingMore?: boolean;
@@ -54,6 +54,8 @@ export const EntryList: React.FC<EntryListProps> = ({
   const [selectedSheets, setSelectedSheets] = useState<Set<string>>(new Set());
   const [showExportModal, setShowExportModal] = useState(false);
   const [isDownloadingImages, setIsDownloadingImages] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<EntrySheet | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const normalizeManufacturerKey = (value: string): string => value.trim();
 
@@ -68,10 +70,30 @@ export const EntryList: React.FC<EntryListProps> = ({
       normalizeManufacturerKey(currentUser.manufacturerName)
     );
   };
-  const canDeleteSheet = (sheet: EntrySheet): boolean =>
-    canModifySheet(sheet) &&
-    (sheet.entryStatus || sheet.status) === 'draft' &&
-    (sheet.creativeStatus || 'none') === 'none';
+  const canDeleteSheet = (sheet: EntrySheet): boolean => canModifySheet(sheet);
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await onDelete(deleteTarget.id);
+      setExpandedSheets((prev) => {
+        const next = new Set(prev);
+        next.delete(deleteTarget.id);
+        return next;
+      });
+      setSelectedSheets((prev) => {
+        const next = new Set(prev);
+        next.delete(deleteTarget.id);
+        return next;
+      });
+      setDeleteTarget(null);
+    } catch {
+      // App layer already surfaces the error.
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const formatYearMonth = (year: number, month: number): string => `${year}/${month}`;
   const computeAutoEndMonth = (startMonth: number | undefined): number | undefined => {
@@ -148,6 +170,17 @@ export const EntryList: React.FC<EntryListProps> = ({
     }
     setSortBy(nextSortBy);
     setSortOrder('asc');
+  };
+
+  const renderSortIcon = (key: 'updatedAt' | 'manufacturer') => {
+    if (sortBy !== key) {
+      return <ArrowUpDown size={14} className="text-slate-400" />;
+    }
+    return sortOrder === 'asc' ? (
+      <ArrowUp size={14} className="text-primary" />
+    ) : (
+      <ArrowDown size={14} className="text-primary" />
+    );
   };
 
   // Search + Sort
@@ -703,12 +736,10 @@ export const EntryList: React.FC<EntryListProps> = ({
                                     <Copy size={18} />
                                 </button>
                                 <button
-                                    onClick={() => {
-                                        if(window.confirm('本当に削除しますか？')) onDelete(sheet.id);
-                                    }}
+                                    onClick={() => setDeleteTarget(sheet)}
                                     disabled={!canDeleteSheet(sheet)}
                                     className={`p-2 rounded-full border border-transparent shadow-sm ${canDeleteSheet(sheet) ? 'text-slate-400 hover:text-danger hover:bg-white hover:border-slate-200' : 'text-slate-300 cursor-not-allowed'}`}
-                                    title={canDeleteSheet(sheet) ? "削除" : "下書きのみ削除できます"}
+                                    title={canDeleteSheet(sheet) ? "削除" : "削除権限がありません"}
                                 >
                                     <Trash2 size={18} />
                                 </button>
@@ -766,28 +797,24 @@ export const EntryList: React.FC<EntryListProps> = ({
                     <th scope="col" className="sticky top-0 z-10 w-[440px] border-b border-slate-200 bg-slate-50 px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">タイトル</th>
                     <th scope="col" className="sticky top-0 z-10 w-28 border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">展開期間</th>
                     <th scope="col" className="sticky top-0 z-10 w-32 border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">棚割り</th>
-                    <th scope="col" className="sticky top-0 z-10 w-36 border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    <th scope="col" className={`sticky top-0 z-10 w-36 border-b border-slate-200 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider ${sortBy === 'manufacturer' ? 'text-primary bg-sky-50' : 'text-slate-500 bg-slate-50'}`}>
                       <button
                         onClick={() => toggleSort('manufacturer')}
-                        className={`inline-flex items-center gap-1 hover:text-slate-700 ${
-                          sortBy === 'manufacturer' ? 'text-slate-700' : ''
-                        }`}
+                        className="inline-flex items-center gap-1 hover:text-primary transition-colors"
                         title="メーカー / 更新者の並び順を切り替え"
                       >
                         <span>メーカー / 更新者</span>
-                        <ArrowUpDown size={14} />
+                        {renderSortIcon('manufacturer')}
                       </button>
                     </th>
-                    <th scope="col" className="sticky top-0 z-10 w-24 border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    <th scope="col" className={`sticky top-0 z-10 w-24 border-b border-slate-200 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider ${sortBy === 'updatedAt' ? 'text-primary bg-sky-50' : 'text-slate-500 bg-slate-50'}`}>
                       <button
                         onClick={() => toggleSort('updatedAt')}
-                        className={`inline-flex items-center gap-1 hover:text-slate-700 ${
-                          sortBy === 'updatedAt' ? 'text-slate-700' : ''
-                        }`}
+                        className="inline-flex items-center gap-1 hover:text-primary transition-colors"
                         title="更新日の並び順を切り替え"
                       >
                         <span>更新日</span>
-                        <ArrowUpDown size={14} />
+                        {renderSortIcon('updatedAt')}
                       </button>
                     </th>
                     <th scope="col" className="sticky top-0 z-10 w-32 border-b border-slate-200 bg-slate-50 px-4 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider">操作</th>
@@ -864,14 +891,10 @@ export const EntryList: React.FC<EntryListProps> = ({
                                   <Copy size={18} />
                               </button>
                               <button
-                                  onClick={() => {
-                                      if(window.confirm('本当に削除しますか？この操作は取り消せません。')) {
-                                          onDelete(sheet.id);
-                                      }
-                                  }}
+                                  onClick={() => setDeleteTarget(sheet)}
                                   disabled={!canDeleteSheet(sheet)}
                                   className={`p-2 rounded ${canDeleteSheet(sheet) ? 'text-slate-400 hover:text-danger hover:bg-red-50' : 'text-slate-300 cursor-not-allowed'}`}
-                                  title={canDeleteSheet(sheet) ? "削除" : "下書きのみ削除できます"}
+                                  title={canDeleteSheet(sheet) ? "削除" : "削除権限がありません"}
                               >
                                   <Trash2 size={18} />
                               </button>
@@ -986,6 +1009,76 @@ export const EntryList: React.FC<EntryListProps> = ({
                     </button>
                 </div>
             </div>
+        </div>
+      )}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-full bg-rose-100 p-2 text-rose-600">
+                  <AlertTriangle size={18} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">エントリーシートを削除しますか？</h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    この操作は取り消せません。関連する履歴、添付、クリエイティブ紐づけも削除されます。
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={isDeleting}
+                className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed"
+                aria-label="閉じる"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <dl className="space-y-2 text-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <dt className="text-slate-500">ID</dt>
+                  <dd className="text-right font-mono text-slate-700">{getDisplaySheetId(deleteTarget)}</dd>
+                </div>
+                <div className="flex items-start justify-between gap-4">
+                  <dt className="text-slate-500">状態</dt>
+                  <dd className="text-right text-slate-700">{getWorkflowStatusView(deleteTarget).label}</dd>
+                </div>
+                <div className="flex items-start justify-between gap-4">
+                  <dt className="text-slate-500">メーカー</dt>
+                  <dd className="text-right text-slate-700">{deleteTarget.manufacturerName}</dd>
+                </div>
+                <div className="flex items-start justify-between gap-4">
+                  <dt className="text-slate-500">タイトル</dt>
+                  <dd className="max-w-[70%] text-right text-slate-700">{deleteTarget.title || '（タイトル未設定）'}</dd>
+                </div>
+              </dl>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={isDeleting}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void handleConfirmDelete();
+                }}
+                disabled={isDeleting}
+                className="rounded-lg bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isDeleting ? '削除中...' : '削除する'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
