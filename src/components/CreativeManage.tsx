@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown, Copy, Edit, Image as ImageIcon, Plus, Search, Trash2, Upload, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Check, Copy, Edit, Image as ImageIcon, Link, Plus, Search, Trash2, Type, Upload, X } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { apiClient } from '../services/apiClient';
 import { dataService } from '../services/dataService';
@@ -82,10 +82,13 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
   const [validationError, setValidationError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [imageError, setImageError] = useState('');
+  const [nameError, setNameError] = useState('');
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Creative | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [showUnlinkedConfirm, setShowUnlinkedConfirm] = useState(false);
 
   // Check if form has unsaved changes
   const isDirty = useMemo(() => {
@@ -361,16 +364,17 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
 
   const handleImageSelect = async (file: File) => {
     if (!editingCreative) return;
+    setImageError('');
     // Validate file type
     const validTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp'];
     if (!validTypes.includes(file.type)) {
-      setValidationError('対応していない画像形式です。PNG, JPEG, WebP, GIF, BMP形式の画像を選択してください。');
+      setImageError('対応形式: PNG, JPEG, WebP, GIF, BMP');
       return;
     }
     // Validate file size (10MB limit)
     const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
-      setValidationError('画像サイズが大きすぎます。10MB以下の画像を選択してください。');
+      setImageError('10MB以下の画像を選択してください');
       return;
     }
     try {
@@ -385,9 +389,9 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
         ...editingCreative,
         imageUrl: result.url,
       });
-      setValidationError('');
+      setImageError('');
     } catch (error) {
-      setValidationError(error instanceof Error ? error.message : '画像のアップロードに失敗しました。');
+      setImageError(error instanceof Error ? error.message : 'アップロード失敗');
     } finally {
       setIsUploadingImage(false);
     }
@@ -417,21 +421,35 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
 
   const handleSave = async () => {
     if (!editingCreative || isSaving) return;
+
+    // フィールドレベルのバリデーション
+    let hasError = false;
+    setNameError('');
+    setImageError('');
+    setValidationError('');
+
     if (!editingCreative.name.trim()) {
-      setValidationError('クリエイティブ名は必須です');
-      return;
+      setNameError('クリエイティブ名を入力してください');
+      hasError = true;
     }
     if (!editingCreative.imageUrl.trim()) {
-      setValidationError('画像は必須です');
+      setImageError('画像をアップロードしてください');
+      hasError = true;
+    }
+    if (hasError) {
       return;
     }
-    if (!editingCreative.manufacturerName.trim()) {
-      setValidationError('メーカーは必須です');
-      return;
-    }
-    const selectedManufacturers = [...new Set(editingCreative.linkedSheets.map((sheet) => sheet.manufacturerName).filter(Boolean))];
-    if (selectedManufacturers.length > 1) {
-      setValidationError('紐づけるエントリーシートのメーカーは1つに揃えてください');
+
+    // シート紐づけがない場合はメーカーチェックをスキップ
+    if (editingCreative.linkedSheets.length > 0) {
+      const selectedManufacturers = [...new Set(editingCreative.linkedSheets.map((sheet) => sheet.manufacturerName).filter(Boolean))];
+      if (selectedManufacturers.length > 1) {
+        setValidationError('紐づけるエントリーシートのメーカーは1つに揃えてください');
+        return;
+      }
+    } else {
+      // シート未紐づけの場合は確認ダイアログを表示
+      setShowUnlinkedConfirm(true);
       return;
     }
 
@@ -468,11 +486,41 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
     }
   };
 
+  // シート未紐づけ確認後の保存処理
+  const handleConfirmSaveWithoutLinkage = async () => {
+    if (!editingCreative || isSaving) return;
+    setShowUnlinkedConfirm(false);
+
+    try {
+      setIsSaving(true);
+      await onSaveCreative({
+        ...editingCreative,
+        manufacturerName: editingCreative.manufacturerName || '',
+        linkedSheets: [],
+      });
+      closeEditor(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      if (message === 'VERSION_CONFLICT') {
+        setValidationError('他のユーザーが更新しました。画面を再読み込みして最新データを取得してください。');
+      } else if (message === 'CREATIVE_REQUIRED_FIELDS') {
+        setValidationError('必須項目を入力してください。');
+      } else {
+        setValidationError(message || '保存に失敗しました。');
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const closeEditor = (skipConfirm = false) => {
     if (!skipConfirm && !confirmDiscardChanges()) return;
     setEditingCreative(null);
     setOriginalCreative(null);
     setValidationError('');
+    setNameError('');
+    setImageError('');
+    setShowUnlinkedConfirm(false);
     setSheetSearchTerm('');
     setCandidateSheets([]);
     setSelectedSheetDetails([]);
@@ -523,7 +571,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
       </div>
 
       {editingCreative && (
-        <div className="rounded-xl border border-sky-200 bg-white p-6 shadow-sm">
+        <div className="rounded-xl border border-sky-200 bg-white p-4 shadow-sm sm:p-6">
           <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <h3 className="text-lg font-bold text-slate-800">
               {editingCreative.version > 1 ? 'クリエイティブ編集' : 'クリエイティブ登録'}
@@ -538,6 +586,68 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
             </button>
           </div>
 
+          {/* ステップインジケーター */}
+          <div className="mt-4 flex items-center justify-center gap-2 sm:gap-4">
+            {/* Step 1: 画像 */}
+            <div className="flex items-center gap-2">
+              <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
+                editingCreative.imageUrl
+                  ? 'bg-emerald-500 text-white'
+                  : 'bg-primary text-white'
+              }`}>
+                {editingCreative.imageUrl ? <Check size={16} /> : '1'}
+              </div>
+              <span className={`hidden text-sm font-medium sm:inline ${
+                editingCreative.imageUrl ? 'text-emerald-600' : 'text-slate-700'
+              }`}>画像</span>
+            </div>
+            <div className={`h-0.5 w-8 sm:w-12 ${editingCreative.imageUrl ? 'bg-emerald-300' : 'bg-slate-200'}`} />
+
+            {/* Step 2: 基本情報 */}
+            <div className="flex items-center gap-2">
+              <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
+                editingCreative.imageUrl && editingCreative.name.trim()
+                  ? 'bg-emerald-500 text-white'
+                  : editingCreative.imageUrl
+                    ? 'bg-primary text-white'
+                    : 'bg-slate-200 text-slate-500'
+              }`}>
+                {editingCreative.imageUrl && editingCreative.name.trim() ? <Check size={16} /> : '2'}
+              </div>
+              <span className={`hidden text-sm font-medium sm:inline ${
+                editingCreative.imageUrl && editingCreative.name.trim()
+                  ? 'text-emerald-600'
+                  : editingCreative.imageUrl
+                    ? 'text-slate-700'
+                    : 'text-slate-400'
+              }`}>基本情報</span>
+            </div>
+            <div className={`h-0.5 w-8 sm:w-12 ${
+              editingCreative.imageUrl && editingCreative.name.trim() ? 'bg-emerald-300' : 'bg-slate-200'
+            }`} />
+
+            {/* Step 3: シート紐づけ */}
+            <div className="flex items-center gap-2">
+              <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
+                editingCreative.selectedSheetIds.length > 0
+                  ? 'bg-emerald-500 text-white'
+                  : editingCreative.imageUrl && editingCreative.name.trim()
+                    ? 'bg-primary text-white'
+                    : 'bg-slate-200 text-slate-500'
+              }`}>
+                {editingCreative.selectedSheetIds.length > 0 ? <Check size={16} /> : '3'}
+              </div>
+              <span className={`hidden text-sm font-medium sm:inline ${
+                editingCreative.selectedSheetIds.length > 0
+                  ? 'text-emerald-600'
+                  : editingCreative.imageUrl && editingCreative.name.trim()
+                    ? 'text-slate-700'
+                    : 'text-slate-400'
+              }`}>シート紐づけ</span>
+              <span className="text-xs text-slate-400">(任意)</span>
+            </div>
+          </div>
+
           {validationError && (
             <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
               {validationError}
@@ -546,6 +656,14 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
 
           <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
             <div>
+              <div className="mb-3 flex items-center gap-2">
+                <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
+                  editingCreative.imageUrl ? 'bg-emerald-500 text-white' : 'bg-primary text-white'
+                }`}>
+                  {editingCreative.imageUrl ? <Check size={12} /> : '1'}
+                </span>
+                <span className="text-sm font-bold text-slate-700">Step 1: 画像をアップロード</span>
+              </div>
               <div>
                 <label className="mb-2 block text-sm font-bold text-slate-700">クリエイティブ画像 <span className="text-danger">*</span></label>
                 <div
@@ -554,14 +672,28 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
                   className={`rounded-xl border-2 border-dashed p-4 transition-colors ${
-                    isDraggingOver
-                      ? 'border-primary bg-sky-50'
-                      : 'border-slate-200 bg-slate-50'
+                    imageError
+                      ? 'border-danger bg-rose-50'
+                      : isDraggingOver
+                        ? 'border-primary bg-sky-50'
+                        : editingCreative.imageUrl
+                          ? 'border-emerald-300 bg-emerald-50'
+                          : 'border-slate-200 bg-slate-50'
                   }`}
                 >
-                  <div className="mb-4 flex h-52 items-center justify-center overflow-hidden rounded-lg bg-white">
-                    {editingCreative.imageUrl ? (
-                      <img src={editingCreative.imageUrl} alt="" className="h-full w-full object-contain" />
+                  <div className="relative mb-4 flex h-52 items-center justify-center overflow-hidden rounded-lg bg-white">
+                    {isUploadingImage ? (
+                      <div className="flex flex-col items-center gap-3 text-slate-500">
+                        <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-primary" />
+                        <span className="text-sm font-medium">アップロード中...</span>
+                      </div>
+                    ) : editingCreative.imageUrl ? (
+                      <>
+                        <img src={editingCreative.imageUrl} alt="" className="h-full w-full object-contain" />
+                        <div className="absolute right-2 top-2 rounded-full bg-emerald-500 p-1 text-white">
+                          <Check size={14} />
+                        </div>
+                      </>
                     ) : (
                       <div className="flex flex-col items-center gap-2 text-slate-400">
                         <ImageIcon size={32} />
@@ -570,6 +702,15 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                       </div>
                     )}
                   </div>
+
+                  {/* インラインエラー表示 */}
+                  {imageError && (
+                    <div className="mb-3 flex items-center gap-2 rounded-lg bg-rose-100 px-3 py-2 text-sm text-rose-700">
+                      <X size={16} className="flex-shrink-0" />
+                      <span>{imageError}</span>
+                    </div>
+                  )}
+
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -587,10 +728,14 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploadingImage}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    className={`inline-flex w-full items-center justify-center gap-2 rounded-lg border px-4 py-3 font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                      editingCreative.imageUrl
+                        ? 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        : 'border-primary bg-primary text-white hover:bg-sky-600'
+                    }`}
                   >
                     <Upload size={18} />
-                    {isUploadingImage ? 'アップロード中...' : '画像を選択'}
+                    {isUploadingImage ? 'アップロード中...' : editingCreative.imageUrl ? '画像を変更' : '画像を選択'}
                   </button>
                   <p className="mt-2 text-center text-xs text-slate-500">
                     PNG, JPEG, WebP, GIF, BMP（10MB以下）
@@ -599,22 +744,42 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
               </div>
             </div>
             <div className="space-y-4">
+              <div className="mb-3 flex items-center gap-2">
+                <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
+                  editingCreative.imageUrl && editingCreative.name.trim()
+                    ? 'bg-emerald-500 text-white'
+                    : editingCreative.imageUrl
+                      ? 'bg-primary text-white'
+                      : 'bg-slate-200 text-slate-500'
+                }`}>
+                  {editingCreative.imageUrl && editingCreative.name.trim() ? <Check size={12} /> : '2'}
+                </span>
+                <span className="text-sm font-bold text-slate-700">Step 2: 基本情報を入力</span>
+              </div>
+
               <div>
                 <label className="mb-2 block text-sm font-bold text-slate-700">クリエイティブ名 <span className="text-danger">*</span></label>
                 <input
                   value={editingCreative.name}
-                  onChange={(event) =>
+                  onChange={(event) => {
                     setEditingCreative({
                       ...editingCreative,
                       name: event.target.value,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
+                    });
+                    if (nameError) setNameError('');
+                  }}
+                  className={`w-full rounded-lg border bg-white px-4 py-3 text-sm text-slate-800 shadow-sm transition-all focus:ring-2 focus:outline-none ${
+                    nameError
+                      ? 'border-danger focus:border-danger focus:ring-danger/20'
+                      : 'border-slate-300 focus:border-primary focus:ring-primary/20'
+                  }`}
                 />
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                画像を登録したあと、下の「紐づけるエントリーシート」から対象シートを選択します。未紐づきのまま保存もできます。
+                {nameError && (
+                  <p className="mt-1.5 flex items-center gap-1 text-sm text-danger">
+                    <X size={14} />
+                    {nameError}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -634,132 +799,172 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
             </div>
           </div>
 
-          <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <h4 className="text-base font-bold text-slate-800">紐づけるエントリーシート</h4>
-                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
-                  選択中 {editingCreative.selectedSheetIds.length}件
-                </span>
-              </div>
-              <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
-                検索対象メーカー:{' '}
-                <span className="font-semibold text-slate-800">
-                  {editingCreative.manufacturerName || '未確定（全メーカーから検索、選択後に確定）'}
-                </span>
-              </div>
-              <div className="relative mt-4">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  value={sheetSearchTerm}
-                  onChange={(event) => setSheetSearchTerm(event.target.value)}
-                  placeholder="ID / シート名 / メーカー名 / 棚割り名 / 案件名で検索"
-                  className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm shadow-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
-                />
-              </div>
-
-              <div className="mt-4 max-h-72 space-y-2 overflow-auto pr-1">
-                {!sheetSearchTerm.trim() ? (
-                  <div className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
-                    キーワードを入力してエントリーシートを検索してください。<br />
-                    一つのクリエイティブに対して、1つのメーカーのエントリーシートしか紐づけることができません。
-                  </div>
-                ) : isLoadingCandidateSheets ? (
-                  <div className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
-                    エントリーシートを検索中です。
-                  </div>
-                ) : candidateSheets.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
-                    該当するエントリーシートが見つかりません。
-                  </div>
-                ) : (
-                  candidateSheets.map((sheet) => {
-                    const linkedCreativeId = linkedCreativeIdBySheetId.get(sheet.id);
-                    const isDisabled = Boolean(linkedCreativeId && linkedCreativeId !== editingCreative.id);
-                    const isSelected = editingCreative.selectedSheetIds.includes(sheet.id);
-                    return (
-                      <button
-                        key={sheet.id}
-                        type="button"
-                        onClick={() => toggleSheetSelection(sheet.id)}
-                        disabled={isDisabled}
-                        className={`w-full rounded-lg border px-4 py-3 text-left transition ${
-                          isSelected
-                            ? 'border-sky-300 bg-sky-50'
-                            : isDisabled
-                              ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
-                              : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className="text-sm font-semibold text-slate-800">
-                          {(sheet.sheetCode || sheet.id.slice(0, 8))} | {sheet.title || '(タイトル未設定)'}
-                        </div>
-                        <div className="mt-1 text-xs text-slate-500">
-                          {sheet.manufacturerName} | {sheet.shelfName || '棚割り未設定'} | {sheet.caseName || '案件未設定'}
-                        </div>
-                        {isDisabled && (
-                          <div className="mt-2 text-xs font-semibold text-slate-500">
-                            他クリエイティブで使用中
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })
-                )}
-              </div>
+          {/* Step 3: シート紐づけ */}
+          <div className="mt-6">
+            <div className="mb-3 flex items-center gap-2">
+              <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
+                editingCreative.selectedSheetIds.length > 0
+                  ? 'bg-emerald-500 text-white'
+                  : editingCreative.imageUrl && editingCreative.name.trim()
+                    ? 'bg-primary text-white'
+                    : 'bg-slate-200 text-slate-500'
+              }`}>
+                {editingCreative.selectedSheetIds.length > 0 ? <Check size={12} /> : '3'}
+              </span>
+              <span className="text-sm font-bold text-slate-700">Step 3: エントリーシートを紐づけ</span>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">任意</span>
             </div>
+            <p className="mb-4 text-xs text-slate-500">
+              シートを紐づけなくても保存できます。1つのメーカーのシートのみ選択可能です。
+            </p>
+          </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <h4 className="text-base font-bold text-slate-800">選択中のエントリーシート</h4>
-              {editingCreative.linkedSheets.length === 0 ? (
-                <p className="mt-3 text-sm text-slate-500">まだ選択されていません。</p>
-              ) : (
-                <div className="mt-3 space-y-2">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
+            {/* 選択済みシート表示 */}
+            {editingCreative.linkedSheets.length > 0 && (
+              <div className="mb-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-sm font-bold text-slate-700">
+                    選択済み ({editingCreative.linkedSheets.length}件)
+                  </span>
+                  {editingCreative.manufacturerName && (
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                      メーカー: {editingCreative.manufacturerName}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
                   {editingCreative.linkedSheets.map((sheet) => {
                     const sourceSheet = candidateSheetById.get(sheet.id);
                     const canUnlink = sourceSheet ? canModifyCreativeLinkage(sourceSheet) : false;
                     return (
-                      <div key={sheet.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-semibold text-slate-800">
-                            {(sheet.sheetCode || sheet.id.slice(0, 8))} | {sheet.title}
-                          </div>
-                          <div className="mt-1 text-xs text-slate-500">
-                            {sheet.manufacturerName} | {sheet.shelfName || '棚割り未設定'} | {sheet.caseName || '案件未設定'}
-                          </div>
-                          {!canUnlink && (
-                            <div className="mt-1 text-xs font-semibold text-slate-500">
-                              シート詳細で制作に戻してから変更してください
-                            </div>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          disabled={!canUnlink}
-                          onClick={() =>
-                            setSelectedSheetIds(
-                              editingCreative.selectedSheetIds.filter((id) => id !== sheet.id)
-                            )
-                          }
-                          className={`rounded-full p-2 ${canUnlink ? 'text-slate-400 hover:bg-white hover:text-danger' : 'cursor-not-allowed text-slate-300'}`}
-                          title={canUnlink ? '解除' : 'この状態のシートはここでは解除できません'}
-                        >
-                          <X size={16} />
-                        </button>
+                      <div
+                        key={sheet.id}
+                        className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm ${
+                          canUnlink
+                            ? 'border-sky-200 bg-sky-50 text-sky-800'
+                            : 'border-slate-200 bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        <Check size={14} className="text-sky-500" />
+                        <span className="max-w-[200px] truncate font-medium">
+                          {sheet.sheetCode || sheet.id.slice(0, 8)}
+                        </span>
+                        {canUnlink ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSelectedSheetIds(
+                                editingCreative.selectedSheetIds.filter((id) => id !== sheet.id)
+                              )
+                            }
+                            className="ml-1 rounded-full p-0.5 text-slate-400 hover:bg-sky-100 hover:text-danger"
+                            title="解除"
+                          >
+                            <X size={14} />
+                          </button>
+                        ) : (
+                          <span className="ml-1 text-xs text-slate-400" title="変更不可">🔒</span>
+                        )}
                       </div>
                     );
                   })}
                 </div>
+              </div>
+            )}
+
+            {/* 検索フォーム */}
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                value={sheetSearchTerm}
+                onChange={(event) => setSheetSearchTerm(event.target.value)}
+                placeholder="シートを検索（ID / シート名 / メーカー名 / 棚割り名 / 案件名）"
+                className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm shadow-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
+              />
+            </div>
+
+            {/* メーカー情報 */}
+            {!editingCreative.manufacturerName && editingCreative.linkedSheets.length === 0 && (
+              <p className="mt-2 text-xs text-slate-500">
+                シートを選択すると、そのメーカーに絞り込まれます
+              </p>
+            )}
+
+            {/* 検索結果 */}
+            <div className="mt-4 max-h-60 space-y-2 overflow-auto pr-1 sm:max-h-80">
+              {!sheetSearchTerm.trim() ? (
+                <div className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
+                  <Search size={24} className="mx-auto mb-2 text-slate-300" />
+                  キーワードを入力して検索
+                </div>
+              ) : isLoadingCandidateSheets ? (
+                <div className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
+                  <div className="mx-auto mb-2 h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-primary" />
+                  検索中...
+                </div>
+              ) : candidateSheets.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
+                  該当するシートが見つかりません
+                </div>
+              ) : (
+                candidateSheets.map((sheet) => {
+                  const linkedCreativeId = linkedCreativeIdBySheetId.get(sheet.id);
+                  const isLinkedToOther = Boolean(linkedCreativeId && linkedCreativeId !== editingCreative.id);
+                  const isSelected = editingCreative.selectedSheetIds.includes(sheet.id);
+                  return (
+                    <button
+                      key={sheet.id}
+                      type="button"
+                      onClick={() => toggleSheetSelection(sheet.id)}
+                      disabled={isLinkedToOther}
+                      className={`group flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left transition ${
+                        isSelected
+                          ? 'border-sky-300 bg-sky-50'
+                          : isLinkedToOther
+                            ? 'cursor-not-allowed border-slate-200 bg-slate-100'
+                            : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      {/* チェックボックス風アイコン */}
+                      <div className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border ${
+                        isSelected
+                          ? 'border-sky-500 bg-sky-500 text-white'
+                          : isLinkedToOther
+                            ? 'border-slate-300 bg-slate-200 text-slate-400'
+                            : 'border-slate-300 bg-white group-hover:border-slate-400'
+                      }`}>
+                        {isSelected && <Check size={12} />}
+                        {isLinkedToOther && <span className="text-xs">🔒</span>}
+                      </div>
+
+                      {/* シート情報 */}
+                      <div className="min-w-0 flex-1">
+                        <div className={`text-sm font-semibold ${isLinkedToOther ? 'text-slate-400' : 'text-slate-800'}`}>
+                          {sheet.sheetCode || sheet.id.slice(0, 8)} | {sheet.title || '(タイトル未設定)'}
+                        </div>
+                        <div className="mt-0.5 text-xs text-slate-500">
+                          {sheet.manufacturerName} | {sheet.shelfName || '棚割り未設定'} | {sheet.caseName || '案件未設定'}
+                        </div>
+                        {isLinkedToOther && (
+                          <div className="mt-1 text-xs font-medium text-amber-600">
+                            他のクリエイティブで使用中
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
               )}
             </div>
           </div>
 
-          <div className="mt-6 flex justify-end gap-3">
+          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <button
               type="button"
               onClick={closeEditor}
               disabled={isSaving}
-              className="rounded-lg border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700 shadow-sm"
+              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700 shadow-sm sm:w-auto"
             >
               キャンセル
             </button>
@@ -769,7 +974,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                 void handleSave();
               }}
               disabled={isSaving || isUploadingImage}
-              className="rounded-lg bg-primary px-5 py-3 font-bold text-white shadow-lg shadow-sky-200 transition-all hover:bg-sky-600 hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-lg"
+              className="w-full rounded-lg bg-primary px-5 py-3 font-bold text-white shadow-lg shadow-sky-200 transition-all hover:bg-sky-600 hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-lg sm:w-auto"
             >
               {isSaving ? '保存中...' : '保存'}
             </button>
@@ -1084,6 +1289,55 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
             </>
           )}
         </>
+      )}
+
+      {/* Unlinked Save Confirmation Modal */}
+      {showUnlinkedConfirm && editingCreative && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          onClick={() => !isSaving && setShowUnlinkedConfirm(false)}
+          style={{ animation: 'fadeIn 150ms ease-out' }}
+        >
+          <div
+            className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+            style={{ animation: 'slideUp 200ms ease-out' }}
+          >
+            <h3 className="text-lg font-bold text-slate-800">シート未紐づけの確認</h3>
+            <div className="mt-4">
+              <div className="flex items-start gap-4">
+                <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                  <img src={editingCreative.imageUrl} alt="" className="h-full w-full object-cover" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-slate-800">{editingCreative.name}</div>
+                </div>
+              </div>
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                <p className="font-medium">エントリーシートが紐づいていません</p>
+                <p className="mt-1">このまま保存すると、どのシートにも紐づかない状態で保存されます。後から編集画面で追加できます。</p>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowUnlinkedConfirm(false)}
+                disabled={isSaving}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-60"
+              >
+                戻って紐づける
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleConfirmSaveWithoutLinkage()}
+                disabled={isSaving}
+                className="rounded-lg bg-primary px-4 py-2.5 font-bold text-white shadow-sm hover:bg-sky-600 disabled:opacity-60"
+              >
+                {isSaving ? '保存中...' : 'このまま保存'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Delete Confirmation Modal */}
