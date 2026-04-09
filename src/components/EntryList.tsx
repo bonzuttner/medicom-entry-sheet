@@ -904,14 +904,14 @@ export const EntryList: React.FC<EntryListProps> = ({
                           onClick={() => toggleExpand(sheet.id)}
                         >
                           <td
-                            className="sticky left-0 z-30 w-12 px-4 py-4 text-center bg-white shadow-[1px_0_0_0_rgba(241,245,249,1)]"
+                            className={`sticky left-0 z-30 w-12 px-4 py-4 text-center shadow-[1px_0_0_0_rgba(241,245,249,1)] ${isSelected ? 'bg-sky-50' : isExpanded ? 'bg-slate-50' : 'bg-white'}`}
                             onClick={(e) => toggleSelect(sheet.id, e)}
                           >
                              <div className="text-primary cursor-pointer inline-block">
                                {isSelected ? <CheckSquare size={20} /> : <Square size={20} className="text-slate-300" />}
                              </div>
                           </td>
-                          <td className="w-24 px-2 py-4 text-[10px] text-slate-400 font-mono whitespace-nowrap bg-white">
+                          <td className={`w-24 px-2 py-4 text-[10px] text-slate-400 font-mono whitespace-nowrap ${isSelected ? 'bg-sky-50' : isExpanded ? 'bg-slate-50' : 'bg-white'}`}>
                             {getDisplaySheetId(sheet)}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap">

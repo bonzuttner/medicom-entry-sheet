@@ -735,7 +735,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
       {/* DESKTOP VIEW: Table */}
       <div className="hidden md:block bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div className="overflow-auto max-h-[calc(100vh-260px)]">
-        <table className="min-w-[1480px] w-full table-fixed border-separate border-spacing-0">
+        <table className="min-w-[1938px] w-full table-fixed border-separate border-spacing-0">
           <thead className="bg-slate-50">
             <tr>
               <th className="sticky left-0 top-0 z-50 w-[52px] border-b border-slate-200 px-2 py-3 text-center text-xs font-bold text-slate-500 bg-slate-50 shadow-[1px_0_0_0_rgba(226,232,240,1)]">
@@ -772,7 +772,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
               return (
                 <React.Fragment key={sheet.id}>
                   <tr className={`${dirty ? 'bg-amber-50/40 hover:bg-amber-50/70' : 'hover:bg-slate-50'}`}>
-                    <td className="sticky left-0 z-30 w-[52px] px-2 py-3 text-center bg-white shadow-[1px_0_0_0_rgba(241,245,249,1)]">
+                    <td className={`sticky left-0 z-30 w-[52px] px-2 py-3 text-center shadow-[1px_0_0_0_rgba(241,245,249,1)] ${dirty ? 'bg-amber-50' : selectedSheets.has(sheet.id) ? 'bg-sky-50' : 'bg-white'}`}>
                       <button
                         type="button"
                         onClick={() => toggleSelect(sheet.id)}
@@ -782,7 +782,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                         {selectedSheets.has(sheet.id) ? <CheckSquare size={15} /> : <Square size={15} />}
                       </button>
                     </td>
-                    <td className="w-24 px-2 py-4 text-[10px] text-slate-400 font-mono whitespace-nowrap bg-white">
+                    <td className={`w-24 px-2 py-4 text-[10px] text-slate-400 font-mono whitespace-nowrap ${dirty ? 'bg-amber-50' : selectedSheets.has(sheet.id) ? 'bg-sky-50' : 'bg-white'}`}>
                       <div className="flex items-center gap-2">
                         <span>{getDisplaySheetId(sheet)}</span>
                         <button
