@@ -43,6 +43,7 @@ const buildDuplicateCreativeDraft = (creative: Creative | CreativeDraft, current
   ...creative,
   id: uuidv4(),
   version: 1,
+  manufacturerName: '',
   creatorId: currentUser.id,
   creatorName: currentUser.displayName,
   name: `${creative.name} (コピー)`,
@@ -203,7 +204,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
     void dataService
       .searchCreativeCandidateSheets({
         ids: selectedIds,
-        manufacturerName: editingCreative.manufacturerName,
+        manufacturerName: editingCreative.manufacturerName || undefined,
         limit: selectedIds.length,
       })
       .then((result) => {
@@ -233,7 +234,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
     void dataService
       .searchCreativeCandidateSheets({
         query,
-        manufacturerName: editingCreative.manufacturerName,
+        manufacturerName: editingCreative.manufacturerName || undefined,
         limit: 30,
       })
       .then((result) => {
@@ -259,7 +260,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
     const newDraft: CreativeDraft = {
       id: uuidv4(),
       version: 1,
-      manufacturerName: currentUser.manufacturerName || '',
+      manufacturerName: '',
       creatorId: currentUser.id,
       creatorName: currentUser.displayName,
       name: '',
@@ -642,7 +643,10 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                 </span>
               </div>
               <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
-                検索対象メーカー: <span className="font-semibold text-slate-800">{editingCreative.manufacturerName || '未設定'}</span>
+                検索対象メーカー:{' '}
+                <span className="font-semibold text-slate-800">
+                  {editingCreative.manufacturerName || '未確定（全メーカーから検索、選択後に確定）'}
+                </span>
               </div>
               <div className="relative mt-4">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -657,7 +661,8 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
               <div className="mt-4 max-h-72 space-y-2 overflow-auto pr-1">
                 {!sheetSearchTerm.trim() ? (
                   <div className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
-                    キーワードを入力してエントリーシートを検索してください。
+                    キーワードを入力してエントリーシートを検索してください。<br />
+                    一つのクリエイティブに対して、1つのメーカーのエントリーシートしか紐づけることができません。
                   </div>
                 ) : isLoadingCandidateSheets ? (
                   <div className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
