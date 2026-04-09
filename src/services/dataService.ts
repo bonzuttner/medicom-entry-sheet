@@ -1,4 +1,4 @@
-import { Creative, EntrySheet, EntrySheetRevision, MasterData, ProductEntry, User } from '../types';
+import { Creative, CreativeCandidateSheet, EntrySheet, EntrySheetRevision, MasterData, ProductEntry, User } from '../types';
 import { apiClient } from './apiClient';
 
 export interface PagedResult<T> {
@@ -40,6 +40,13 @@ export interface DataService {
   getMasterData: () => Promise<MasterData>;
   saveMasterData: (data: MasterData) => Promise<MasterData>;
   getCreatives: () => Promise<Creative[]>;
+  searchCreativeCandidateSheets: (params: {
+    query?: string;
+    ids?: string[];
+    manufacturerName?: string;
+    offset?: number;
+    limit?: number;
+  }) => Promise<PagedResult<CreativeCandidateSheet>>;
   getCreativeBySheetId: (sheetId: string) => Promise<Creative | null>;
   saveCreative: (
     creative: Creative,
@@ -109,6 +116,16 @@ const apiDataService: DataService = {
   getMasterData: async () => apiClient.get<MasterData>('/api/master'),
   saveMasterData: async (data) => apiClient.put<MasterData>('/api/master', { data }),
   getCreatives: async () => apiClient.get<Creative[]>('/api/creatives'),
+  searchCreativeCandidateSheets: async ({ query = '', ids = [], manufacturerName = '', offset = 0, limit = 30 }) => {
+    const search = new URLSearchParams();
+    search.set('mode', 'creative-candidates');
+    search.set('offset', String(offset));
+    search.set('limit', String(limit));
+    if (query.trim()) search.set('q', query);
+    if (manufacturerName.trim()) search.set('manufacturerName', manufacturerName);
+    ids.forEach((id) => search.append('id', id));
+    return apiClient.get<PagedResult<CreativeCandidateSheet>>(`/api/sheets?${search.toString()}`);
+  },
   getCreativeBySheetId: async (sheetId) =>
     apiClient.get<Creative | null>(`/api/creatives?sheetId=${encodeURIComponent(sheetId)}`),
   saveCreative: async (creative, options) =>

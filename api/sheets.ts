@@ -1,5 +1,5 @@
 import { isAdmin, requireUser } from './_lib/auth.js';
-import { getMethod, methodNotAllowed, sendJson } from './_lib/http.js';
+import { getMethod, methodNotAllowed, sendError, sendJson } from './_lib/http.js';
 import * as SheetRepository from './_lib/repositories/sheets.js';
 import * as UserRepository from './_lib/repositories/users.js';
 import { EntrySheet } from './_lib/types.js';
@@ -30,7 +30,6 @@ export default async function handler(req: any, res: any) {
 
   await SheetRepository.pruneRetentionIfDue();
 
-  const hasPagingQuery = req.query?.limit !== undefined || req.query?.offset !== undefined;
   const requestedLimit = parsePositiveInt(req.query?.limit);
   const requestedOffset = parsePositiveInt(req.query?.offset);
   const pageSize = Math.min(
@@ -38,6 +37,34 @@ export default async function handler(req: any, res: any) {
     MAX_PAGE_SIZE
   );
   const pageOffset = requestedOffset ?? 0;
+
+  const mode = Array.isArray(req.query?.mode) ? req.query.mode[0] : req.query?.mode;
+  if (mode === 'creative-candidates') {
+    if (!isAdmin(currentUser)) {
+      sendError(res, 403, 'Only admin can access creative candidate sheets');
+      return;
+    }
+    const rawIds = req.query?.id;
+    const ids = Array.isArray(rawIds)
+      ? rawIds
+      : typeof rawIds === 'string'
+        ? [rawIds]
+        : [];
+    const result = await SheetRepository.searchCreativeCandidateSheets({
+      query: Array.isArray(req.query?.q) ? req.query.q[0] : req.query?.q,
+      ids,
+      manufacturerName: Array.isArray(req.query?.manufacturerName)
+        ? req.query.manufacturerName[0]
+        : req.query?.manufacturerName,
+      limit: pageSize,
+      offset: pageOffset,
+      includeLocked: ids.length > 0,
+    });
+    sendJson(res, 200, result);
+    return;
+  }
+
+  const hasPagingQuery = req.query?.limit !== undefined || req.query?.offset !== undefined;
 
   // Get sheets based on user role
   let sheets;

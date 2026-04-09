@@ -143,6 +143,14 @@ export interface CreativeLinkedSheet {
   caseName: string;
 }
 
+export interface CreativeCandidateSheet extends CreativeLinkedSheet {
+  updatedAt: string;
+  entryStatus?: string;
+  status: string;
+  creativeStatus?: CreativeStatus;
+  linkedCreativeId?: string;
+}
+
 export interface CreativeSummary {
   id: string;
   name: string;

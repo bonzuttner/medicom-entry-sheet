@@ -2,11 +2,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp, ArrowUpDown, Copy, Edit, Image as ImageIcon, Plus, Search, Trash2, Upload, X } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { apiClient } from '../services/apiClient';
-import { Creative, CreativeLinkedSheet, EntrySheet, User } from '../types';
+import { dataService } from '../services/dataService';
+import { Creative, CreativeCandidateSheet, CreativeLinkedSheet, EntrySheet, User } from '../types';
 
 interface CreativeManageProps {
   creatives: Creative[];
-  sheets: EntrySheet[];
   currentUser: User;
   onSaveCreative: (creative: Creative) => Promise<void> | void;
   onDeleteCreative: (id: string) => Promise<void> | void;
@@ -62,7 +62,6 @@ const toDataUrl = (file: File): Promise<string> =>
 
 export const CreativeManage: React.FC<CreativeManageProps> = ({
   creatives,
-  sheets,
   currentUser,
   onSaveCreative,
   onDeleteCreative,
@@ -74,6 +73,9 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
   const [sortKey, setSortKey] = useState<SortKey>('updatedAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [sheetSearchTerm, setSheetSearchTerm] = useState('');
+  const [candidateSheets, setCandidateSheets] = useState<CreativeCandidateSheet[]>([]);
+  const [selectedSheetDetails, setSelectedSheetDetails] = useState<CreativeCandidateSheet[]>([]);
+  const [isLoadingCandidateSheets, setIsLoadingCandidateSheets] = useState(false);
   const [editingCreative, setEditingCreative] = useState<CreativeDraft | null>(null);
   const [originalCreative, setOriginalCreative] = useState<CreativeDraft | null>(null);
   const [validationError, setValidationError] = useState('');
@@ -112,10 +114,12 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
     return window.confirm('編集内容が保存されていません。破棄してよろしいですか？');
   }, [isDirty]);
 
-  const sheetById = useMemo(
-    () => new Map(sheets.map((sheet) => [sheet.id, sheet])),
-    [sheets]
-  );
+  const candidateSheetById = useMemo(() => {
+    const map = new Map<string, CreativeCandidateSheet>();
+    selectedSheetDetails.forEach((sheet) => map.set(sheet.id, sheet));
+    candidateSheets.forEach((sheet) => map.set(sheet.id, sheet));
+    return map;
+  }, [candidateSheets, selectedSheetDetails]);
   const linkedCreativeIdBySheetId = useMemo(() => {
     const map = new Map<string, string>();
     creatives.forEach((creative) => {
@@ -123,8 +127,14 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
         map.set(sheet.id, creative.id);
       });
     });
+    selectedSheetDetails.forEach((sheet) => {
+      if (sheet.linkedCreativeId) map.set(sheet.id, sheet.linkedCreativeId);
+    });
+    candidateSheets.forEach((sheet) => {
+      if (sheet.linkedCreativeId) map.set(sheet.id, sheet.linkedCreativeId);
+    });
     return map;
-  }, [creatives]);
+  }, [candidateSheets, creatives, selectedSheetDetails]);
   const filteredCreatives = useMemo(() => {
     const normalizedQuery = normalizeSearchText(searchTerm);
     const filtered = creatives.filter((creative) => {
@@ -178,23 +188,72 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
     });
   }, [creatives, searchTerm, sortKey, sortOrder]);
 
-  const candidateSheets = useMemo(() => {
-    const normalizedQuery = normalizeSearchText(sheetSearchTerm);
-    return [...sheets]
-      .filter((sheet) => canModifyCreativeLinkage(sheet))
-      .filter((sheet) => {
-        if (!normalizedQuery) return true;
-        const fields = [
-          sheet.sheetCode || '',
-          sheet.title,
-          sheet.manufacturerName,
-          sheet.shelfName,
-          sheet.caseName,
-        ];
-        return fields.some((value) => normalizeSearchText(value).includes(normalizedQuery));
+  useEffect(() => {
+    if (!editingCreative) {
+      setSelectedSheetDetails([]);
+      return;
+    }
+    const selectedIds = editingCreative.selectedSheetIds;
+    if (selectedIds.length === 0) {
+      setSelectedSheetDetails([]);
+      return;
+    }
+
+    let mounted = true;
+    void dataService
+      .searchCreativeCandidateSheets({
+        ids: selectedIds,
+        manufacturerName: editingCreative.manufacturerName,
+        limit: selectedIds.length,
       })
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-  }, [sheetSearchTerm, sheets]);
+      .then((result) => {
+        if (!mounted) return;
+        setSelectedSheetDetails(result.items);
+      })
+      .catch((error) => {
+        console.error('Failed to load selected creative sheet details:', error);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [editingCreative?.selectedSheetIds]);
+
+  useEffect(() => {
+    if (!editingCreative) return;
+    const query = sheetSearchTerm.trim();
+    if (!query) {
+      setCandidateSheets([]);
+      setIsLoadingCandidateSheets(false);
+      return;
+    }
+
+    let mounted = true;
+    setIsLoadingCandidateSheets(true);
+    void dataService
+      .searchCreativeCandidateSheets({
+        query,
+        manufacturerName: editingCreative.manufacturerName,
+        limit: 30,
+      })
+      .then((result) => {
+        if (!mounted) return;
+        setCandidateSheets(result.items);
+      })
+      .catch((error) => {
+        console.error('Failed to search creative candidate sheets:', error);
+        if (!mounted) return;
+        setCandidateSheets([]);
+      })
+      .finally(() => {
+        if (!mounted) return;
+        setIsLoadingCandidateSheets(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [editingCreative, sheetSearchTerm]);
 
   const startNewCreative = () => {
     const newDraft: CreativeDraft = {
@@ -214,6 +273,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
     setEditingCreative(newDraft);
     setOriginalCreative(newDraft);
     setSheetSearchTerm('');
+    setCandidateSheets([]);
     setValidationError('');
   };
 
@@ -225,6 +285,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
     setEditingCreative(draft);
     setOriginalCreative(draft);
     setSheetSearchTerm('');
+    setCandidateSheets([]);
     setValidationError('');
   };
 
@@ -233,6 +294,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
     setEditingCreative(draft);
     setOriginalCreative(draft);
     setSheetSearchTerm('');
+    setCandidateSheets([]);
     setValidationError('');
   };
 
@@ -259,8 +321,8 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
   const setSelectedSheetIds = (sheetIds: string[]) => {
     if (!editingCreative) return;
     const linkedSheets = sheetIds
-      .map((id) => sheetById.get(id))
-      .filter((sheet): sheet is EntrySheet => Boolean(sheet))
+      .map((id) => candidateSheetById.get(id) || editingCreative.linkedSheets.find((sheet) => sheet.id === id))
+      .filter((sheet): sheet is CreativeLinkedSheet => Boolean(sheet))
       .map(
         (sheet): CreativeLinkedSheet => ({
           id: sheet.id,
@@ -411,6 +473,8 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
     setOriginalCreative(null);
     setValidationError('');
     setSheetSearchTerm('');
+    setCandidateSheets([]);
+    setSelectedSheetDetails([]);
   };
 
   const handleDelete = async () => {
@@ -577,6 +641,9 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                   選択中 {editingCreative.selectedSheetIds.length}件
                 </span>
               </div>
+              <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+                検索対象メーカー: <span className="font-semibold text-slate-800">{editingCreative.manufacturerName || '未設定'}</span>
+              </div>
               <div className="relative mt-4">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
@@ -588,7 +655,15 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
               </div>
 
               <div className="mt-4 max-h-72 space-y-2 overflow-auto pr-1">
-                {candidateSheets.length === 0 ? (
+                {!sheetSearchTerm.trim() ? (
+                  <div className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
+                    キーワードを入力してエントリーシートを検索してください。
+                  </div>
+                ) : isLoadingCandidateSheets ? (
+                  <div className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
+                    エントリーシートを検索中です。
+                  </div>
+                ) : candidateSheets.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
                     該当するエントリーシートが見つかりません。
                   </div>
@@ -636,7 +711,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
               ) : (
                 <div className="mt-3 space-y-2">
                   {editingCreative.linkedSheets.map((sheet) => {
-                    const sourceSheet = sheetById.get(sheet.id);
+                    const sourceSheet = candidateSheetById.get(sheet.id);
                     const canUnlink = sourceSheet ? canModifyCreativeLinkage(sourceSheet) : false;
                     return (
                       <div key={sheet.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">

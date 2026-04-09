@@ -1,5 +1,5 @@
 import * as db from '../db.js';
-import { EntrySheet, ProductEntry, Attachment, EntrySheetRevision } from '../types.js';
+import { CreativeCandidateSheet, EntrySheet, ProductEntry, Attachment, EntrySheetRevision } from '../types.js';
 import { ensureManufacturer, ensureManufacturerCodeInfrastructure } from './users.js';
 import { randomUUID } from 'crypto';
 import {
@@ -45,6 +45,20 @@ interface SheetRow {
   return_reason: string | null;
   created_at: Date | string;
   updated_at: Date | string;
+}
+
+interface CreativeCandidateSheetRow {
+  id: string;
+  sheet_code: string | null;
+  title: string;
+  manufacturer_name: string;
+  shelf_name: string | null;
+  case_name: string | null;
+  updated_at: Date | string;
+  status: string;
+  entry_status: string | null;
+  creative_status: string | null;
+  linked_creative_id: string | null;
 }
 
 interface AdminMemoRow {
@@ -137,6 +151,26 @@ const toDateOnlyString = (value: Date | string | null | undefined): string => {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString().split('T')[0];
 };
+
+const rowToCreativeCandidateSheet = (row: CreativeCandidateSheetRow): CreativeCandidateSheet => ({
+  id: row.id,
+  sheetCode: row.sheet_code || undefined,
+  title: row.title,
+  manufacturerName: row.manufacturer_name,
+  shelfName: row.shelf_name || '',
+  caseName: row.case_name || '',
+  updatedAt: toIsoString(row.updated_at),
+  status: row.status,
+  entryStatus: row.entry_status || undefined,
+  creativeStatus:
+    row.creative_status === 'in_progress' ||
+    row.creative_status === 'confirmation_pending' ||
+    row.creative_status === 'returned' ||
+    row.creative_status === 'approved'
+      ? row.creative_status
+      : undefined,
+  linkedCreativeId: row.linked_creative_id || undefined,
+});
 
 const toSafeIso = (value: string | undefined, fallback: string): string => {
   if (!value) return fallback;
@@ -259,6 +293,8 @@ const normalizeSearchTextToHalfwidthKana = (value: string): string => {
 const normalizeSearchText = (value: string): string => {
   return normalizeKanaToHiragana(value.normalize('NFKC')).toLowerCase().trim();
 };
+
+const normalizeAlnumSearchText = (value: string): string => value.normalize('NFKC').toLowerCase().trim();
 
 let ensureSnapshotColumnsPromise: Promise<void> | null = null;
 let ensureCreatorReferencePromise: Promise<void> | null = null;
@@ -1329,6 +1365,105 @@ export const countByManufacturerId = async (manufacturerId: string): Promise<num
     [manufacturerId]
   );
   return Number(result.rows[0]?.count || 0);
+};
+
+export const searchCreativeCandidateSheets = async (
+  params: {
+    query?: string;
+    ids?: string[];
+    manufacturerName?: string;
+    limit?: number;
+    offset?: number;
+    includeLocked?: boolean;
+  } = {}
+): Promise<{ items: CreativeCandidateSheet[]; hasMore: boolean; totalCount: number }> => {
+  await ensureSheetCreatorReference();
+  const query = String(params.query || '').trim();
+  const ids = [...new Set((params.ids || []).map((id) => String(id).trim()).filter(Boolean))];
+  const manufacturerName = String(params.manufacturerName || '').trim();
+  const limit = typeof params.limit === 'number' ? params.limit : 30;
+  const offset = typeof params.offset === 'number' ? params.offset : 0;
+  const includeLocked = params.includeLocked === true;
+
+  const whereParts: string[] = [];
+  const values: Array<string | number | string[]> = [];
+
+  if (ids.length > 0) {
+    values.push(ids);
+    whereParts.push(`s.id = ANY($${values.length})`);
+  } else {
+    if (!query) {
+      return { items: [], hasMore: false, totalCount: 0 };
+    }
+    const normalizedQuery = normalizeAlnumSearchText(query);
+    const like = `%${normalizedQuery}%`;
+    values.push(like);
+    const queryIndex = values.length;
+    whereParts.push(
+      `(
+        translate(lower(COALESCE(s.sheet_code, '')), '${FULLWIDTH_SEARCH_CHARS}', '${HALFWIDTH_SEARCH_CHARS}') LIKE $${queryIndex}
+        OR translate(lower(s.title), '${FULLWIDTH_SEARCH_CHARS}', '${HALFWIDTH_SEARCH_CHARS}') LIKE $${queryIndex}
+        OR translate(lower(m.name), '${FULLWIDTH_SEARCH_CHARS}', '${HALFWIDTH_SEARCH_CHARS}') LIKE $${queryIndex}
+        OR translate(lower(COALESCE(s.shelf_name, '')), '${FULLWIDTH_SEARCH_CHARS}', '${HALFWIDTH_SEARCH_CHARS}') LIKE $${queryIndex}
+        OR translate(lower(COALESCE(s.case_name, '')), '${FULLWIDTH_SEARCH_CHARS}', '${HALFWIDTH_SEARCH_CHARS}') LIKE $${queryIndex}
+      )`
+    );
+  }
+
+  if (manufacturerName) {
+    values.push(manufacturerName);
+    whereParts.push(`m.name = $${values.length}`);
+  }
+
+  if (!includeLocked) {
+    whereParts.push(
+      `(COALESCE(s.entry_status, s.status) <> 'draft' AND COALESCE(s.creative_status, 'none') IN ('none', 'in_progress'))`
+    );
+  }
+
+  const whereClause = whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : '';
+
+  const countResult = await db.query<{ count: string }>(
+    `
+    SELECT COUNT(*)::text AS count
+    FROM entry_sheets s
+    JOIN manufacturers m ON m.id = s.manufacturer_id
+    ${whereClause}
+    `,
+    values
+  );
+  const totalCount = Number(countResult.rows[0]?.count || 0);
+
+  values.push(limit + 1, offset);
+  const limitIndex = values.length - 1;
+  const offsetIndex = values.length;
+  const result = await db.query<CreativeCandidateSheetRow>(
+    `
+    SELECT
+      s.id,
+      s.sheet_code,
+      s.title,
+      m.name AS manufacturer_name,
+      s.shelf_name,
+      s.case_name,
+      s.updated_at,
+      s.status,
+      s.entry_status,
+      s.creative_status,
+      ces.creative_id AS linked_creative_id
+    FROM entry_sheets s
+    JOIN manufacturers m ON m.id = s.manufacturer_id
+    LEFT JOIN creative_entry_sheets ces ON ces.sheet_id = s.id
+    ${whereClause}
+    ORDER BY s.updated_at DESC, s.id DESC
+    LIMIT $${limitIndex} OFFSET $${offsetIndex}
+    `,
+    values
+  );
+
+  const hasMore = result.rows.length > limit;
+  const items = (hasMore ? result.rows.slice(0, limit) : result.rows).map(rowToCreativeCandidateSheet);
+  return { items, hasMore, totalCount };
 };
 
 /**

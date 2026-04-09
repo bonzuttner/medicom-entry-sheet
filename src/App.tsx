@@ -213,7 +213,6 @@ const App: React.FC = () => {
   const [sheets, setSheets] = useState<EntrySheet[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [creatives, setCreatives] = useState<Creative[]>([]);
-  const [creativeSheets, setCreativeSheets] = useState<EntrySheet[]>([]);
   const [masterData, setMasterData] = useState<MasterData>(EMPTY_MASTER_DATA);
   const [editingSheet, setEditingSheet] = useState<EntrySheet | null>(null);
   const [initialProductIndex, setInitialProductIndex] = useState<number>(0);
@@ -306,12 +305,8 @@ const App: React.FC = () => {
     if (!currentUser || currentUser.role !== UserRole.ADMIN) return;
     setIsLoadingCreatives(true);
     try {
-      const [creativeRows, allSheets] = await Promise.all([
-        dataService.getCreatives(),
-        dataService.getSheets(),
-      ]);
+      const creativeRows = await dataService.getCreatives();
       setCreatives(creativeRows);
-      setCreativeSheets(allSheets);
     } catch (error) {
       console.error('Failed to load creatives:', error);
     } finally {
@@ -399,7 +394,6 @@ const App: React.FC = () => {
       setSheets([]);
       setUsers([]);
       setCreatives([]);
-      setCreativeSheets([]);
       setMasterData(EMPTY_MASTER_DATA);
       setHasMoreSheets(false);
       setSheetOffset(0);
@@ -683,7 +677,6 @@ const App: React.FC = () => {
         return next;
       });
       const latestSheets = await dataService.getSheets();
-      setCreativeSheets(latestSheets);
       setSheets((prev) =>
         prev.map((sheet) => {
           if (!affectedSheetIds.has(sheet.id)) return sheet;
@@ -865,7 +858,6 @@ const App: React.FC = () => {
       {currentPage === Page.CREATIVES && currentUser.role === UserRole.ADMIN && (
         <CreativeManage
           creatives={creatives}
-          sheets={creativeSheets}
           currentUser={currentUser}
           onSaveCreative={handleSaveCreative}
           onDeleteCreative={handleDeleteCreative}
