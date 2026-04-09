@@ -559,13 +559,6 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${workflowStatus.pillClassName}`}>
                       {workflowStatus.label}
                     </span>
-                    <div className="flex items-center gap-1">
-                      {dirty && (
-                        <span className="text-xs font-bold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">
-                          未保存
-                        </span>
-                      )}
-                    </div>
                   </div>
                   <div className="text-[10px] text-slate-400 font-mono mb-1">ID: {getDisplaySheetId(sheet)}</div>
                   <h3 className="text-base font-bold text-slate-900 leading-tight mb-1 line-clamp-2">{sheet.title}</h3>
@@ -759,7 +752,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
               <th className="sticky top-0 z-10 w-[120px] border-b border-slate-200 bg-slate-50 px-3 py-3 text-left text-xs font-bold text-slate-500">帯パターン</th>
               <th className="sticky top-0 z-10 w-[110px] border-b border-slate-200 bg-slate-50 px-3 py-3 text-left text-xs font-bold text-slate-500">対象店舗数</th>
               <th className="sticky top-0 z-10 hidden md:table-cell w-[260px] border-b border-slate-200 bg-slate-50 px-3 py-3 text-left text-xs font-bold text-slate-500">印刷依頼数量</th>
-              <th className="sticky top-0 z-10 w-[100px] border-b border-slate-200 bg-slate-50 px-3 py-3 text-left text-xs font-bold text-slate-500">保存</th>
+              <th className="sticky top-0 z-10 w-[140px] border-b border-slate-200 bg-slate-50 px-3 py-3 text-left text-xs font-bold text-slate-500">アクション</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-slate-100">
@@ -771,8 +764,8 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
               const assigneeLabel = getCurrentAssigneeLabel(sheet.currentAssignee);
               return (
                 <React.Fragment key={sheet.id}>
-                  <tr className={`${dirty ? 'bg-amber-50/40 hover:bg-amber-50/70' : 'hover:bg-slate-50'}`}>
-                    <td className={`sticky left-0 z-30 w-[52px] px-2 py-3 text-center shadow-[1px_0_0_0_rgba(241,245,249,1)] ${dirty ? 'bg-amber-50' : selectedSheets.has(sheet.id) ? 'bg-sky-50' : 'bg-white'}`}>
+                  <tr className={`group ${dirty ? 'bg-amber-50/40 hover:bg-amber-50/70' : selectedSheets.has(sheet.id) ? 'bg-sky-50 hover:bg-sky-100' : 'hover:bg-slate-50'}`}>
+                    <td className={`sticky left-0 z-30 w-[52px] px-2 py-3 text-center shadow-[1px_0_0_0_rgba(241,245,249,1)] ${dirty ? 'bg-amber-50 group-hover:bg-amber-50' : selectedSheets.has(sheet.id) ? 'bg-sky-50 group-hover:bg-sky-100' : 'bg-white group-hover:bg-slate-50'}`}>
                       <button
                         type="button"
                         onClick={() => toggleSelect(sheet.id)}
@@ -782,7 +775,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                         {selectedSheets.has(sheet.id) ? <CheckSquare size={15} /> : <Square size={15} />}
                       </button>
                     </td>
-                    <td className={`w-24 px-2 py-4 text-[10px] text-slate-400 font-mono whitespace-nowrap ${dirty ? 'bg-amber-50' : selectedSheets.has(sheet.id) ? 'bg-sky-50' : 'bg-white'}`}>
+                    <td className={`w-24 px-2 py-4 text-[10px] text-slate-400 font-mono whitespace-nowrap ${dirty ? 'bg-amber-50 group-hover:bg-amber-50' : selectedSheets.has(sheet.id) ? 'bg-sky-50 group-hover:bg-sky-100' : 'bg-white group-hover:bg-slate-50'}`}>
                       <div className="flex items-center gap-2">
                         <span>{getDisplaySheetId(sheet)}</span>
                         <button
@@ -792,14 +785,6 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                           title="詳細編集"
                         >
                           <Edit3 size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeleteTarget(sheet)}
-                          className="inline-flex items-center justify-center rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                          title="削除"
-                        >
-                          <Trash2 size={16} />
                         </button>
                       </div>
                     </td>
@@ -964,12 +949,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                       </div>
                     </td>
                     <td className="px-3 py-3 text-left">
-                      <div className={`inline-flex items-center gap-1.5 rounded-lg p-1 whitespace-nowrap ${dirty ? 'bg-amber-100/70' : 'bg-slate-50'}`}>
-                        {dirty && (
-                          <span className="inline-flex items-center rounded-md bg-white px-2 py-1 text-[10px] font-semibold text-amber-700">
-                            未保存
-                          </span>
-                        )}
+                      <div className="inline-flex items-center gap-1.5 rounded-lg p-1 whitespace-nowrap bg-slate-50">
                         <button
                           onClick={() => {
                             void handleSave(sheet.id);
@@ -983,6 +963,14 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                         >
                           <Save size={14} />
                           {savingById[sheet.id] ? '保存中' : '保存'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget(sheet)}
+                          className="inline-flex items-center justify-center rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                          title="削除"
+                        >
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     </td>

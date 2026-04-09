@@ -899,19 +899,19 @@ export const EntryList: React.FC<EntryListProps> = ({
 
                      return (
                       <React.Fragment key={sheet.id}>
-                        <tr 
-                          className={`hover:bg-slate-50 transition-colors cursor-pointer ${isExpanded ? 'bg-slate-50' : ''}`}
+                        <tr
+                          className={`group transition-colors cursor-pointer ${isSelected ? 'bg-sky-50 hover:bg-sky-100' : isExpanded ? 'bg-slate-50 hover:bg-slate-100' : 'hover:bg-slate-50'}`}
                           onClick={() => toggleExpand(sheet.id)}
                         >
                           <td
-                            className={`sticky left-0 z-30 w-12 px-4 py-4 text-center shadow-[1px_0_0_0_rgba(241,245,249,1)] ${isSelected ? 'bg-sky-50' : isExpanded ? 'bg-slate-50' : 'bg-white'}`}
+                            className={`sticky left-0 z-30 w-12 px-4 py-4 text-center shadow-[1px_0_0_0_rgba(241,245,249,1)] ${isSelected ? 'bg-sky-50 group-hover:bg-sky-100' : isExpanded ? 'bg-slate-50 group-hover:bg-slate-100' : 'bg-white group-hover:bg-slate-50'}`}
                             onClick={(e) => toggleSelect(sheet.id, e)}
                           >
                              <div className="text-primary cursor-pointer inline-block">
                                {isSelected ? <CheckSquare size={20} /> : <Square size={20} className="text-slate-300" />}
                              </div>
                           </td>
-                          <td className={`w-24 px-2 py-4 text-[10px] text-slate-400 font-mono whitespace-nowrap ${isSelected ? 'bg-sky-50' : isExpanded ? 'bg-slate-50' : 'bg-white'}`}>
+                          <td className={`w-24 px-2 py-4 text-[10px] text-slate-400 font-mono whitespace-nowrap ${isSelected ? 'bg-sky-50 group-hover:bg-sky-100' : isExpanded ? 'bg-slate-50 group-hover:bg-slate-100' : 'bg-white group-hover:bg-slate-50'}`}>
                             {getDisplaySheetId(sheet)}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap">
