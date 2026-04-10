@@ -1374,16 +1374,16 @@ export const searchCreativeCandidateSheets = async (
     manufacturerName?: string;
     limit?: number;
     offset?: number;
-    includeLocked?: boolean;
   } = {}
 ): Promise<{ items: CreativeCandidateSheet[]; hasMore: boolean; totalCount: number }> => {
   await ensureSheetCreatorReference();
+  await ensureWorkflowColumns();
+  await ensureSheetCodeInfrastructure();
   const query = String(params.query || '').trim();
   const ids = [...new Set((params.ids || []).map((id) => String(id).trim()).filter(Boolean))];
   const manufacturerName = String(params.manufacturerName || '').trim();
   const limit = typeof params.limit === 'number' ? params.limit : 30;
   const offset = typeof params.offset === 'number' ? params.offset : 0;
-  const includeLocked = params.includeLocked === true;
 
   const whereParts: string[] = [];
   const values: Array<string | number | string[]> = [];
@@ -1413,12 +1413,6 @@ export const searchCreativeCandidateSheets = async (
   if (manufacturerName) {
     values.push(manufacturerName);
     whereParts.push(`m.name = $${values.length}`);
-  }
-
-  if (!includeLocked) {
-    whereParts.push(
-      `(COALESCE(s.entry_status, s.status) <> 'draft' AND COALESCE(s.creative_status, 'none') IN ('none', 'in_progress'))`
-    );
   }
 
   const whereClause = whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : '';

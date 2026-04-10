@@ -58,7 +58,6 @@ export default async function handler(req: any, res: any) {
         : req.query?.manufacturerName,
       limit: pageSize,
       offset: pageOffset,
-      includeLocked: ids.length > 0,
     });
     sendJson(res, 200, result);
     return;

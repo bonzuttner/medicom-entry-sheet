@@ -910,18 +910,20 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
               ) : (
                 candidateSheets.map((sheet) => {
                   const linkedCreativeId = linkedCreativeIdBySheetId.get(sheet.id);
+                  const isWorkflowLocked = !canModifyCreativeLinkage(sheet);
                   const isLinkedToOther = Boolean(linkedCreativeId && linkedCreativeId !== editingCreative.id);
+                  const isDisabled = isWorkflowLocked || isLinkedToOther;
                   const isSelected = editingCreative.selectedSheetIds.includes(sheet.id);
                   return (
                     <button
                       key={sheet.id}
                       type="button"
                       onClick={() => toggleSheetSelection(sheet.id)}
-                      disabled={isLinkedToOther}
+                      disabled={isDisabled}
                       className={`group flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left transition ${
                         isSelected
                           ? 'border-sky-300 bg-sky-50'
-                          : isLinkedToOther
+                          : isDisabled
                             ? 'cursor-not-allowed border-slate-200 bg-slate-100'
                             : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
                       }`}
@@ -930,27 +932,31 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                       <div className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border ${
                         isSelected
                           ? 'border-sky-500 bg-sky-500 text-white'
-                          : isLinkedToOther
+                          : isDisabled
                             ? 'border-slate-300 bg-slate-200 text-slate-400'
                             : 'border-slate-300 bg-white group-hover:border-slate-400'
                       }`}>
                         {isSelected && <Check size={12} />}
-                        {isLinkedToOther && <span className="text-xs">🔒</span>}
+                        {isDisabled && <span className="text-xs">🔒</span>}
                       </div>
 
                       {/* シート情報 */}
                       <div className="min-w-0 flex-1">
-                        <div className={`text-sm font-semibold ${isLinkedToOther ? 'text-slate-400' : 'text-slate-800'}`}>
+                        <div className={`text-sm font-semibold ${isDisabled ? 'text-slate-400' : 'text-slate-800'}`}>
                           {sheet.sheetCode || sheet.id.slice(0, 8)} | {sheet.title || '(タイトル未設定)'}
                         </div>
                         <div className="mt-0.5 text-xs text-slate-500">
                           {sheet.manufacturerName} | {sheet.shelfName || '棚割り未設定'} | {sheet.caseName || '案件未設定'}
                         </div>
-                        {isLinkedToOther && (
+                        {isWorkflowLocked ? (
+                          <div className="mt-1 text-xs font-medium text-slate-500">
+                            下書き・確認待ち・差し戻し・承認済みのシートは選択できません
+                          </div>
+                        ) : isLinkedToOther ? (
                           <div className="mt-1 text-xs font-medium text-amber-600">
                             他のクリエイティブで使用中
                           </div>
-                        )}
+                        ) : null}
                       </div>
                     </button>
                   );
