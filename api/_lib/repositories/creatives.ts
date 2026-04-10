@@ -206,11 +206,7 @@ const assertWorkflowEditableSheets = async (sheetIds: string[]): Promise<void> =
   }
 };
 
-const assertLinkableSheets = async (
-  sheetIds: string[],
-  manufacturerName: string,
-  creativeId: string
-): Promise<void> => {
+const assertLinkableSheets = async (sheetIds: string[], creativeId: string): Promise<void> => {
   if (sheetIds.length === 0) return;
 
   const result = await db.query<CreativeWorkflowSheetRow>(
@@ -225,9 +221,6 @@ const assertLinkableSheets = async (
 
   if (result.rows.length !== sheetIds.length) {
     throw new Error('SHEET_NOT_FOUND');
-  }
-  if (result.rows.some((row) => row.manufacturer_name !== manufacturerName)) {
-    throw new Error('SHEET_MANUFACTURER_MISMATCH');
   }
   if (result.rows.some((row) => !canModifyCreativeLinkage(row))) {
     throw new Error('SHEET_WORKFLOW_LOCKED');
@@ -369,7 +362,7 @@ export const upsert = async (
     const previousLinkedSheetIds = existingLinkedRows.rows.map((row) => row.sheet_id);
     const touchedSheetIds = [...new Set([...previousLinkedSheetIds, ...linkedSheetIds])];
     await assertWorkflowEditableSheets(touchedSheetIds);
-    await assertLinkableSheets(linkedSheetIds, normalizedCreative.manufacturerName, normalizedCreative.id);
+    await assertLinkableSheets(linkedSheetIds, normalizedCreative.id);
 
     const existing = await db.queryOne<{ version: number }>(
       `SELECT version FROM creatives WHERE id = $1 FOR UPDATE`,
@@ -495,11 +488,11 @@ export const upsert = async (
 export const deleteById = async (creativeId: string): Promise<boolean> => {
   await ensureCreativeTables();
   return db.transaction(async () => {
-    const linkedCount = await db.queryOne<{ count: string }>(
-      `SELECT COUNT(*)::text AS count FROM creative_entry_sheets WHERE creative_id = $1 FOR UPDATE`,
+    const linkedRow = await db.queryOne<{ sheet_id: string }>(
+      `SELECT sheet_id FROM creative_entry_sheets WHERE creative_id = $1 LIMIT 1 FOR UPDATE`,
       [creativeId]
     );
-    if (Number(linkedCount?.count || '0') > 0) {
+    if (linkedRow) {
       throw new Error('CREATIVE_STILL_LINKED');
     }
     const result = await db.query(`DELETE FROM creatives WHERE id = $1`, [creativeId]);
@@ -544,9 +537,6 @@ export const relinkSheetToCreative = async (
     );
     if (!sheetRow) {
       throw new Error('SHEET_NOT_FOUND');
-    }
-    if (sheetRow.manufacturer_name !== targetCreativeRow.manufacturer_name) {
-      throw new Error('SHEET_MANUFACTURER_MISMATCH');
     }
     if (!canModifyCreativeLinkage(sheetRow)) {
       throw new Error('SHEET_WORKFLOW_LOCKED');

@@ -209,7 +209,6 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
     void dataService
       .searchCreativeCandidateSheets({
         ids: selectedIds,
-        manufacturerName: editingCreative.manufacturerName || undefined,
         limit: selectedIds.length,
       })
       .then((result) => {
@@ -241,7 +240,6 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
     void dataService
       .searchCreativeCandidateSheets({
         query,
-        manufacturerName: editingCreative.manufacturerName || undefined,
         limit: 30,
       })
       .then((result) => {
@@ -345,11 +343,9 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
           caseName: sheet.caseName,
         })
       );
-    const linkedManufacturers = [...new Set(linkedSheets.map((sheet) => sheet.manufacturerName).filter(Boolean))];
     setEditingCreative({
       ...editingCreative,
-      manufacturerName:
-        linkedManufacturers.length === 1 ? linkedManufacturers[0] : '',
+      manufacturerName: linkedSheets[0]?.manufacturerName || '',
       linkedSheets,
       selectedSheetIds: sheetIds,
     });
@@ -448,14 +444,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
       return;
     }
 
-    // シート紐づけがない場合はメーカーチェックをスキップ
-    if (editingCreative.linkedSheets.length > 0) {
-      const selectedManufacturers = [...new Set(editingCreative.linkedSheets.map((sheet) => sheet.manufacturerName).filter(Boolean))];
-      if (selectedManufacturers.length > 1) {
-        setValidationError('紐づけるエントリーシートのメーカーは1つに揃えてください');
-        return;
-      }
-    } else {
+    if (editingCreative.linkedSheets.length === 0) {
       // シート未紐づけの場合は確認ダイアログを表示
       setShowUnlinkedConfirm(true);
       return;
@@ -465,7 +454,11 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
       setIsSaving(true);
       await onSaveCreative({
         ...editingCreative,
-        manufacturerName: editingCreative.linkedSheets[0]?.manufacturerName || editingCreative.manufacturerName,
+        manufacturerName:
+          editingCreative.linkedSheets[0]?.manufacturerName ||
+          editingCreative.manufacturerName ||
+          currentUser.manufacturerName ||
+          '',
         linkedSheets: editingCreative.linkedSheets,
       });
       closeEditor(true); // Skip confirmation since we just saved
@@ -482,8 +475,6 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
         setValidationError('紐づけ先のエントリーシートが見つかりません。');
       } else if (message === 'SHEET_ALREADY_LINKED') {
         setValidationError('選択したシートは既に他のクリエイティブに紐づいています。');
-      } else if (message === 'SHEET_MANUFACTURER_MISMATCH') {
-        setValidationError('シートのメーカーとクリエイティブのメーカーが一致しません。');
       } else if (message === 'SHEET_WORKFLOW_LOCKED') {
         setValidationError('確認待ち・差し戻し・承認済みのシートに紐づくクリエイティブは、シート詳細で制作に戻してから変更してください。');
       } else {
@@ -824,7 +815,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">任意</span>
             </div>
             <p className="mb-4 text-xs text-slate-500">
-              シートを紐づけなくても保存できます。1つのメーカーのシートのみ選択可能です。
+              シートを紐づけなくても保存できます。複数メーカーのシートを選択できます。
             </p>
           </div>
 
@@ -836,11 +827,9 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                   <span className="text-sm font-bold text-slate-700">
                     選択済み ({editingCreative.linkedSheets.length}件)
                   </span>
-                  {editingCreative.manufacturerName && (
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                      メーカー: {editingCreative.manufacturerName}
-                    </span>
-                  )}
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                    メーカー: {new Set(editingCreative.linkedSheets.map((sheet) => sheet.manufacturerName).filter(Boolean)).size}件
+                  </span>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {editingCreative.linkedSheets.map((sheet) => {
@@ -893,12 +882,9 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
               />
             </div>
 
-            {/* メーカー情報 */}
-            {!editingCreative.manufacturerName && editingCreative.linkedSheets.length === 0 && (
-              <p className="mt-2 text-xs text-slate-500">
-                シートを選択すると、そのメーカーに絞り込まれます
-              </p>
-            )}
+            <p className="mt-2 text-xs text-slate-500">
+              メーカー制限なしで検索できます。
+            </p>
 
             {/* 検索結果 */}
             <div className="mt-4 max-h-60 space-y-2 overflow-auto pr-1 sm:max-h-80">
