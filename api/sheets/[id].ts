@@ -354,7 +354,7 @@ const buildRevisionSummary = (before: EntrySheet | null, after: EntrySheet): str
   pushChange('状態', before.status, after.status);
   pushChange('展開スタート月', before.deploymentStartMonth, after.deploymentStartMonth);
   pushChange('展開終了月', before.deploymentEndMonth, after.deploymentEndMonth);
-  pushChange('フェイス数', before.faceLabel || '', after.faceLabel || '');
+  pushChange('棚割り幅', before.faceLabel || '', after.faceLabel || '');
   pushChange('フェイスMAX値', before.faceMaxWidth, after.faceMaxWidth);
 
   if (before.products.length !== after.products.length) {

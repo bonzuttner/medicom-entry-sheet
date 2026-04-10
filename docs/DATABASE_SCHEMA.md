@@ -44,7 +44,7 @@
   - `case_name`: 案件名
   - `deployment_start_month`: 展開スタート月（1〜12）
   - `deployment_end_month`: 展開終了月（1〜12）
-  - `face_label`: 選択されたフェイス数ラベル
+  - `face_label`: 選択された棚割り幅ラベル
   - `face_max_width`: 選択されたフェイスMAX値（mm）
   - `status`: `draft` / `completed` / `completed_no_image`
   - `entry_status`: エントリーシート本体の進行状態
@@ -178,7 +178,7 @@
 - 外部キー:
   - `manufacturer_id -> manufacturers.id`
 - 主項目:
-  - `face_label`: フェイス数の表示ラベル
+  - `face_label`: 棚割り幅の表示ラベル
   - `max_width`: そのラベル選択時の許容MAX幅(mm)
   - `display_order`
   - `created_at`

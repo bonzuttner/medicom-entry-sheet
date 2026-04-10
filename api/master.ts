@@ -57,7 +57,7 @@ const findTooLongMasterValue = (data: MasterData): string | null => {
     }
     for (const option of options) {
       if (String(option?.label || '').length > MAX_MASTER_VALUE_LENGTH) {
-        return 'フェイス数';
+        return '棚割り幅';
       }
       if (!Number.isInteger(Number(option?.maxWidth)) || Number(option?.maxWidth) <= 0) {
         return 'フェイスMAX値';

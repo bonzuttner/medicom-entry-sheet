@@ -185,7 +185,7 @@
 補足:
 - 過去商品検索は `manufacturer_products` を検索元とする
 - `product_entries` はシート保存時点のスナップショットとして維持する
-- フェイス数はマスタで `label + maxWidth` の組として管理し、シート保存時には選択した `faceLabel` / `faceMaxWidth` を `entry_sheets` に保存する
+- 棚割り幅はマスタで `label + maxWidth` の組として管理し、シート保存時には選択した `faceLabel` / `faceMaxWidth` を `entry_sheets` に保存する
 - 完了保存時の棚割り幅判定は `商品ごとの width × facingCount の合計 <= faceMaxWidth` を用いる
 - 保存は 1 トランザクションで実施し、途中失敗時は全ロールバックする
 - 本対応では、本番後に不要になる一時DB項目・移行専用テーブルは追加しない

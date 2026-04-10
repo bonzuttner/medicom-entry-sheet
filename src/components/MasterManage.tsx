@@ -446,7 +446,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
                     <div className="flex gap-2 items-stretch">
                       <input
                         className="min-w-0 flex-1 border border-slate-300 rounded-md px-3 py-1.5 text-sm"
-                        placeholder="フェイス(w)"
+                        placeholder="棚割り幅(w)"
                         value={faceLabelInput}
                         onChange={(e) => setFaceLabelInput(e.target.value)}
                       />

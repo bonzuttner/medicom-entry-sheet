@@ -933,7 +933,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     let finalStatus: EntrySheet['status'] = status;
     if (status === 'completed') {
         if (faceOptions.length > 0 && !selectedFaceMaxWidth) {
-            alert("フェイス数を選択してください");
+            alert("棚割り幅を選択してください");
             return;
         }
         if (selectedFaceMaxWidth && shelfWidthTotal > selectedFaceMaxWidth) {
@@ -1592,7 +1592,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                 <div className="col-span-1 md:col-span-2 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 items-start">
                       <div>
-                          <label className="block text-sm font-bold text-slate-700 mb-2">フェイス数</label>
+                          <label className="block text-sm font-bold text-slate-700 mb-2">棚割り幅</label>
                           {faceOptions.length > 0 ? (
                             <select
                               value={formData.faceLabel || ''}
@@ -1619,7 +1619,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                             </div>
                           )}
                           <p className="text-xs text-slate-500 mt-2">
-                            選択したフェイス数に紐づくMAX値で商品幅合計を判定します。
+                            選択した棚割り幅に紐づくMAX値で商品幅合計を判定します。
                           </p>
                       </div>
                       <div>
@@ -1631,7 +1631,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                           商品情報ごとの「個装サイズ(幅) × フェイシング数」の合計値。
                           {selectedFaceMaxWidth
                             ? ` 選択中のフェイスMAX値は ${selectedFaceMaxWidth}mm です。`
-                            : ' フェイス数を選択すると判定上限を表示します。'}
+                            : ' 棚割り幅を選択すると判定上限を表示します。'}
                           </p>
                       </div>
                     </div>
