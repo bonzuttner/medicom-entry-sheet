@@ -77,6 +77,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
   const [candidateSheets, setCandidateSheets] = useState<CreativeCandidateSheet[]>([]);
   const [selectedSheetDetails, setSelectedSheetDetails] = useState<CreativeCandidateSheet[]>([]);
   const [isLoadingCandidateSheets, setIsLoadingCandidateSheets] = useState(false);
+  const [candidateSheetsError, setCandidateSheetsError] = useState('');
   const [editingCreative, setEditingCreative] = useState<CreativeDraft | null>(null);
   const [originalCreative, setOriginalCreative] = useState<CreativeDraft | null>(null);
   const [validationError, setValidationError] = useState('');
@@ -195,6 +196,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
   useEffect(() => {
     if (!editingCreative) {
       setSelectedSheetDetails([]);
+      setCandidateSheetsError('');
       return;
     }
     const selectedIds = editingCreative.selectedSheetIds;
@@ -229,11 +231,13 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
     if (!query) {
       setCandidateSheets([]);
       setIsLoadingCandidateSheets(false);
+      setCandidateSheetsError('');
       return;
     }
 
     let mounted = true;
     setIsLoadingCandidateSheets(true);
+    setCandidateSheetsError('');
     void dataService
       .searchCreativeCandidateSheets({
         query,
@@ -248,6 +252,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
         console.error('Failed to search creative candidate sheets:', error);
         if (!mounted) return;
         setCandidateSheets([]);
+        setCandidateSheetsError(error instanceof Error ? error.message : 'エントリーシート検索に失敗しました。');
       })
       .finally(() => {
         if (!mounted) return;
@@ -278,6 +283,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
     setOriginalCreative(newDraft);
     setSheetSearchTerm('');
     setCandidateSheets([]);
+    setCandidateSheetsError('');
     setValidationError('');
   };
 
@@ -290,6 +296,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
     setOriginalCreative(draft);
     setSheetSearchTerm('');
     setCandidateSheets([]);
+    setCandidateSheetsError('');
     setValidationError('');
   };
 
@@ -299,6 +306,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
     setOriginalCreative(draft);
     setSheetSearchTerm('');
     setCandidateSheets([]);
+    setCandidateSheetsError('');
     setValidationError('');
   };
 
@@ -341,7 +349,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
     setEditingCreative({
       ...editingCreative,
       manufacturerName:
-        linkedManufacturers.length === 1 ? linkedManufacturers[0] : editingCreative.manufacturerName,
+        linkedManufacturers.length === 1 ? linkedManufacturers[0] : '',
       linkedSheets,
       selectedSheetIds: sheetIds,
     });
@@ -523,6 +531,7 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
     setShowUnlinkedConfirm(false);
     setSheetSearchTerm('');
     setCandidateSheets([]);
+    setCandidateSheetsError('');
     setSelectedSheetDetails([]);
   };
 
@@ -902,6 +911,10 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                 <div className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
                   <div className="mx-auto mb-2 h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-primary" />
                   検索中...
+                </div>
+              ) : candidateSheetsError ? (
+                <div className="rounded-lg border border-dashed border-rose-200 bg-rose-50 px-4 py-8 text-center text-sm text-rose-700">
+                  {candidateSheetsError}
                 </div>
               ) : candidateSheets.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
