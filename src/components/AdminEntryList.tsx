@@ -831,14 +831,10 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                           </div>
                         </div>
                       ) : (
-                        <div className="group relative inline-flex">
+                        <div className="inline-flex">
                           <span className="inline-flex items-center justify-center h-8 w-8 rounded-full text-slate-300 bg-slate-100">
                             <CircleOff size={16} />
                           </span>
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 bg-slate-700 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-lg">
-                            期限表URL未設定
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-700" />
-                          </div>
                         </div>
                       )}
                     </td>
