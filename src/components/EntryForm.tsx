@@ -112,6 +112,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   const [isLoadingCreativeOptions, setIsLoadingCreativeOptions] = useState(false);
   const [isRelinkingCreative, setIsRelinkingCreative] = useState(false);
   const [isPreparingReturn, setIsPreparingReturn] = useState(false);
+  const [isCreativeImageModalOpen, setIsCreativeImageModalOpen] = useState(false);
   const askedPrefillByProductRef = useRef<Map<number, string>>(new Map());
   const lastAutoTitleRef = useRef('');
   const isAdminUser = currentUser.role === UserRole.ADMIN;
@@ -2162,13 +2163,23 @@ export const EntryForm: React.FC<EntryFormProps> = ({
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               {linkedCreative ? (
-                <div className="flex items-center gap-4">
-                  <div className="flex h-16 w-24 items-center justify-center overflow-hidden rounded-lg bg-white">
+                <div className="flex items-start gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreativeImageModalOpen(true)}
+                    className="flex h-24 w-36 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white transition-colors hover:border-sky-400"
+                    style={{ cursor: 'zoom-in' }}
+                  >
                     <img src={linkedCreative.imageUrl} alt="" className="h-full w-full object-cover" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-slate-800">{linkedCreative.name}</div>
-                    <div className="mt-1 text-xs text-slate-500">
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold text-slate-800">{linkedCreative.name}</div>
+                    {linkedCreative.memo && (
+                      <div className="mt-2 rounded-lg bg-slate-50 p-2 text-xs text-slate-600 whitespace-pre-wrap">
+                        {linkedCreative.memo}
+                      </div>
+                    )}
+                    <div className="mt-2 text-xs text-slate-500">
                       最終更新日: {formatDate(linkedCreative.updatedAt)}
                     </div>
                   </div>
@@ -2489,6 +2500,31 @@ export const EntryForm: React.FC<EntryFormProps> = ({
           </div>
         </div>
       </div>
+      )}
+
+      {/* クリエイティブ画像拡大モーダル */}
+      {isCreativeImageModalOpen && linkedCreative && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+          onClick={() => setIsCreativeImageModalOpen(false)}
+        >
+          <div className="relative max-h-[90vh] max-w-[90vw]">
+            <button
+              type="button"
+              onClick={() => setIsCreativeImageModalOpen(false)}
+              className="absolute -right-3 -top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-600 shadow-lg hover:bg-slate-100"
+            >
+              ✕
+            </button>
+            <img
+              src={linkedCreative.imageUrl}
+              alt={linkedCreative.name}
+              className="max-h-[85vh] max-w-[85vw] rounded-lg object-contain"
+              onClick={(e: React.MouseEvent) => e.stopPropagation()}
+            />
+            <div className="mt-2 text-center text-sm text-white">{linkedCreative.name}</div>
+          </div>
+        </div>
       )}
     </div>
   );
