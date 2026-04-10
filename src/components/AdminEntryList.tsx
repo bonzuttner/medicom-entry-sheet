@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { EntrySheet, EntrySheetAdminMemo } from '../types';
-import { AlertTriangle, CheckSquare, CircleOff, Download, Edit3, ExternalLink, Info, Save, SaveAll, Search, Square, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, CheckSquare, CircleOff, Download, Edit3, ExternalLink, Info, Save, SaveAll, Search, Square, Trash2, X } from 'lucide-react';
 import { getCurrentAssigneeLabel, getWorkflowStatusView } from '../lib/sheetWorkflow';
 
 interface AdminEntryListProps {
@@ -142,6 +142,8 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
   const [showExportModal, setShowExportModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<EntrySheet | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [sortKey, setSortKey] = useState<'updatedAt' | 'status'>('updatedAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     setDrafts((prev) => {
