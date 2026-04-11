@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown, Check, Copy, Edit, Image as ImageIcon, Link, Plus, Search, Trash2, Type, Upload, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Check, Copy, Download, Edit, Image as ImageIcon, Link, Plus, Search, Trash2, Type, Upload, X } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { apiClient } from '../services/apiClient';
 import { dataService } from '../services/dataService';
@@ -724,19 +724,30 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                       event.target.value = '';
                     }}
                   />
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploadingImage}
-                    className={`inline-flex w-full items-center justify-center gap-2 rounded-lg border px-4 py-3 font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                      editingCreative.imageUrl
-                        ? 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                        : 'border-primary bg-primary text-white hover:bg-sky-600'
-                    }`}
-                  >
-                    <Upload size={18} />
-                    {isUploadingImage ? 'アップロード中...' : editingCreative.imageUrl ? '画像を変更' : '画像を選択'}
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploadingImage}
+                      className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg border px-4 py-3 font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                        editingCreative.imageUrl
+                          ? 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                          : 'border-primary bg-primary text-white hover:bg-sky-600'
+                      }`}
+                    >
+                      <Upload size={18} />
+                      {isUploadingImage ? 'アップロード中...' : editingCreative.imageUrl ? '画像を変更' : '画像を選択'}
+                    </button>
+                    {editingCreative.imageUrl && (
+                      <a
+                        href={editingCreative.imageUrl}
+                        download={editingCreative.name || 'creative'}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50"
+                      >
+                        <Download size={18} />
+                      </a>
+                    )}
+                  </div>
                   <p className="mt-2 text-center text-xs text-slate-500">
                     PNG, JPEG, WebP, GIF, BMP（10MB以下）
                   </p>
@@ -1208,6 +1219,18 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                                 >
                                   <Copy size={16} />
                                 </button>
+                                {creative.imageUrl && (
+                                  <a
+                                    href={creative.imageUrl}
+                                    download={creative.name}
+                                    onClick={(e) => e.stopPropagation()}
+                                    title="ダウンロード"
+                                    aria-label="ダウンロード"
+                                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition-colors hover:bg-slate-200"
+                                  >
+                                    <Download size={16} />
+                                  </a>
+                                )}
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -1278,6 +1301,16 @@ export const CreativeManage: React.FC<CreativeManageProps> = ({
                           <Copy size={14} />
                           複製
                         </button>
+                        {creative.imageUrl && (
+                          <a
+                            href={creative.imageUrl}
+                            download={creative.name}
+                            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
+                          >
+                            <Download size={14} />
+                            DL
+                          </a>
+                        )}
                         <button
                           type="button"
                           onClick={() => setDeleteTarget(creative)}

@@ -2522,7 +2522,17 @@ export const EntryForm: React.FC<EntryFormProps> = ({
               className="max-h-[85vh] max-w-[85vw] rounded-lg object-contain"
               onClick={(e: React.MouseEvent) => e.stopPropagation()}
             />
-            <div className="mt-2 text-center text-sm text-white">{linkedCreative.name}</div>
+            <div className="mt-2 flex items-center justify-center gap-4">
+              <span className="text-sm text-white">{linkedCreative.name}</span>
+              <a
+                href={linkedCreative.imageUrl}
+                download={linkedCreative.name}
+                onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                className="inline-flex items-center gap-1 rounded-lg bg-white/90 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-white"
+              >
+                ダウンロード
+              </a>
+            </div>
           </div>
         </div>
       )}
