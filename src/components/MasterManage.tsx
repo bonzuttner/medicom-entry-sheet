@@ -9,9 +9,19 @@ interface MasterManageProps {
   onSave: (data: MasterData) => Promise<void> | void;
 }
 
+type SavingSection =
+  | 'manufacturerNames'
+  | 'riskClassifications'
+  | 'specificIngredients'
+  | 'manufacturerShelf'
+  | 'manufacturerCase'
+  | 'manufacturerFace'
+  | 'manufacturerMonth'
+  | null;
+
 export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
   const [localData, setLocalData] = useState<MasterData>(data);
-  const [isSaving, setIsSaving] = useState(false);
+  const [savingSection, setSavingSection] = useState<SavingSection>(null);
   const [selectedManufacturer, setSelectedManufacturer] = useState('');
   const [shelfInput, setShelfInput] = useState('');
   const [caseInput, setCaseInput] = useState('');
@@ -30,17 +40,17 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
 
   const normalizeItem = (value: string): string => value.trim();
 
-  const persist = async (newData: MasterData) => {
+  const persist = async (newData: MasterData, section: SavingSection) => {
     setLocalData(newData);
-    setIsSaving(true);
+    setSavingSection(section);
     try {
       await onSave(newData);
     } finally {
-      setIsSaving(false);
+      setSavingSection(null);
     }
   };
 
-  const addItem = async (category: keyof MasterData, rawValue: string) => {
+  const addItem = async (category: keyof MasterData, rawValue: string, section: SavingSection) => {
     const value = normalizeItem(rawValue);
     if (!value) return;
 
@@ -49,13 +59,13 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
     }
 
     const newData = { ...localData, [category]: [...localData[category], value] };
-    await persist(newData);
+    await persist(newData, section);
   };
 
-  const removeItem = async (category: keyof MasterData, value: string) => {
+  const removeItem = async (category: keyof MasterData, value: string, section: SavingSection) => {
     if(!window.confirm(`「${value}」を削除しますか？`)) return;
     const newData = { ...localData, [category]: localData[category].filter(v => v !== value) };
-    await persist(newData);
+    await persist(newData, section);
   };
 
   const getShelfNamesForSelectedManufacturer = (): string[] => {
@@ -97,7 +107,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
       ...(localData.manufacturerShelfNames || {}),
       [selectedManufacturer]: [...current, value],
     };
-    await persist({ ...localData, manufacturerShelfNames });
+    await persist({ ...localData, manufacturerShelfNames }, 'manufacturerShelf');
   };
 
   const removeShelfName = async (value: string) => {
@@ -108,7 +118,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
       ...(localData.manufacturerShelfNames || {}),
       [selectedManufacturer]: current.filter((v) => v !== value),
     };
-    await persist({ ...localData, manufacturerShelfNames });
+    await persist({ ...localData, manufacturerShelfNames }, 'manufacturerShelf');
   };
 
   const removeShelfNameByManufacturer = async (manufacturer: string, value: string) => {
@@ -118,7 +128,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
       ...(localData.manufacturerShelfNames || {}),
       [manufacturer]: current.filter((v) => v !== value),
     };
-    await persist({ ...localData, manufacturerShelfNames });
+    await persist({ ...localData, manufacturerShelfNames }, 'manufacturerShelf');
   };
 
   const addCaseName = async (rawValue: string) => {
@@ -132,7 +142,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
       ...(localData.manufacturerCaseNames || {}),
       [selectedManufacturer]: [...current, value],
     };
-    await persist({ ...localData, manufacturerCaseNames });
+    await persist({ ...localData, manufacturerCaseNames }, 'manufacturerCase');
   };
 
   const removeCaseName = async (value: string) => {
@@ -143,7 +153,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
       ...(localData.manufacturerCaseNames || {}),
       [selectedManufacturer]: current.filter((v) => v !== value),
     };
-    await persist({ ...localData, manufacturerCaseNames });
+    await persist({ ...localData, manufacturerCaseNames }, 'manufacturerCase');
   };
 
   const removeCaseNameByManufacturer = async (manufacturer: string, value: string) => {
@@ -153,7 +163,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
       ...(localData.manufacturerCaseNames || {}),
       [manufacturer]: current.filter((v) => v !== value),
     };
-    await persist({ ...localData, manufacturerCaseNames });
+    await persist({ ...localData, manufacturerCaseNames }, 'manufacturerCase');
   };
 
   const monthLabels = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
@@ -184,7 +194,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
       ...(localData.manufacturerFaceOptions || {}),
       [selectedManufacturer]: [...current, { label, maxWidth }],
     };
-    await persist({ ...localData, manufacturerFaceOptions });
+    await persist({ ...localData, manufacturerFaceOptions }, 'manufacturerFace');
     setFaceLabelInput('');
     setFaceMaxWidthInput('');
   };
@@ -197,7 +207,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
       ...(localData.manufacturerFaceOptions || {}),
       [selectedManufacturer]: current.filter((option) => option.label !== label),
     };
-    await persist({ ...localData, manufacturerFaceOptions });
+    await persist({ ...localData, manufacturerFaceOptions }, 'manufacturerFace');
   };
 
   const removeFaceOptionByManufacturer = async (manufacturer: string, label: string) => {
@@ -207,7 +217,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
       ...(localData.manufacturerFaceOptions || {}),
       [manufacturer]: current.filter((option) => option.label !== label),
     };
-    await persist({ ...localData, manufacturerFaceOptions });
+    await persist({ ...localData, manufacturerFaceOptions }, 'manufacturerFace');
   };
 
   const getDefaultStartMonthsForSelectedManufacturer = (): number[] => {
@@ -225,7 +235,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
       ...(localData.manufacturerDefaultStartMonths || {}),
       [selectedManufacturer]: next,
     };
-    await persist({ ...localData, manufacturerDefaultStartMonths });
+    await persist({ ...localData, manufacturerDefaultStartMonths }, 'manufacturerMonth');
   };
 
   return (
@@ -233,12 +243,12 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
         <h2 className="text-2xl font-bold text-slate-800">マスタ管理</h2>
         <p className="text-slate-500">エントリーシートのプルダウン選択肢を編集します。</p>
 
-        <MasterSection 
-            title="メーカー名" 
-            items={localData.manufacturerNames} 
-            onAdd={(v) => addItem('manufacturerNames', v)} 
-            onRemove={(v) => removeItem('manufacturerNames', v)} 
-            isSaving={isSaving}
+        <MasterSection
+            title="メーカー名"
+            items={localData.manufacturerNames}
+            onAdd={(v) => addItem('manufacturerNames', v, 'manufacturerNames')}
+            onRemove={(v) => removeItem('manufacturerNames', v, 'manufacturerNames')}
+            isSaving={savingSection === 'manufacturerNames'}
         />
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
@@ -317,7 +327,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
                           await addShelfName(shelfInput);
                           setShelfInput('');
                         }}
-                        disabled={isSaving}
+                        disabled={savingSection === 'manufacturerShelf'}
                         className="bg-secondary text-white px-3 py-1.5 rounded-md hover:bg-slate-600 text-sm flex items-center gap-1"
                       >
                         <Plus size={14} /> 追加
@@ -385,7 +395,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
                           await addCaseName(caseInput);
                           setCaseInput('');
                         }}
-                        disabled={isSaving}
+                        disabled={savingSection === 'manufacturerCase'}
                         className="bg-secondary text-white px-3 py-1.5 rounded-md hover:bg-slate-600 text-sm flex items-center gap-1"
                       >
                         <Plus size={14} /> 追加
@@ -461,7 +471,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
                         onClick={async () => {
                           await addFaceOption();
                         }}
-                        disabled={isSaving}
+                        disabled={savingSection === 'manufacturerFace'}
                         className="w-20 shrink-0 bg-secondary text-white px-3 py-1.5 rounded-md hover:bg-slate-600 text-sm flex items-center gap-1 justify-center whitespace-nowrap"
                       >
                         <Plus size={14} /> 追加
@@ -488,7 +498,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
                         onClick={() => {
                           void toggleDefaultStartMonth(month);
                         }}
-                        disabled={isSaving}
+                        disabled={savingSection === 'manufacturerMonth'}
                         className={`px-2.5 py-1.5 rounded-md border text-xs ${
                           checked
                             ? 'bg-primary text-white border-primary'
@@ -504,20 +514,20 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
             </div>
         </div>
         
-        <MasterSection 
-            title="リスク分類" 
-            items={localData.riskClassifications} 
-            onAdd={(v) => addItem('riskClassifications', v)} 
-            onRemove={(v) => removeItem('riskClassifications', v)} 
-            isSaving={isSaving}
+        <MasterSection
+            title="リスク分類"
+            items={localData.riskClassifications}
+            onAdd={(v) => addItem('riskClassifications', v, 'riskClassifications')}
+            onRemove={(v) => removeItem('riskClassifications', v, 'riskClassifications')}
+            isSaving={savingSection === 'riskClassifications'}
         />
 
-        <MasterSection 
-            title="特定成分" 
-            items={localData.specificIngredients} 
-            onAdd={(v) => addItem('specificIngredients', v)} 
-            onRemove={(v) => removeItem('specificIngredients', v)} 
-            isSaving={isSaving}
+        <MasterSection
+            title="特定成分"
+            items={localData.specificIngredients}
+            onAdd={(v) => addItem('specificIngredients', v, 'specificIngredients')}
+            onRemove={(v) => removeItem('specificIngredients', v, 'specificIngredients')}
+            isSaving={savingSection === 'specificIngredients'}
         />
     </div>
   );

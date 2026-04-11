@@ -2172,10 +2172,10 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsCreativeImageModalOpen(true)}
-                    className="flex h-24 w-36 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white transition-colors hover:border-sky-400"
+                    className="flex h-40 w-60 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white transition-colors hover:border-sky-400"
                     style={{ cursor: 'zoom-in' }}
                   >
-                    <img src={linkedCreative.imageUrl} alt="" className="h-full w-full object-cover" />
+                    <img src={linkedCreative.imageUrl} alt="" className="h-full w-full object-contain" />
                   </button>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -2194,11 +2194,11 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                       )}
                     </div>
                     {linkedCreative.memo && (
-                      <div className="mt-2 rounded-lg bg-slate-50 p-2 text-xs text-slate-600 whitespace-pre-wrap">
+                      <div className="mt-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-600 whitespace-pre-wrap">
                         {linkedCreative.memo}
                       </div>
                     )}
-                    <div className="mt-2 text-xs text-slate-500">
+                    <div className="mt-2 text-sm text-slate-500">
                       最終更新日: {formatDate(linkedCreative.updatedAt)}
                     </div>
                   </div>
