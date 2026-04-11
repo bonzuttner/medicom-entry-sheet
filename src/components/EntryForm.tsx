@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Creative, EntrySheet, EntrySheetRevision, FaceOption, MasterData, ProductEntry, User, UserRole } from '../types';
-import { Save, Plus, Trash2, AlertTriangle, Image as ImageIcon, Search, ChevronRight, FileText, PlusCircle, RefreshCw, Package, CheckCircle, RotateCcw, Edit3 } from 'lucide-react';
+import { Save, Plus, Trash2, AlertTriangle, Image as ImageIcon, Search, ChevronRight, FileText, PlusCircle, RefreshCw, Package, CheckCircle, RotateCcw, Edit3, X } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { dataService } from '../services/dataService';
 import { getCurrentAssigneeLabel, getWorkflowStatusView } from '../lib/sheetWorkflow';
@@ -113,6 +113,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   const [isRelinkingCreative, setIsRelinkingCreative] = useState(false);
   const [isPreparingReturn, setIsPreparingReturn] = useState(false);
   const [isCreativeImageModalOpen, setIsCreativeImageModalOpen] = useState(false);
+  const [relinkError, setRelinkError] = useState('');
+  const [relinkSuccess, setRelinkSuccess] = useState(false);
   const askedPrefillByProductRef = useRef<Map<number, string>>(new Map());
   const lastAutoTitleRef = useRef('');
   const isAdminUser = currentUser.role === UserRole.ADMIN;
@@ -1122,6 +1124,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   });
   const handleRelinkCreative = async (targetCreativeId: string) => {
     if (!onRelinkCreative || !initialData.id || isRelinkingCreative) return;
+    setRelinkError('');
     try {
       setIsRelinkingCreative(true);
       const result = await onRelinkCreative(initialData.id, targetCreativeId);
@@ -1138,8 +1141,10 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       }));
       setCreativePickerOpen(false);
       setCreativePickerQuery('');
+      setRelinkSuccess(true);
+      setTimeout(() => setRelinkSuccess(false), 3000);
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'クリエイティブの差し替えに失敗しました。');
+      setRelinkError(error instanceof Error ? error.message : 'クリエイティブの差し替えに失敗しました。');
     } finally {
       setIsRelinkingCreative(false);
     }
@@ -2173,7 +2178,21 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     <img src={linkedCreative.imageUrl} alt="" className="h-full w-full object-cover" />
                   </button>
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-semibold text-slate-800">{linkedCreative.name}</div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-semibold text-slate-800">{linkedCreative.name}</span>
+                      {currentCreativeStatus === 'in_progress' && (
+                        <span className="inline-flex items-center rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">制作中</span>
+                      )}
+                      {currentCreativeStatus === 'confirmation_pending' && (
+                        <span className="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">確認待ち</span>
+                      )}
+                      {currentCreativeStatus === 'returned' && (
+                        <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">差し戻し</span>
+                      )}
+                      {currentCreativeStatus === 'approved' && (
+                        <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">承認済み</span>
+                      )}
+                    </div>
                     {linkedCreative.memo && (
                       <div className="mt-2 rounded-lg bg-slate-50 p-2 text-xs text-slate-600 whitespace-pre-wrap">
                         {linkedCreative.memo}
@@ -2212,9 +2231,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                 <button
                   type="button"
                   onClick={() => setCreativePickerOpen(false)}
-                  className="rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-slate-100"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                 >
-                  閉じる
+                  <X size={20} />
                 </button>
               </div>
               <div className="mt-4">
@@ -2271,6 +2290,25 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                   })
                 )}
               </div>
+            </div>
+          )}
+          {relinkError && (
+            <div className="mt-4 flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+              <AlertTriangle size={16} className="shrink-0" />
+              <span>{relinkError}</span>
+              <button
+                type="button"
+                onClick={() => setRelinkError('')}
+                className="ml-auto shrink-0 rounded p-1 hover:bg-rose-100"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
+          {relinkSuccess && (
+            <div className="mt-4 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              <CheckCircle size={16} className="shrink-0" />
+              <span>クリエイティブを差し替えました</span>
             </div>
           )}
         </div>
@@ -2505,16 +2543,19 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       {/* クリエイティブ画像拡大モーダル */}
       {isCreativeImageModalOpen && linkedCreative && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
           onClick={() => setIsCreativeImageModalOpen(false)}
         >
-          <div className="relative max-h-[90vh] max-w-[90vw]">
+          <div className="relative max-h-[90vh] max-w-[90vw] animate-[fadeIn_150ms_ease-out]">
             <button
               type="button"
-              onClick={() => setIsCreativeImageModalOpen(false)}
+              onClick={(e: React.MouseEvent) => {
+                e.stopPropagation();
+                setIsCreativeImageModalOpen(false);
+              }}
               className="absolute -right-3 -top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-600 shadow-lg hover:bg-slate-100"
             >
-              ✕
+              <X size={20} />
             </button>
             <img
               src={linkedCreative.imageUrl}
