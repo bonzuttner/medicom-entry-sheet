@@ -736,9 +736,9 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
               <th className="sticky left-0 top-0 z-50 w-[52px] border-b border-slate-200 px-2 py-3 text-center text-xs font-bold text-slate-500 bg-slate-50 shadow-[1px_0_0_0_rgba(226,232,240,1)]">
                 <button onClick={toggleSelectAll} className="inline-flex items-center justify-center text-slate-500 hover:text-slate-700">
                   {filteredSheets.length > 0 && selectedCount === filteredSheets.length ? (
-                    <CheckSquare size={15} />
+                    <CheckSquare size={20} />
                   ) : (
-                    <Square size={15} />
+                    <Square size={20} />
                   )}
                 </button>
               </th>
@@ -774,7 +774,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                         className="inline-flex items-center justify-center text-slate-500 hover:text-slate-700"
                         title="CSV出力対象として選択"
                       >
-                        {selectedSheets.has(sheet.id) ? <CheckSquare size={15} /> : <Square size={15} />}
+                        {selectedSheets.has(sheet.id) ? <CheckSquare size={20} /> : <Square size={20} />}
                       </button>
                     </td>
                     <td className={`w-24 px-2 py-4 text-[10px] text-slate-400 font-mono whitespace-nowrap ${dirty ? 'bg-amber-50 group-hover:bg-amber-50' : selectedSheets.has(sheet.id) ? 'bg-sky-50 group-hover:bg-sky-100' : 'bg-white group-hover:bg-slate-50'}`}>

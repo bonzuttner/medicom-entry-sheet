@@ -76,7 +76,7 @@ export const EntryList: React.FC<EntryListProps> = ({
   const toolbarAccentButtonClass =
     'flex items-center justify-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 font-semibold text-sky-700 shadow-sm transition-all hover:bg-sky-100';
   const toolbarPrimaryButtonClass =
-    'flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 font-bold text-white shadow-lg shadow-sky-200 transition-all hover:bg-sky-600 hover:-translate-y-0.5';
+    'flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 font-bold text-white shadow-lg shadow-sky-200 transition-all hover:bg-sky-600 hover:-translate-y-0.5';
   const searchInputClass =
     'block w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm leading-5 shadow-sm placeholder-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary';
   const filterControlClass =
@@ -794,7 +794,7 @@ export const EntryList: React.FC<EntryListProps> = ({
                                     className={`p-2 rounded-full border border-transparent shadow-sm ${canModifySheet(sheet) ? 'text-primary hover:bg-white hover:border-slate-200' : 'text-slate-300 cursor-not-allowed'}`}
                                     title={canModifySheet(sheet) ? "編集" : "編集権限がありません"}
                                 >
-                                    <Edit3 size={18} />
+                                    <Edit3 size={16} />
                                 </button>
                                 <button
                                     onClick={() => onDuplicate(sheet)}
@@ -802,7 +802,7 @@ export const EntryList: React.FC<EntryListProps> = ({
                                     className={`p-2 rounded-full border border-transparent shadow-sm ${canModifySheet(sheet) ? 'text-slate-500 hover:bg-white hover:border-slate-200' : 'text-slate-300 cursor-not-allowed'}`}
                                     title={canModifySheet(sheet) ? "複製" : "複製権限がありません"}
                                 >
-                                    <Copy size={18} />
+                                    <Copy size={16} />
                                 </button>
                                 <button
                                     onClick={() => setDeleteTarget(sheet)}
@@ -810,7 +810,7 @@ export const EntryList: React.FC<EntryListProps> = ({
                                     className={`p-2 rounded-full border border-transparent shadow-sm ${canDeleteSheet(sheet) ? 'text-slate-400 hover:text-danger hover:bg-white hover:border-slate-200' : 'text-slate-300 cursor-not-allowed'}`}
                                     title={canDeleteSheet(sheet) ? "削除" : "削除権限がありません"}
                                 >
-                                    <Trash2 size={18} />
+                                    <Trash2 size={16} />
                                 </button>
                             </div>
                             <button 
@@ -949,7 +949,7 @@ export const EntryList: React.FC<EntryListProps> = ({
                                   className={`p-2 rounded ${canModifySheet(sheet) ? 'text-primary hover:text-sky-700 hover:bg-sky-100' : 'text-slate-300 cursor-not-allowed'}`}
                                   title={canModifySheet(sheet) ? "編集" : "編集権限がありません"}
                               >
-                                  <Edit3 size={18} />
+                                  <Edit3 size={16} />
                               </button>
                               <button
                                   onClick={() => onDuplicate(sheet)}
@@ -957,7 +957,7 @@ export const EntryList: React.FC<EntryListProps> = ({
                                   className={`p-2 rounded ${canModifySheet(sheet) ? 'text-slate-500 hover:text-slate-700 hover:bg-slate-200' : 'text-slate-300 cursor-not-allowed'}`}
                                   title={canModifySheet(sheet) ? "複製" : "複製権限がありません"}
                               >
-                                  <Copy size={18} />
+                                  <Copy size={16} />
                               </button>
                               <button
                                   onClick={() => setDeleteTarget(sheet)}
@@ -965,7 +965,7 @@ export const EntryList: React.FC<EntryListProps> = ({
                                   className={`p-2 rounded ${canDeleteSheet(sheet) ? 'text-slate-400 hover:text-danger hover:bg-red-50' : 'text-slate-300 cursor-not-allowed'}`}
                                   title={canDeleteSheet(sheet) ? "削除" : "削除権限がありません"}
                               >
-                                  <Trash2 size={18} />
+                                  <Trash2 size={16} />
                               </button>
                             </div>
                           </td>
