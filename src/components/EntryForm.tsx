@@ -2318,7 +2318,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 mt-4 sm:mt-6">
         <h4 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
           <span className="w-1 h-5 bg-violet-500 rounded-full"></span>
-          Adminメモ（管理者のみ編集）
+          Adminメモ
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           <div>

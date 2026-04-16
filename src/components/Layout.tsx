@@ -90,8 +90,8 @@ export const Layout: React.FC<LayoutProps> = ({ currentUser, currentPage, onNavi
                 active={currentPage === Page.ADMIN_LIST}
                 onClick={() => onNavigate(Page.ADMIN_LIST)}
                 icon={<ListChecks size={17} />}
-                label="履歴(Admin)"
-                fullLabel="エントリー履歴(Admin)"
+                label="履歴"
+                fullLabel="エントリー履歴"
               />
             )}
           </div>
