@@ -51,6 +51,19 @@ export interface EntrySheetAdminMemo {
   adminNote?: string;
 }
 
+// Promotion (Sheet Level, 1:N)
+export interface Promotion {
+  id: string;
+  sheetId?: string;
+  hasPromoMaterial: 'yes' | 'no';
+  promoSample?: string;
+  specialFixture?: string;
+  promoWidth?: number;
+  promoHeight?: number;
+  promoDepth?: number;
+  promoImage?: string;
+}
+
 // Product Level Data
 export interface ProductEntry {
   id: string;
@@ -64,24 +77,15 @@ export interface ProductEntry {
   catchCopy: string;
   productNotes?: string;
   productAttachments?: Attachment[];
-  
+
   // Dimensions
   width: number;
   height: number;
   depth: number;
   facingCount: number;
 
-  // Promotion Info
+  // Arrival date (stays in product)
   arrivalDate?: string;
-  hasPromoMaterial: 'yes' | 'no';
-  promoSample?: string; // Color/Scent sample
-  specialFixture?: string;
-  
-  // Promo Dimensions (Required if hasPromoMaterial is yes)
-  promoWidth?: number;
-  promoHeight?: number;
-  promoDepth?: number;
-  promoImage?: string;
 }
 
 // Sheet Level Data (Header)
@@ -115,6 +119,7 @@ export interface EntrySheet {
   adminMemo?: EntrySheetAdminMemo;
   creative?: CreativeSummary;
   products: ProductEntry[];
+  promotions?: Promotion[];
 }
 
 export interface EntrySheetRevision {

@@ -48,6 +48,18 @@ export interface EntrySheetAdminMemo {
   adminNote?: string;
 }
 
+export interface Promotion {
+  id: string;
+  sheetId?: string;
+  hasPromoMaterial: 'yes' | 'no';
+  promoSample?: string;
+  specialFixture?: string;
+  promoWidth?: number;
+  promoHeight?: number;
+  promoDepth?: number;
+  promoImage?: string;
+}
+
 export interface ProductEntry {
   id: string;
   manufacturerProductId?: string;
@@ -65,13 +77,6 @@ export interface ProductEntry {
   depth: number;
   facingCount: number;
   arrivalDate?: string;
-  hasPromoMaterial: 'yes' | 'no';
-  promoSample?: string;
-  specialFixture?: string;
-  promoWidth?: number;
-  promoHeight?: number;
-  promoDepth?: number;
-  promoImage?: string;
 }
 
 export interface EntrySheet {
@@ -104,6 +109,7 @@ export interface EntrySheet {
   adminMemo?: EntrySheetAdminMemo;
   creative?: CreativeSummary;
   products: ProductEntry[];
+  promotions?: Promotion[];
 }
 
 export interface EntrySheetRevision {

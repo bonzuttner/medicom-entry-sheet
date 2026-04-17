@@ -166,8 +166,6 @@ const findTooLongField = (sheet: EntrySheet): string | null => {
     if (isTooLong(product.janCode)) return `${prefix} JANコード`;
     if (isTooLong(product.catchCopy)) return `${prefix} キャッチコピー`;
     if (isTooLong(product.productNotes)) return `${prefix} 補足事項`;
-    if (isTooLong(product.promoSample)) return `${prefix} 香り・色見本`;
-    if (isTooLong(product.specialFixture)) return `${prefix} 特殊な陳列什器`;
   }
 
   return null;
@@ -282,13 +280,6 @@ const toComparableProducts = (products: EntrySheet['products']) =>
     depth: normalizeOptionalNumberForCompare(product.depth),
     facingCount: normalizeOptionalNumberForCompare(product.facingCount),
     arrivalDate: normalizeOptionalString(product.arrivalDate),
-    hasPromoMaterial: product.hasPromoMaterial === 'yes' ? 'yes' : 'no',
-    promoSample: normalizeOptionalString(product.promoSample),
-    specialFixture: normalizeOptionalString(product.specialFixture),
-    promoWidth: normalizeOptionalNumberForCompare(product.promoWidth),
-    promoHeight: normalizeOptionalNumberForCompare(product.promoHeight),
-    promoDepth: normalizeOptionalNumberForCompare(product.promoDepth),
-    promoImage: normalizeOptionalString(product.promoImage),
     productAttachments: (product.productAttachments || []).map((attachment) => ({
       name: normalizeOptionalString(attachment.name),
       size: Number(attachment.size) || 0,

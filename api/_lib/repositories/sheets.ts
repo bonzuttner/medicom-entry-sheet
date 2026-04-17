@@ -1,5 +1,5 @@
 import * as db from '../db.js';
-import { CreativeCandidateSheet, EntrySheet, ProductEntry, Attachment, EntrySheetRevision } from '../types.js';
+import { CreativeCandidateSheet, EntrySheet, ProductEntry, Attachment, EntrySheetRevision, Promotion } from '../types.js';
 import { ensureManufacturer, ensureManufacturerCodeInfrastructure } from './users.js';
 import { randomUUID } from 'crypto';
 import {
@@ -103,13 +103,6 @@ interface ProductRow {
   depth: number | null;
   facing_count: number | null;
   arrival_date: Date | string | null;
-  has_promo_material: boolean;
-  promo_sample: string | null;
-  special_fixture: string | null;
-  promo_width: number | null;
-  promo_height: number | null;
-  promo_depth: number | null;
-  promo_image_url: string | null;
 }
 
 interface ManufacturerProductRow {
@@ -127,6 +120,13 @@ interface ManufacturerProductRow {
   depth: number | null;
   facing_count: number | null;
   arrival_date: Date | string | null;
+  last_used_at: Date | string;
+  updated_at: Date | string;
+}
+
+interface PromotionRow {
+  id: string;
+  sheet_id: string;
   has_promo_material: boolean;
   promo_sample: string | null;
   special_fixture: string | null;
@@ -134,8 +134,6 @@ interface ManufacturerProductRow {
   promo_height: number | null;
   promo_depth: number | null;
   promo_image_url: string | null;
-  last_used_at: Date | string;
-  updated_at: Date | string;
 }
 
 const toIsoString = (value: Date | string | null | undefined): string => {
@@ -307,6 +305,7 @@ let ensureWorkflowColumnsPromise: Promise<void> | null = null;
 let ensureManufacturerProductTablesPromise: Promise<void> | null = null;
 let ensureProductManufacturerProductColumnPromise: Promise<void> | null = null;
 let ensureSheetCodeInfrastructurePromise: Promise<void> | null = null;
+let ensurePromotionsTablePromise: Promise<void> | null = null;
 let pruneRetentionIfDuePromise: Promise<{ deletedSheets: number; deletedManufacturerProducts: number }> | null = null;
 
 const ensureSheetSnapshotColumns = async (): Promise<void> => {
@@ -738,6 +737,37 @@ const ensureSheetRevisionTable = async (): Promise<void> => {
   await ensureSheetRevisionTablePromise;
 };
 
+const ensurePromotionsTable = async (): Promise<void> => {
+  if (!ensurePromotionsTablePromise) {
+    ensurePromotionsTablePromise = (async () => {
+      await db.query(
+        `
+        CREATE TABLE IF NOT EXISTS promotions (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          sheet_id UUID NOT NULL REFERENCES entry_sheets(id) ON DELETE CASCADE,
+          has_promo_material BOOLEAN NOT NULL DEFAULT FALSE,
+          promo_sample TEXT,
+          special_fixture TEXT,
+          promo_width NUMERIC(10, 2),
+          promo_height NUMERIC(10, 2),
+          promo_depth NUMERIC(10, 2),
+          promo_image_url TEXT,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+        `
+      );
+      await db.query(
+        `CREATE INDEX IF NOT EXISTS idx_promotions_sheet ON promotions(sheet_id)`
+      );
+    })().catch((error) => {
+      ensurePromotionsTablePromise = null;
+      throw error;
+    });
+  }
+  await ensurePromotionsTablePromise;
+};
+
 const ensureSheetStatusConstraint = async (): Promise<void> => {
   if (!ensureSheetStatusConstraintPromise) {
     ensureSheetStatusConstraintPromise = (async () => {
@@ -802,6 +832,21 @@ interface AttachmentRow {
 }
 
 /**
+ * Convert PromotionRow to Promotion
+ */
+const rowToPromotion = (row: PromotionRow): Promotion => ({
+  id: row.id,
+  sheetId: row.sheet_id,
+  hasPromoMaterial: row.has_promo_material ? 'yes' : 'no',
+  promoSample: row.promo_sample || undefined,
+  specialFixture: row.special_fixture || undefined,
+  promoWidth: row.promo_width || undefined,
+  promoHeight: row.promo_height || undefined,
+  promoDepth: row.promo_depth || undefined,
+  promoImage: row.promo_image_url || undefined,
+});
+
+/**
  * Convert database rows to EntrySheet object
  */
 const rowsToSheet = (
@@ -810,7 +855,8 @@ const rowsToSheet = (
   ingredientsByProductId: Map<string, string[]>,
   attachmentsByProductId: Map<string, Attachment[]>,
   sheetAttachments: Attachment[],
-  adminMemoBySheetId: Map<string, EntrySheet['adminMemo']>
+  adminMemoBySheetId: Map<string, EntrySheet['adminMemo']>,
+  promotionsBySheetId: Map<string, Promotion[]>
 ): EntrySheet => {
   const products: ProductEntry[] = productRows.map((p) => {
     const ingredients = ingredientsByProductId.get(p.id) || [];
@@ -831,17 +877,12 @@ const rowsToSheet = (
       depth: p.depth || 0,
       facingCount: p.facing_count || 1,
       arrivalDate: toDateOnlyString(p.arrival_date),
-      hasPromoMaterial: p.has_promo_material ? 'yes' : 'no',
-      promoSample: p.promo_sample || undefined,
-      specialFixture: p.special_fixture || undefined,
-      promoWidth: p.promo_width || undefined,
-      promoHeight: p.promo_height || undefined,
-      promoDepth: p.promo_depth || undefined,
-      promoImage: p.promo_image_url || undefined,
       specificIngredients: ingredients,
       productAttachments: productAttachments.length > 0 ? productAttachments : undefined,
     };
   });
+
+  const promotions = promotionsBySheetId.get(sheetRow.id) || [];
 
   return {
     id: sheetRow.id,
@@ -880,6 +921,7 @@ const rowsToSheet = (
           }
         : undefined,
     products,
+    promotions: promotions.length > 0 ? promotions : undefined,
     attachments: sheetAttachments.length > 0 ? sheetAttachments : undefined,
   };
 };
@@ -975,6 +1017,35 @@ const fetchAdminMemoBySheetIds = async (
   return buildAdminMemoBySheetId(result.rows);
 };
 
+const buildPromotionsBySheetId = (rows: PromotionRow[]): Map<string, Promotion[]> => {
+  const map = new Map<string, Promotion[]>();
+  for (const row of rows) {
+    const list = map.get(row.sheet_id) || [];
+    list.push(rowToPromotion(row));
+    map.set(row.sheet_id, list);
+  }
+  return map;
+};
+
+const fetchPromotionsBySheetIds = async (
+  sheetIds: string[]
+): Promise<Map<string, Promotion[]>> => {
+  if (sheetIds.length === 0) return new Map();
+  await ensurePromotionsTable();
+  const result = await db.query<PromotionRow>(
+    `
+    SELECT
+      id, sheet_id, has_promo_material, promo_sample, special_fixture,
+      promo_width, promo_height, promo_depth, promo_image_url
+    FROM promotions
+    WHERE sheet_id = ANY($1)
+    ORDER BY created_at ASC
+    `,
+    [sheetIds]
+  );
+  return buildPromotionsBySheetId(result.rows);
+};
+
 const toUniqueTrimmedIngredients = (ingredients: string[] | undefined): string[] =>
   [...new Set((ingredients || []).map((value) => value.trim()).filter(Boolean))];
 
@@ -990,13 +1061,6 @@ const productToMasterPayload = (product: ProductEntry) => ({
   depth: product.depth,
   facingCount: product.facingCount,
   arrivalDate: product.arrivalDate || null,
-  hasPromoMaterial: product.hasPromoMaterial === 'yes',
-  promoSample: product.promoSample || null,
-  specialFixture: product.specialFixture || null,
-  promoWidth: product.promoWidth || null,
-  promoHeight: product.promoHeight || null,
-  promoDepth: product.promoDepth || null,
-  promoImage: product.promoImage || null,
   specificIngredients: toUniqueTrimmedIngredients(product.specificIngredients),
 });
 
@@ -1061,16 +1125,12 @@ const syncManufacturerProducts = async (
         id, manufacturer_id, jan_code, product_name,
         product_image_url, risk_classification, catch_copy,
         product_notes, width, height, depth, facing_count, arrival_date,
-        has_promo_material, promo_sample, special_fixture,
-        promo_width, promo_height, promo_depth, promo_image_url, last_used_at,
-        created_at, updated_at
+        last_used_at, created_at, updated_at
       ) VALUES (
         $1, $2, $3, $4,
         $5, $6, $7,
         $8, $9, $10, $11, $12, $13,
-        $14, $15, $16,
-        $17, $18, $19, $20, NOW(),
-        NOW(), NOW()
+        NOW(), NOW(), NOW()
       )
       ON CONFLICT (id) DO UPDATE SET
         manufacturer_id = EXCLUDED.manufacturer_id,
@@ -1085,13 +1145,6 @@ const syncManufacturerProducts = async (
         depth = EXCLUDED.depth,
         facing_count = EXCLUDED.facing_count,
         arrival_date = EXCLUDED.arrival_date,
-        has_promo_material = EXCLUDED.has_promo_material,
-        promo_sample = EXCLUDED.promo_sample,
-        special_fixture = EXCLUDED.special_fixture,
-        promo_width = EXCLUDED.promo_width,
-        promo_height = EXCLUDED.promo_height,
-        promo_depth = EXCLUDED.promo_depth,
-        promo_image_url = EXCLUDED.promo_image_url,
         last_used_at = NOW(),
         updated_at = NOW()
       `,
@@ -1109,13 +1162,6 @@ const syncManufacturerProducts = async (
         master.depth,
         master.facingCount,
         master.arrivalDate,
-        master.hasPromoMaterial,
-        master.promoSample,
-        master.specialFixture,
-        master.promoWidth,
-        master.promoHeight,
-        master.promoDepth,
-        master.promoImage,
       ]
     );
 
@@ -1229,7 +1275,10 @@ export const findAll = async (limit?: number, offset: number = 0): Promise<Entry
   const ingredientsByProductId = buildIngredientsByProductId(ingredientResult.rows);
   const attachmentsByProductId = buildAttachmentsByProductId(attachmentResult.rows);
   const sheetAttachmentsBySheetId = buildSheetAttachmentsBySheetId(attachmentResult.rows);
-  const adminMemoBySheetId = await fetchAdminMemoBySheetIds(sheetIds);
+  const [adminMemoBySheetId, promotionsBySheetId] = await Promise.all([
+    fetchAdminMemoBySheetIds(sheetIds),
+    fetchPromotionsBySheetIds(sheetIds),
+  ]);
 
   const sheets = sheetResult.rows.map((sheetRow) =>
     rowsToSheet(
@@ -1238,7 +1287,8 @@ export const findAll = async (limit?: number, offset: number = 0): Promise<Entry
       ingredientsByProductId,
       attachmentsByProductId,
       sheetAttachmentsBySheetId.get(sheetRow.id) || [],
-      adminMemoBySheetId
+      adminMemoBySheetId,
+      promotionsBySheetId
     )
   );
 
@@ -1336,7 +1386,10 @@ export const findByManufacturerId = async (
   const ingredientsByProductId = buildIngredientsByProductId(ingredientResult.rows);
   const attachmentsByProductId = buildAttachmentsByProductId(attachmentResult.rows);
   const sheetAttachmentsBySheetId = buildSheetAttachmentsBySheetId(attachmentResult.rows);
-  const adminMemoBySheetId = await fetchAdminMemoBySheetIds(sheetIds);
+  const [adminMemoBySheetId, promotionsBySheetId] = await Promise.all([
+    fetchAdminMemoBySheetIds(sheetIds),
+    fetchPromotionsBySheetIds(sheetIds),
+  ]);
 
   const sheets = sheetResult.rows.map((sheetRow) =>
     rowsToSheet(
@@ -1345,7 +1398,8 @@ export const findByManufacturerId = async (
       ingredientsByProductId,
       attachmentsByProductId,
       sheetAttachmentsBySheetId.get(sheetRow.id) || [],
-      adminMemoBySheetId
+      adminMemoBySheetId,
+      promotionsBySheetId
     )
   );
 
@@ -1534,7 +1588,10 @@ export const findById = async (sheetId: string): Promise<EntrySheet | null> => {
   const ingredientsByProductId = buildIngredientsByProductId(ingredientResult.rows);
   const attachmentsByProductId = buildAttachmentsByProductId(attachmentResult.rows);
   const sheetAttachmentsBySheetId = buildSheetAttachmentsBySheetId(attachmentResult.rows);
-  const adminMemoBySheetId = await fetchAdminMemoBySheetIds([sheetResult.rows[0].id]);
+  const [adminMemoBySheetId, promotionsBySheetId] = await Promise.all([
+    fetchAdminMemoBySheetIds([sheetResult.rows[0].id]),
+    fetchPromotionsBySheetIds([sheetResult.rows[0].id]),
+  ]);
 
   return rowsToSheet(
     sheetResult.rows[0],
@@ -1542,7 +1599,8 @@ export const findById = async (sheetId: string): Promise<EntrySheet | null> => {
     ingredientsByProductId,
     attachmentsByProductId,
     sheetAttachmentsBySheetId.get(sheetResult.rows[0].id) || [],
-    adminMemoBySheetId
+    adminMemoBySheetId,
+    promotionsBySheetId
   );
 };
 
@@ -1861,12 +1919,9 @@ export const upsert = async (
         INSERT INTO product_entries (
           id, sheet_id, manufacturer_product_id, manufacturer_id, jan_code, product_name,
           product_image_url, risk_classification, catch_copy,
-          product_notes, width, height, depth, facing_count, arrival_date,
-          has_promo_material, promo_sample, special_fixture,
-          promo_width, promo_height, promo_depth, promo_image_url
+          product_notes, width, height, depth, facing_count, arrival_date
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-          $16, $17, $18, $19, $20, $21, $22
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
         )
         ON CONFLICT (id) DO UPDATE SET
           sheet_id = EXCLUDED.sheet_id,
@@ -1882,14 +1937,7 @@ export const upsert = async (
           height = EXCLUDED.height,
           depth = EXCLUDED.depth,
           facing_count = EXCLUDED.facing_count,
-          arrival_date = EXCLUDED.arrival_date,
-          has_promo_material = EXCLUDED.has_promo_material,
-          promo_sample = EXCLUDED.promo_sample,
-          special_fixture = EXCLUDED.special_fixture,
-          promo_width = EXCLUDED.promo_width,
-          promo_height = EXCLUDED.promo_height,
-          promo_depth = EXCLUDED.promo_depth,
-          promo_image_url = EXCLUDED.promo_image_url
+          arrival_date = EXCLUDED.arrival_date
         `,
         [
           productId,
@@ -1907,13 +1955,6 @@ export const upsert = async (
           product.depth,
           product.facingCount,
           product.arrivalDate || null,
-          product.hasPromoMaterial === 'yes',
-          product.promoSample || null,
-          product.specialFixture || null,
-          product.promoWidth || null,
-          product.promoHeight || null,
-          product.promoDepth || null,
-          product.promoImage || null,
         ]
       );
 
@@ -2038,6 +2079,60 @@ export const upsert = async (
           ]
         );
       }
+    }
+
+    // Handle promotions (sheet-level, 1:N)
+    await ensurePromotionsTable();
+    await db.query(`DELETE FROM promotions WHERE sheet_id = $1`, [normalizedSheet.id]);
+    const promotions = Array.isArray(sheet.promotions) ? sheet.promotions : [];
+    if (promotions.length > 0) {
+      const normalizedPromotions = promotions.map((promo) => ({
+        id: String(promo.id || '').trim() || randomUUID(),
+        hasPromoMaterial: promo.hasPromoMaterial === 'yes',
+        promoSample: String(promo.promoSample || '').trim() || null,
+        specialFixture: String(promo.specialFixture || '').trim() || null,
+        promoWidth: promo.promoWidth || null,
+        promoHeight: promo.promoHeight || null,
+        promoDepth: promo.promoDepth || null,
+        promoImage: String(promo.promoImage || '').trim() || null,
+      }));
+
+      await db.query(
+        `
+        INSERT INTO promotions (id, sheet_id, has_promo_material, promo_sample, special_fixture, promo_width, promo_height, promo_depth, promo_image_url)
+        SELECT
+          items.id,
+          $1,
+          items.has_promo_material,
+          items.promo_sample,
+          items.special_fixture,
+          items.promo_width,
+          items.promo_height,
+          items.promo_depth,
+          items.promo_image_url
+        FROM unnest(
+          $2::uuid[],
+          $3::boolean[],
+          $4::text[],
+          $5::text[],
+          $6::numeric[],
+          $7::numeric[],
+          $8::numeric[],
+          $9::text[]
+        ) AS items(id, has_promo_material, promo_sample, special_fixture, promo_width, promo_height, promo_depth, promo_image_url)
+        `,
+        [
+          normalizedSheet.id,
+          normalizedPromotions.map((p) => p.id),
+          normalizedPromotions.map((p) => p.hasPromoMaterial),
+          normalizedPromotions.map((p) => p.promoSample),
+          normalizedPromotions.map((p) => p.specialFixture),
+          normalizedPromotions.map((p) => p.promoWidth),
+          normalizedPromotions.map((p) => p.promoHeight),
+          normalizedPromotions.map((p) => p.promoDepth),
+          normalizedPromotions.map((p) => p.promoImage),
+        ]
+      );
     }
 
     if (revision?.updateAdminMemo) {
@@ -2333,13 +2428,6 @@ export const searchProductsByManufacturerId = async (
       p.depth,
       p.facing_count,
       p.arrival_date,
-      p.has_promo_material,
-      p.promo_sample,
-      p.special_fixture,
-      p.promo_width,
-      p.promo_height,
-      p.promo_depth,
-      p.promo_image_url,
       array_remove(array_agg(pi.ingredient_name ORDER BY pi.ingredient_name), NULL) as ingredient_names
     FROM manufacturer_products p
     JOIN manufacturers m ON p.manufacturer_id = m.id
@@ -2388,13 +2476,6 @@ export const searchProductsByManufacturerId = async (
     depth: row.depth || 0,
     facingCount: row.facing_count || 1,
     arrivalDate: toDateOnlyString(row.arrival_date),
-    hasPromoMaterial: row.has_promo_material ? 'yes' : 'no',
-    promoSample: row.promo_sample || undefined,
-    specialFixture: row.special_fixture || undefined,
-    promoWidth: row.promo_width || undefined,
-    promoHeight: row.promo_height || undefined,
-    promoDepth: row.promo_depth || undefined,
-    promoImage: row.promo_image_url || undefined,
     productAttachments: [],
   }));
 };

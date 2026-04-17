@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Creative, EntrySheet, EntrySheetRevision, FaceOption, MasterData, ProductEntry, User, UserRole } from '../types';
+import { Creative, EntrySheet, EntrySheetRevision, FaceOption, MasterData, ProductEntry, Promotion, User, UserRole } from '../types';
 import { Save, Plus, Trash2, AlertTriangle, Image as ImageIcon, Search, ChevronRight, FileText, PlusCircle, RefreshCw, Package, CheckCircle, RotateCcw, Edit3, X } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { dataService } from '../services/dataService';
@@ -115,6 +115,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   const [isCreativeImageModalOpen, setIsCreativeImageModalOpen] = useState(false);
   const [relinkError, setRelinkError] = useState('');
   const [relinkSuccess, setRelinkSuccess] = useState(false);
+  const [activePromotionTab, setActivePromotionTab] = useState<number>(0);
   const askedPrefillByProductRef = useRef<Map<number, string>>(new Map());
   const lastAutoTitleRef = useRef('');
   const isAdminUser = currentUser.role === UserRole.ADMIN;
@@ -781,13 +782,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     depth: product.depth,
     facingCount: product.facingCount,
     arrivalDate: product.arrivalDate || '',
-    hasPromoMaterial: product.hasPromoMaterial,
-    promoSample: product.promoSample || '',
-    specialFixture: product.specialFixture || '',
-    promoWidth: product.promoWidth ?? '',
-    promoHeight: product.promoHeight ?? '',
-    promoDepth: product.promoDepth ?? '',
-    promoImage: product.promoImage || '',
   });
 
   const applyReusableProduct = (index: number, candidate: ProductEntry) => {
@@ -888,7 +882,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       height: 0,
       depth: 0,
       facingCount: 1,
-      hasPromoMaterial: 'no',
     };
     setFormData(prev => ({
       ...prev,
@@ -907,6 +900,76 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     const newProducts = formData.products.filter((_, i) => i !== index);
     setFormData(prev => ({ ...prev, products: newProducts }));
     if (activeTab >= newProducts.length) setActiveTab(newProducts.length - 1);
+  };
+
+  // Promotion handlers
+  const addPromotion = () => {
+    const newPromotion: Promotion = {
+      id: uuidv4(),
+      hasPromoMaterial: 'yes',
+      promoSample: '',
+      specialFixture: '',
+      promoWidth: undefined,
+      promoHeight: undefined,
+      promoDepth: undefined,
+      promoImage: '',
+    };
+    setFormData(prev => ({
+      ...prev,
+      promotions: [...(prev.promotions || []), newPromotion]
+    }));
+    setActivePromotionTab((formData.promotions || []).length);
+  };
+
+  const removePromotion = (index: number) => {
+    if (!window.confirm("この販促物情報を削除しますか？")) return;
+    const newPromotions = (formData.promotions || []).filter((_, i) => i !== index);
+    setFormData(prev => ({ ...prev, promotions: newPromotions }));
+    if (activePromotionTab >= newPromotions.length) {
+      setActivePromotionTab(Math.max(0, newPromotions.length - 1));
+    }
+  };
+
+  const handlePromotionChange = (index: number, field: keyof Promotion, value: any) => {
+    const newPromotions = [...(formData.promotions || [])];
+    newPromotions[index] = { ...newPromotions[index], [field]: value };
+    setFormData(prev => ({ ...prev, promotions: newPromotions }));
+  };
+
+  const handlePromotionImageUpload = (index: number) => {
+    const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*,.ai,.eps';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      if (file.size > MAX_IMAGE_BYTES) {
+        alert('画像サイズが大きすぎます。25MB以下の画像を使用してください。');
+        return;
+      }
+      try {
+        const url = await runTrackedUpload(() => uploadFile(file, 'promo'));
+        handlePromotionChange(index, 'promoImage', url);
+      } catch (error) {
+        console.error('Promotion image upload failed:', error);
+        const message = error instanceof Error ? error.message : '画像のアップロードに失敗しました。';
+        alert(message);
+      }
+    };
+    input.click();
+  };
+
+  const getPromotionTabState = (promo: Promotion) => {
+    const hasImage = !!promo.promoImage;
+    const hasDimensions = (promo.promoWidth ?? 0) > 0 && (promo.promoHeight ?? 0) > 0 && (promo.promoDepth ?? 0) > 0;
+    if (hasImage && hasDimensions) {
+      return { label: '完了', tone: 'bg-emerald-100 text-emerald-700' };
+    }
+    if (hasImage || hasDimensions || promo.promoSample || promo.specialFixture) {
+      return { label: '入力中', tone: 'bg-amber-100 text-amber-700' };
+    }
+    return { label: '未入力', tone: 'bg-slate-100 text-slate-500' };
   };
 
   const saveSheet = async (status: 'draft' | 'completed') => {
@@ -960,15 +1023,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                 alert(`商品${index + 1}（${p.productName}）のJANコードは8桁 / 13桁 / 16桁で入力してください。`);
                 return;
             }
-            if (p.hasPromoMaterial === 'yes') {
-                const promoMissing: string[] = [];
-                if (!p.promoWidth) promoMissing.push('販促物幅');
-                if (!p.promoImage) promoMissing.push('販促物画像');
-                if (promoMissing.length > 0) {
-                  alert(`商品${index + 1}（${p.productName}）の販促物情報が不足しています: ${promoMissing.join('、')}`);
-                  return;
-                }
-            }
             if (!/^\d+$/.test(p.janCode)) {
                 alert(`商品${index + 1}（${p.productName}）のJANコードは半角数字のみ入力してください。`);
                 return;
@@ -1005,8 +1059,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     }
   };
 
-  // Helper for mock image upload
-  const handleImageUpload = (index: number, field: 'productImage' | 'promoImage') => {
+  // Helper for product image upload
+  const handleImageUpload = (index: number) => {
     const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
     const MIN_SHORT_SIDE_PX = 1000;
     const getImageDimensions = (file: File): Promise<{ width: number; height: number }> =>
@@ -1031,22 +1085,19 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     input.onchange = async (e) => {
         const file = (e.target as HTMLInputElement).files?.[0];
         if (file) {
-            if (field === 'productImage' && (file.size <= 0 || file.size > MAX_IMAGE_BYTES)) {
+            if (file.size <= 0 || file.size > MAX_IMAGE_BYTES) {
                 alert("画像容量は25MB以下にしてください。");
                 return;
             }
             try {
-              if (field === 'productImage') {
-                const { width, height } = await getImageDimensions(file);
-                const shortSide = Math.min(width, height);
-                if (shortSide < MIN_SHORT_SIDE_PX) {
-                  alert(`解像度不足です（短辺${MIN_SHORT_SIDE_PX}px未満）。`);
-                  return;
-                }
+              const { width, height } = await getImageDimensions(file);
+              const shortSide = Math.min(width, height);
+              if (shortSide < MIN_SHORT_SIDE_PX) {
+                alert(`解像度不足です（短辺${MIN_SHORT_SIDE_PX}px未満）。`);
+                return;
               }
-              const uploadKind = field === 'promoImage' ? 'promo' : 'image';
-              const url = await runTrackedUpload(() => uploadFile(file, uploadKind));
-              handleProductChange(index, field, url);
+              const url = await runTrackedUpload(() => uploadFile(file, 'image'));
+              handleProductChange(index, 'productImage', url);
             } catch (error) {
               const message = error instanceof Error ? error.message : '';
               if (
@@ -1058,11 +1109,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                 return;
               }
               if (message.includes('解像度不足')) {
-                if (field === 'productImage') {
-                  alert(`商品画像の解像度が不足しています（${file.name}）。短辺1000px以上の画像を選択してください。`);
-                  return;
-                }
-                alert(`画像の解像度要件に合致していません（${file.name}）。`);
+                alert(`商品画像の解像度が不足しています（${file.name}）。短辺1000px以上の画像を選択してください。`);
                 return;
               }
               if (message.includes('画像の解像度を判定できない') || message.includes('Unsupported file type')) {
@@ -1077,7 +1124,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   };
 
   const activeProduct = formData.products[activeTab];
-  const promoImageFileName = getDisplayFileNameFromUrl(activeProduct.promoImage);
   const faceOptions = getFaceOptions();
   const selectedFaceOption =
     faceOptions.find((option) => option.label === formData.faceLabel) ||
@@ -1159,15 +1205,11 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       Number(product.depth) > 0,
       Number(product.facingCount) > 0,
     ];
-    const promoChecks =
-      product.hasPromoMaterial === 'yes'
-        ? [Number(product.promoWidth) > 0, hasText(product.promoImage)]
-        : [];
-    const allFilled = [...coreChecks, ...promoChecks].every(Boolean);
+    const allFilled = coreChecks.every(Boolean);
     if (allFilled) {
       return { label: '完了', tone: 'bg-emerald-100 text-emerald-700' };
     }
-    const anyFilled = [...coreChecks, ...promoChecks].some(Boolean);
+    const anyFilled = coreChecks.some(Boolean);
     if (anyFilled) {
       return { label: '入力中', tone: 'bg-amber-100 text-amber-700' };
     }
@@ -1832,7 +1874,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                                 w-full sm:w-40 h-48 sm:h-40 flex-shrink-0 rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer overflow-hidden relative
                                 ${!activeProduct.productImage ? 'border-amber-200 bg-amber-100/70' : 'border-transparent bg-slate-100'}
                             `}
-                            onClick={() => handleImageUpload(activeTab, 'productImage')}
+                            onClick={() => handleImageUpload(activeTab)}
                         >
                             {activeProduct.productImage ? (
                                 <img src={activeProduct.productImage} alt="Product" className="w-full h-full object-contain" />
@@ -1848,7 +1890,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                             <p className="mb-3 text-slate-500">※A4で印刷可能な高解像度画像をアップロードしてください。保存できない場合は担当者へメール送付してください。</p>
                             <p className="mb-3 text-slate-500">※登録可能な形式: ai / PNG / jpeg / eps</p>
                             <button 
-                                onClick={() => handleImageUpload(activeTab, 'productImage')}
+                                onClick={() => handleImageUpload(activeTab)}
                                 className="w-full sm:w-auto px-4 py-2 bg-white border border-slate-300 rounded shadow-sm hover:bg-slate-50 text-slate-700 font-medium"
                             >
                                 画像を選択...
@@ -1998,99 +2040,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                 <span className="w-1 h-6 bg-orange-500 rounded-full"></span>
                 販促物情報
             </h4>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                 <div>
-                     <label className="block text-sm font-bold text-slate-700 mb-2">販促物の有無 <span className="text-danger font-bold">*</span></label>
-                    <select
-                        className={getSelectClass(!hasText(activeProduct.hasPromoMaterial))}
-                        value={activeProduct.hasPromoMaterial || ''}
-                        onChange={(e) => handleProductChange(activeTab, 'hasPromoMaterial', e.target.value)}
-                    >
-                        <option value="">選択してください</option>
-                        <option value="no">無し</option>
-                        <option value="yes">有り</option>
-                    </select>
-                </div>
-            </div>
-
-            {/* Conditional Promo Fields */}
-            {activeProduct.hasPromoMaterial === 'yes' && (
-                <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 sm:p-6 animate-in fade-in slide-in-from-top-4 duration-300">
-                    <h5 className="font-bold text-orange-800 mb-4 flex items-center gap-2">
-                        <AlertTriangle size={18} />
-                        販促物詳細入力
-                    </h5>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                         <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-2">香り・色見本</label>
-                            <select 
-                                className={getSelectClass()}
-                                value={activeProduct.promoSample || '無し'}
-                                onChange={(e) => handleProductChange(activeTab, 'promoSample', e.target.value)}
-                            >
-                                <option value="無し">無し</option>
-                                <option value="有り">有り</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-2">特殊な陳列什器</label>
-                            <input 
-                                type="text" 
-                                className={getFieldClass()}
-                                placeholder="例：前後陳列用什器"
-                                value={activeProduct.specialFixture || ''}
-                                onChange={(e) => handleProductChange(activeTab, 'specialFixture', e.target.value)}
-                            />
-                        </div>
-
-                         <div className="md:col-span-2">
-                             <label className="block text-sm font-bold text-slate-700 mb-2">販促物サイズ (mm) <span className="text-danger font-bold">*</span></label>
-                             <div className="grid grid-cols-3 gap-2 sm:gap-4">
-                                <input 
-                                    type="number" placeholder="幅" className={getFieldClass(!(Number(activeProduct.promoWidth) > 0))}
-                                    value={activeProduct.promoWidth || ''}
-                                    onChange={(e) => handleProductChange(activeTab, 'promoWidth', parseOptionalNumber(e.target.value))}
-                                />
-                                <input 
-                                    type="number" placeholder="高さ" className={getFieldClass()}
-                                    value={activeProduct.promoHeight || ''}
-                                    onChange={(e) => handleProductChange(activeTab, 'promoHeight', parseOptionalNumber(e.target.value))}
-                                />
-                                <input 
-                                    type="number" placeholder="奥行" className={getFieldClass()}
-                                    value={activeProduct.promoDepth || ''}
-                                    onChange={(e) => handleProductChange(activeTab, 'promoDepth', parseOptionalNumber(e.target.value))}
-                                />
-                             </div>
-                        </div>
-
-                         <div className="md:col-span-2">
-                            <label className="block text-sm font-bold text-slate-700 mb-2">販促物画像 <span className="text-danger font-bold">*</span></label>
-                            <div className={`flex flex-col sm:flex-row gap-4 items-start sm:items-center rounded-lg p-3 ${activeProduct.promoImage ? 'bg-slate-100' : 'bg-amber-100/70'}`}>
-                                <button 
-                                    onClick={() => handleImageUpload(activeTab, 'promoImage')}
-                                    className="w-full sm:w-auto rounded-lg bg-white px-4 py-3 text-slate-700 shadow-sm hover:bg-slate-50"
-                                >
-                                    画像を選択...
-                                </button>
-                                {activeProduct.promoImage ? (
-                                    <div className="text-success font-medium flex flex-col gap-1">
-                                        <span className="flex items-center gap-1">
-                                            <ImageIcon size={16} /> 登録済み
-                                        </span>
-                                        {promoImageFileName ? (
-                                            <span className="text-xs text-slate-600 break-all">{promoImageFileName}</span>
-                                        ) : null}
-                                    </div>
-                                ) : (
-                                    <span className="text-danger font-medium text-sm">※登録必須</span>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
         </section>
 
         <hr className="my-8 border-slate-200" />
@@ -2157,6 +2106,190 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             </div>
         </section>
 
+      </div>
+
+      {/* Promotions Section */}
+      <div className="mt-8">
+        <h4 className={`${pageBlockTitleClass} mb-4 flex items-center gap-2`}>
+          <span className="w-1 h-5 bg-orange-500 rounded-full"></span>
+          販促物情報
+          <span className="ml-1 text-sm font-normal text-slate-500">
+            （{(formData.promotions || []).length}件）
+          </span>
+        </h4>
+
+        {/* Promotions Tabs */}
+        <div className="relative">
+          <div className="flex items-center overflow-x-auto gap-2 mb-0 pb-2 no-scrollbar pr-8 sm:pr-0">
+            <button
+              onClick={addPromotion}
+              className="flex items-center gap-1 px-3 sm:px-4 py-2 text-sm text-orange-600 font-bold hover:bg-orange-50 rounded-lg transition-colors flex-shrink-0"
+            >
+              <Plus size={16} /> <span className="hidden sm:inline">販促物追加</span><span className="sm:hidden">追加</span>
+            </button>
+            {(formData.promotions || []).map((promo, idx) => {
+              const tabState = getPromotionTabState(promo);
+              return (
+                <button
+                  key={promo.id}
+                  onClick={() => setActivePromotionTab(idx)}
+                  className={`
+                    px-3 sm:px-5 py-3 rounded-t-lg font-bold text-xs sm:text-sm whitespace-nowrap border-t border-l border-r flex-shrink-0 max-w-[120px] sm:max-w-none truncate
+                    ${activePromotionTab === idx
+                      ? 'bg-white border-slate-200 text-orange-600 z-10 relative -mb-[1px]'
+                      : 'bg-slate-100 border-transparent text-slate-500 hover:bg-slate-200'}
+                  `}
+                  title={`販促物 ${idx + 1}`}
+                >
+                  <span>販促物 {idx + 1}</span>
+                  <span className={`ml-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${tabState.tone}`}>
+                    {tabState.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {(formData.promotions || []).length > 2 && (
+            <div className="sm:hidden absolute right-0 top-0 bottom-2 w-8 bg-gradient-to-l from-slate-50 to-transparent flex items-center justify-end pointer-events-none">
+              <ChevronRight size={16} className="text-slate-400 mr-1" />
+            </div>
+          )}
+        </div>
+
+        {/* Promotion Form Area */}
+        {(formData.promotions || []).length > 0 && (() => {
+          const activePromotion = (formData.promotions || [])[activePromotionTab];
+          if (!activePromotion) return null;
+          return (
+            <div className="bg-white rounded-xl rounded-tl-none shadow-sm border border-slate-200 p-4 sm:p-8 relative">
+              <div className="absolute top-4 right-4 sm:top-6 sm:right-6">
+                <button
+                  onClick={() => removePromotion(activePromotionTab)}
+                  className="p-2 text-slate-400 hover:text-danger hover:bg-red-50 rounded-full transition-colors"
+                  title="この販促物を削除"
+                >
+                  <Trash2 size={18} />
+                </button>
+              </div>
+
+              <section className="mb-10">
+                <h4 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                  <span className="w-1 h-6 bg-orange-500 rounded-full"></span>
+                  販促物情報
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">サンプル仕様</label>
+                    <input
+                      type="text"
+                      className="w-full p-3 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                      placeholder="例：商品サンプル同梱"
+                      value={activePromotion.promoSample || ''}
+                      onChange={(e) => handlePromotionChange(activePromotionTab, 'promoSample', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">特別什器等</label>
+                    <input
+                      type="text"
+                      className="w-full p-3 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                      placeholder="例：専用什器"
+                      value={activePromotion.specialFixture || ''}
+                      onChange={(e) => handlePromotionChange(activePromotionTab, 'specialFixture', e.target.value)}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <hr className="my-8 border-slate-200" />
+
+              <section className="mb-10">
+                <h4 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                  <span className="w-1 h-6 bg-orange-500 rounded-full"></span>
+                  販促物サイズ
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">幅 (mm)</label>
+                    <input
+                      type="number"
+                      className="w-full p-3 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                      value={activePromotion.promoWidth || ''}
+                      onChange={(e) => handlePromotionChange(activePromotionTab, 'promoWidth', e.target.value ? Number(e.target.value) : undefined)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">高さ (mm)</label>
+                    <input
+                      type="number"
+                      className="w-full p-3 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                      value={activePromotion.promoHeight || ''}
+                      onChange={(e) => handlePromotionChange(activePromotionTab, 'promoHeight', e.target.value ? Number(e.target.value) : undefined)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">奥行 (mm)</label>
+                    <input
+                      type="number"
+                      className="w-full p-3 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                      value={activePromotion.promoDepth || ''}
+                      onChange={(e) => handlePromotionChange(activePromotionTab, 'promoDepth', e.target.value ? Number(e.target.value) : undefined)}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <hr className="my-8 border-slate-200" />
+
+              <section className="mb-10">
+                <h4 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                  <span className="w-1 h-6 bg-orange-500 rounded-full"></span>
+                  販促物画像
+                </h4>
+                <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start">
+                  <div
+                    className={`
+                      w-full sm:w-40 h-48 sm:h-40 flex-shrink-0 rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer overflow-hidden relative
+                      ${!activePromotion.promoImage ? 'border-orange-200 bg-orange-100/70' : 'border-transparent bg-slate-100'}
+                    `}
+                    onClick={() => handlePromotionImageUpload(activePromotionTab)}
+                  >
+                    {activePromotion.promoImage ? (
+                      <img src={activePromotion.promoImage} alt="Promotion" className="w-full h-full object-contain" />
+                    ) : (
+                      <div className="text-center p-2">
+                        <ImageIcon className="mx-auto text-orange-400 mb-1" />
+                        <span className="text-xs text-slate-500 font-bold">画像登録なし</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 text-sm text-slate-600">
+                    <p className="mb-2"><strong>推奨:</strong> 300dpi相当 (2500px以上)。</p>
+                    <p className="mb-3 text-slate-500">※登録可能な形式: ai / PNG / jpeg / eps</p>
+                    <button
+                      onClick={() => handlePromotionImageUpload(activePromotionTab)}
+                      className="w-full sm:w-auto px-4 py-2 bg-white border border-slate-300 rounded shadow-sm hover:bg-slate-50 text-slate-700 font-medium"
+                    >
+                      画像を選択...
+                    </button>
+                  </div>
+                </div>
+              </section>
+            </div>
+          );
+        })()}
+
+        {(formData.promotions || []).length === 0 && (
+          <div className="bg-slate-50 rounded-xl border border-slate-200 p-8 text-center">
+            <p className="text-slate-500 mb-4">販促物情報がまだ登録されていません。</p>
+            <button
+              onClick={addPromotion}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 text-white font-bold rounded-lg hover:bg-orange-600 transition-colors"
+            >
+              <Plus size={16} /> 販促物を追加
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="mt-8">

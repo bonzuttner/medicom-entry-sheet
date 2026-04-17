@@ -213,6 +213,23 @@ CREATE TABLE IF NOT EXISTS entry_sheet_admin_memos (
 CREATE INDEX IF NOT EXISTS idx_entry_sheet_admin_memos_updated_at
   ON entry_sheet_admin_memos(updated_at DESC);
 
+-- 販促物テーブル（シート:販促 = 1:N）
+CREATE TABLE IF NOT EXISTS promotions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sheet_id UUID NOT NULL REFERENCES entry_sheets(id) ON DELETE CASCADE,
+  has_promo_material BOOLEAN NOT NULL DEFAULT FALSE,
+  promo_sample TEXT,
+  special_fixture TEXT,
+  promo_width NUMERIC(10, 2),
+  promo_height NUMERIC(10, 2),
+  promo_depth NUMERIC(10, 2),
+  promo_image_url TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_promotions_sheet ON promotions(sheet_id);
+
 -- クリエイティブ
 CREATE TABLE IF NOT EXISTS creatives (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

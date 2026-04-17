@@ -1,5 +1,5 @@
 import { del, put } from '@vercel/blob';
-import { Attachment, EntrySheet, ProductEntry } from './types.js';
+import { Attachment, EntrySheet, ProductEntry, Promotion } from './types.js';
 
 const IMAGE_MIME_TYPES = new Set([
   'image/jpeg',
@@ -287,12 +287,6 @@ const normalizeProduct = async (
     `${product.id}-product`,
     'image'
   );
-  const normalizedPromoImage = await normalizeMediaUrl(
-    product.promoImage,
-    `${pathPrefix}/promo-image`,
-    `${product.id}-promo`,
-    'promo'
-  );
   const normalizedAttachments = product.productAttachments
     ? await Promise.all(
         product.productAttachments.map((attachment, index) =>
@@ -304,8 +298,24 @@ const normalizeProduct = async (
   return {
     ...product,
     productImage: normalizedProductImage,
-    promoImage: normalizedPromoImage,
     productAttachments: normalizedAttachments,
+  };
+};
+
+const normalizePromotion = async (
+  promotion: Promotion,
+  pathPrefix: string
+): Promise<Promotion> => {
+  const normalizedPromoImage = await normalizeMediaUrl(
+    promotion.promoImage,
+    `${pathPrefix}/promo-image`,
+    `${promotion.id}-promo`,
+    'promo'
+  );
+
+  return {
+    ...promotion,
+    promoImage: normalizedPromoImage,
   };
 };
 
@@ -319,11 +329,13 @@ export const normalizeSheetMedia = async (
     ) ||
     sheet.products.some((product) => {
       if ((product.productImage || '').startsWith('data:')) return true;
-      if ((product.promoImage || '').startsWith('data:')) return true;
       return (product.productAttachments || []).some((attachment) =>
         Boolean((attachment.url || attachment.dataUrl || '').startsWith('data:'))
       );
-    });
+    }) ||
+    (sheet.promotions || []).some((promotion) =>
+      (promotion.promoImage || '').startsWith('data:')
+    );
 
   if (!hasInlineMedia) {
     return sheet;
@@ -332,6 +344,11 @@ export const normalizeSheetMedia = async (
   const normalizedProducts = await Promise.all(
     sheet.products.map((product) => normalizeProduct(product, `${pathPrefix}/products`))
   );
+  const normalizedPromotions = sheet.promotions
+    ? await Promise.all(
+        sheet.promotions.map((promotion) => normalizePromotion(promotion, `${pathPrefix}/promotions`))
+      )
+    : undefined;
   const normalizedAttachments = sheet.attachments
     ? await Promise.all(
         sheet.attachments.map((attachment, index) =>
@@ -343,6 +360,7 @@ export const normalizeSheetMedia = async (
   return {
     ...sheet,
     products: normalizedProducts,
+    promotions: normalizedPromotions,
     attachments: normalizedAttachments,
   };
 };
@@ -384,8 +402,10 @@ const collectSheetMediaUrls = (sheet: EntrySheet): string[] => {
   urls.push(...collectAttachmentUrls(sheet.attachments));
   for (const product of sheet.products) {
     if (product.productImage) urls.push(product.productImage);
-    if (product.promoImage) urls.push(product.promoImage);
     urls.push(...collectAttachmentUrls(product.productAttachments));
+  }
+  for (const promotion of sheet.promotions || []) {
+    if (promotion.promoImage) urls.push(promotion.promoImage);
   }
   return urls;
 };
@@ -426,9 +446,9 @@ export const deleteUnusedManagedBlobUrls = async (
 export const hasLegacyEmbeddedMedia = (sheets: EntrySheet[]): boolean =>
   sheets.some((sheet) => {
     if (sheet.attachments?.some(hasLegacyAttachment)) return true;
+    if (sheet.promotions?.some((promotion) => promotion.promoImage?.startsWith('data:'))) return true;
     return sheet.products.some((product) => {
       if (product.productImage?.startsWith('data:')) return true;
-      if (product.promoImage?.startsWith('data:')) return true;
       return Boolean(product.productAttachments?.some(hasLegacyAttachment));
     });
   });

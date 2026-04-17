@@ -321,6 +321,7 @@ export const EntryList: React.FC<EntryListProps> = ({
         'シート添付ファイル名一覧',
         'シート添付ファイルURL一覧',
         '棚割名',
+        '販促物件数',
         '商品メーカー名',
         'JANコード',
         '商品名',
@@ -336,13 +337,6 @@ export const EntryList: React.FC<EntryListProps> = ({
         '奥行(mm)',
         'フェイシング数',
         '送込み店舗着日要望',
-        '販促物有無',
-        '香り・色見本',
-        '特殊な陳列什器',
-        '販促物サイズ(幅)',
-        '販促物サイズ(高さ)',
-        '販促物サイズ(奥行)',
-        '販促物画像URL',
       ]
     ];
 
@@ -350,6 +344,7 @@ export const EntryList: React.FC<EntryListProps> = ({
       const deploymentPeriod = getDeploymentPeriod(sheet);
       const sheetAttachmentNames = (sheet.attachments || []).map((file) => file.name).join(' / ');
       const sheetAttachmentUrls = (sheet.attachments || []).map((file) => file.url).join(' / ');
+      const promotionCount = (sheet.promotions || []).length;
       sheet.products.forEach(prod => {
         const productAttachmentNames = (prod.productAttachments || []).map((file) => file.name).join(' / ');
         const productAttachmentUrls = (prod.productAttachments || []).map((file) => file.url).join(' / ');
@@ -367,6 +362,7 @@ export const EntryList: React.FC<EntryListProps> = ({
           toSafeCsvCell(sheetAttachmentNames),
           toSafeCsvCell(sheetAttachmentUrls),
           toSafeCsvCell(sheet.shelfName || ''),
+          toSafeCsvCell(promotionCount),
           toSafeCsvCell(prod.manufacturerName),
           toSafeCsvCell(prod.janCode),
           toSafeCsvCell(prod.productName),
@@ -382,13 +378,6 @@ export const EntryList: React.FC<EntryListProps> = ({
           toSafeCsvCell(prod.depth),
           toSafeCsvCell(prod.facingCount),
           toSafeCsvCell(prod.arrivalDate || ''),
-          toSafeCsvCell(prod.hasPromoMaterial === 'yes' ? '有り' : '無し'),
-          toSafeCsvCell(prod.promoSample || ''),
-          toSafeCsvCell(prod.specialFixture || ''),
-          toSafeCsvCell(prod.promoWidth ?? ''),
-          toSafeCsvCell(prod.promoHeight ?? ''),
-          toSafeCsvCell(prod.promoDepth ?? ''),
-          toSafeCsvCell(prod.promoImage || ''),
         ]);
       });
     });
@@ -532,19 +521,16 @@ export const EntryList: React.FC<EntryListProps> = ({
   // Helper to determine product card styling based on completion status
   const getProductStatusStyle = (prod: any) => {
     const isBasicFilled = hasText(prod.productName) && hasText(prod.janCode);
-    const isPromoFilled = prod.hasPromoMaterial === 'yes' 
-        ? (prod.promoWidth && prod.promoImage) 
-        : true;
-    
-    // Condition 1: Missing basic info or promo info -> RED
-    if (!isBasicFilled || !isPromoFilled) {
+
+    // Condition 1: Missing basic info -> RED
+    if (!isBasicFilled) {
         return {
             className: "bg-red-50 border border-red-300 hover:bg-red-100",
             icon: <AlertCircle size={16} className="text-danger" />,
             statusText: "必須項目未入力"
         };
     }
-    
+
     // Condition 2: Only Product Image is missing -> YELLOW
     if (!prod.productImage) {
         return {
