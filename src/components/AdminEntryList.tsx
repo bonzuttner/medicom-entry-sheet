@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { EntrySheet, EntrySheetAdminMemo } from '../types';
 import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, CheckSquare, CircleOff, Download, Edit3, ExternalLink, Info, Save, SaveAll, Search, Square, Trash2, X } from 'lucide-react';
-import { getCurrentAssigneeLabel, getWorkflowStatusView } from '../lib/sheetWorkflow';
+import { getWorkflowStatusView } from '../lib/sheetWorkflow';
 
 interface AdminEntryListProps {
   sheets: EntrySheet[];
@@ -763,7 +763,6 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
               const urlEnabled = isHttpUrl(draft.deadlineTableUrl);
               const dirty = isDraftDirty(sheet);
               const workflowStatus = getWorkflowStatusView(sheet);
-              const assigneeLabel = getCurrentAssigneeLabel(sheet.currentAssignee);
               return (
                 <React.Fragment key={sheet.id}>
                   <tr className={`group ${dirty ? 'bg-amber-50/40 hover:bg-amber-50/70' : selectedSheets.has(sheet.id) ? 'bg-sky-50 hover:bg-sky-100' : 'hover:bg-slate-50'}`}>
@@ -791,12 +790,9 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                       </div>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="space-y-1">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full whitespace-nowrap ${workflowStatus.pillClassName}`}>
-                          {workflowStatus.label}
-                        </span>
-                        <div className="text-[11px] text-slate-500">担当: {assigneeLabel}</div>
-                      </div>
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full whitespace-nowrap ${workflowStatus.pillClassName}`}>
+                        {workflowStatus.label}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm font-bold text-slate-900 break-words leading-tight line-clamp-2">{sheet.title}</div>

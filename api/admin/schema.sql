@@ -32,10 +32,28 @@ CREATE TABLE IF NOT EXISTS users (
   manufacturer_id UUID NOT NULL REFERENCES manufacturers(id) ON DELETE RESTRICT,
   email VARCHAR(255) NOT NULL,
   phone_number VARCHAR(50),
-  role VARCHAR(20) NOT NULL CHECK (role IN ('ADMIN', 'STAFF')),
+  role VARCHAR(20) NOT NULL CHECK (role IN ('ADMIN', 'RETAILER', 'STAFF')),
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+-- 小売店-メーカー紐づけ（RETAILERが複数メーカーをレビュー可能）
+CREATE TABLE IF NOT EXISTS retailer_manufacturer_assignments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  retailer_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  manufacturer_id UUID NOT NULL REFERENCES manufacturers(id) ON DELETE CASCADE,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE (retailer_user_id, manufacturer_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_retailer_assignments_user
+  ON retailer_manufacturer_assignments(retailer_user_id);
+CREATE INDEX IF NOT EXISTS idx_retailer_assignments_manufacturer
+  ON retailer_manufacturer_assignments(manufacturer_id);
+
+-- role制約の更新（マイグレーション用）
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('ADMIN', 'RETAILER', 'STAFF'));
 
 CREATE INDEX IF NOT EXISTS idx_users_manufacturer ON users(manufacturer_id);
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
@@ -51,9 +69,6 @@ CREATE TABLE IF NOT EXISTS entry_sheets (
   creator_name_snapshot VARCHAR(200),
   creator_email_snapshot VARCHAR(255),
   creator_phone_snapshot VARCHAR(50),
-  creative_name_snapshot VARCHAR(500),
-  creative_image_url_snapshot TEXT,
-  creative_updated_at_snapshot TIMESTAMP,
   shelf_name VARCHAR(200),
   title VARCHAR(500) NOT NULL,
   case_name VARCHAR(200),
@@ -62,12 +77,8 @@ CREATE TABLE IF NOT EXISTS entry_sheets (
   deployment_end_month SMALLINT,
   face_label VARCHAR(50),
   face_max_width INTEGER,
-  status VARCHAR(30) NOT NULL CHECK (status IN ('draft', 'completed', 'completed_no_image')),
-  entry_status VARCHAR(30) CHECK (entry_status IN ('draft', 'completed', 'completed_no_image')),
-  creative_status VARCHAR(30) NOT NULL DEFAULT 'none' CHECK (creative_status IN ('none', 'in_progress', 'confirmation_pending', 'returned', 'approved')),
-  current_assignee VARCHAR(30) DEFAULT 'none' CHECK (current_assignee IN ('admin', 'manufacturer_user', 'none')),
-  assignee_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  return_reason TEXT,
+  status VARCHAR(30) NOT NULL CHECK (status IN ('draft', 'completed', 'completed_no_image', 'revision_requested', 'approved')),
+  entry_status VARCHAR(30) CHECK (entry_status IN ('draft', 'completed', 'completed_no_image', 'revision_requested', 'approved')),
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
@@ -87,14 +98,14 @@ ALTER TABLE entry_sheets
 ALTER TABLE entry_sheets
   ADD COLUMN IF NOT EXISTS creator_phone_snapshot VARCHAR(50);
 
-ALTER TABLE entry_sheets
-  ADD COLUMN IF NOT EXISTS creative_name_snapshot VARCHAR(500);
-
-ALTER TABLE entry_sheets
-  ADD COLUMN IF NOT EXISTS creative_image_url_snapshot TEXT;
-
-ALTER TABLE entry_sheets
-  ADD COLUMN IF NOT EXISTS creative_updated_at_snapshot TIMESTAMP;
+-- クリエイティブ関連カラムの削除（マイグレーション）
+ALTER TABLE entry_sheets DROP COLUMN IF EXISTS creative_name_snapshot;
+ALTER TABLE entry_sheets DROP COLUMN IF EXISTS creative_image_url_snapshot;
+ALTER TABLE entry_sheets DROP COLUMN IF EXISTS creative_updated_at_snapshot;
+ALTER TABLE entry_sheets DROP COLUMN IF EXISTS creative_status;
+ALTER TABLE entry_sheets DROP COLUMN IF EXISTS current_assignee;
+ALTER TABLE entry_sheets DROP COLUMN IF EXISTS assignee_user_id;
+ALTER TABLE entry_sheets DROP COLUMN IF EXISTS return_reason;
 
 ALTER TABLE entry_sheets
   ADD COLUMN IF NOT EXISTS shelf_name VARCHAR(200);
@@ -118,37 +129,23 @@ ALTER TABLE entry_sheets
   ADD COLUMN IF NOT EXISTS entry_status VARCHAR(30);
 
 ALTER TABLE entry_sheets
-  ADD COLUMN IF NOT EXISTS creative_status VARCHAR(30) NOT NULL DEFAULT 'none';
-
-ALTER TABLE entry_sheets
-  ADD COLUMN IF NOT EXISTS current_assignee VARCHAR(30) DEFAULT 'none';
-
-ALTER TABLE entry_sheets
-  ADD COLUMN IF NOT EXISTS assignee_user_id UUID REFERENCES users(id) ON DELETE SET NULL;
-
-ALTER TABLE entry_sheets
-  ADD COLUMN IF NOT EXISTS return_reason TEXT;
-
-ALTER TABLE entry_sheets
   DROP CONSTRAINT IF EXISTS entry_sheets_entry_status_check;
 
 ALTER TABLE entry_sheets
   ADD CONSTRAINT entry_sheets_entry_status_check
-  CHECK (entry_status IS NULL OR entry_status IN ('draft', 'completed', 'completed_no_image'));
+  CHECK (entry_status IS NULL OR entry_status IN ('draft', 'completed', 'completed_no_image', 'revision_requested', 'approved'));
 
+-- status制約の更新（マイグレーション用）
+ALTER TABLE entry_sheets DROP CONSTRAINT IF EXISTS entry_sheets_status_check;
+ALTER TABLE entry_sheets ADD CONSTRAINT entry_sheets_status_check
+  CHECK (status IN ('draft', 'completed', 'completed_no_image', 'revision_requested', 'approved'));
+
+-- クリエイティブ関連のconstraint削除（マイグレーション）
 ALTER TABLE entry_sheets
   DROP CONSTRAINT IF EXISTS entry_sheets_creative_status_check;
 
 ALTER TABLE entry_sheets
-  ADD CONSTRAINT entry_sheets_creative_status_check
-  CHECK (creative_status IN ('none', 'in_progress', 'confirmation_pending', 'returned', 'approved'));
-
-ALTER TABLE entry_sheets
   DROP CONSTRAINT IF EXISTS entry_sheets_current_assignee_check;
-
-ALTER TABLE entry_sheets
-  ADD CONSTRAINT entry_sheets_current_assignee_check
-  CHECK (current_assignee IN ('admin', 'manufacturer_user', 'none'));
 
 UPDATE entry_sheets
 SET entry_status = status
@@ -180,9 +177,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_sheets_sheet_code
   WHERE sheet_code IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_sheets_entry_status ON entry_sheets(entry_status);
-CREATE INDEX IF NOT EXISTS idx_sheets_creative_status ON entry_sheets(creative_status);
-CREATE INDEX IF NOT EXISTS idx_sheets_current_assignee ON entry_sheets(current_assignee);
-CREATE INDEX IF NOT EXISTS idx_sheets_assignee_user ON entry_sheets(assignee_user_id);
+
+-- クリエイティブ関連インデックスの削除（マイグレーション）
+DROP INDEX IF EXISTS idx_sheets_creative_status;
+DROP INDEX IF EXISTS idx_sheets_current_assignee;
+DROP INDEX IF EXISTS idx_sheets_assignee_user;
 
 CREATE TABLE IF NOT EXISTS sheet_code_sequences (
   manufacturer_code VARCHAR(3) PRIMARY KEY,
@@ -230,35 +229,13 @@ CREATE TABLE IF NOT EXISTS promotions (
 
 CREATE INDEX IF NOT EXISTS idx_promotions_sheet ON promotions(sheet_id);
 
--- クリエイティブ
-CREATE TABLE IF NOT EXISTS creatives (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  version INTEGER NOT NULL DEFAULT 1,
-  manufacturer_id UUID NOT NULL REFERENCES manufacturers(id) ON DELETE RESTRICT,
-  creator_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  creator_name_snapshot VARCHAR(200),
-  name VARCHAR(500) NOT NULL,
-  image_url TEXT NOT NULL,
-  memo TEXT,
-  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_creatives_manufacturer ON creatives(manufacturer_id);
-CREATE INDEX IF NOT EXISTS idx_creatives_updated_at ON creatives(updated_at DESC);
-CREATE INDEX IF NOT EXISTS idx_creatives_manufacturer_updated_at
-  ON creatives(manufacturer_id, updated_at DESC);
-
-CREATE TABLE IF NOT EXISTS creative_entry_sheets (
-  creative_id UUID NOT NULL REFERENCES creatives(id) ON DELETE CASCADE,
-  sheet_id UUID NOT NULL REFERENCES entry_sheets(id) ON DELETE CASCADE,
-  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (creative_id, sheet_id),
-  UNIQUE (sheet_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_creative_entry_sheets_creative
-  ON creative_entry_sheets(creative_id);
+-- クリエイティブ関連テーブルの削除（マイグレーション）
+DROP TABLE IF EXISTS creative_entry_sheets;
+DROP TABLE IF EXISTS creatives;
+DROP INDEX IF EXISTS idx_creatives_manufacturer;
+DROP INDEX IF EXISTS idx_creatives_updated_at;
+DROP INDEX IF EXISTS idx_creatives_manufacturer_updated_at;
+DROP INDEX IF EXISTS idx_creative_entry_sheets_creative;
 
 -- メーカー商品マスタ（検索用の正本）
 CREATE TABLE IF NOT EXISTS manufacturer_products (
@@ -452,3 +429,19 @@ CREATE TABLE IF NOT EXISTS entry_sheet_revisions (
 
 CREATE INDEX IF NOT EXISTS idx_sheet_revisions_sheet_created_at
   ON entry_sheet_revisions(sheet_id, created_at DESC);
+
+-- レビューコメント（修正依頼時のコメント履歴）
+CREATE TABLE IF NOT EXISTS sheet_review_comments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sheet_id UUID NOT NULL REFERENCES entry_sheets(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_name_snapshot VARCHAR(200) NOT NULL,
+  user_role_snapshot VARCHAR(20) NOT NULL,
+  comment TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_review_comments_sheet
+  ON sheet_review_comments(sheet_id);
+CREATE INDEX IF NOT EXISTS idx_review_comments_created
+  ON sheet_review_comments(sheet_id, created_at DESC);

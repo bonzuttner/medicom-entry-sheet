@@ -21,5 +21,33 @@ export const requireUser = async (req: any, res: any): Promise<User | null> => {
 
 export const isAdmin = (user: User): boolean => user.role === 'ADMIN';
 
+export const isRetailer = (user: User): boolean => user.role === 'RETAILER';
+
+export const isStaff = (user: User): boolean => user.role === 'STAFF';
+
 export const canAccessManufacturer = (user: User, manufacturerName: string): boolean =>
   isAdmin(user) || user.manufacturerName === manufacturerName;
+
+export const canAccessManufacturerById = (user: User, manufacturerId: string): boolean => {
+  if (isAdmin(user)) return true;
+  if (isRetailer(user)) {
+    return user.assignedManufacturerIds?.includes(manufacturerId) ?? false;
+  }
+  return user.manufacturerId === manufacturerId;
+};
+
+export const canReviewSheet = (user: User, manufacturerId: string): boolean => {
+  if (isAdmin(user)) return true;
+  if (isRetailer(user)) {
+    return user.assignedManufacturerIds?.includes(manufacturerId) ?? false;
+  }
+  return false;
+};
+
+export const canModifySheet = (user: User, manufacturerId: string): boolean => {
+  if (isAdmin(user)) return true;
+  if (isStaff(user)) {
+    return user.manufacturerId === manufacturerId;
+  }
+  return false;
+};

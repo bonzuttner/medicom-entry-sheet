@@ -1,9 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Creative, EntrySheet, EntrySheetRevision, FaceOption, MasterData, ProductEntry, Promotion, User, UserRole } from '../types';
+import { EntrySheet, EntrySheetRevision, FaceOption, MasterData, ProductEntry, Promotion, User, UserRole } from '../types';
 import { Save, Plus, Trash2, AlertTriangle, Image as ImageIcon, Search, ChevronRight, FileText, PlusCircle, RefreshCw, Package, CheckCircle, RotateCcw, Edit3, X } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { dataService } from '../services/dataService';
-import { getCurrentAssigneeLabel, getWorkflowStatusView } from '../lib/sheetWorkflow';
+import { getWorkflowStatusView } from '../lib/sheetWorkflow';
 
 // Helper to determine revision icon based on summary text
 const getRevisionIcon = (summary: string): { icon: React.ReactNode; color: string } => {
@@ -47,13 +47,7 @@ interface EntryFormProps {
   currentUser: User;
   onSearchProducts: (query: string, manufacturerName: string) => Promise<ProductEntry[]>;
   onSave: (sheet: EntrySheet) => Promise<void> | void;
-  onSaveWorkflow: (sheet: EntrySheet) => Promise<EntrySheet>;
   onCancel: () => void;
-  onOpenCreatives?: () => void;
-  onRelinkCreative?: (
-    sheetId: string,
-    targetCreativeId: string
-  ) => Promise<{ sheet: EntrySheet; creative: Creative }>;
 }
 
 const normalizeProductName = (value: string): string => value.trim().toLowerCase();
@@ -74,30 +68,11 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   currentUser,
   onSearchProducts,
   onSave,
-  onSaveWorkflow,
   onCancel,
-  onOpenCreatives,
-  onRelinkCreative,
 }) => {
   const sectionTitleClass = 'text-base font-bold text-slate-800';
   const pageBlockTitleClass = 'text-lg font-bold text-slate-800';
   const helpTextClass = 'mt-1 text-xs text-slate-500';
-  const toCreativePreview = (creative: EntrySheet['creative']): Creative | null =>
-    creative
-      ? ({
-          id: creative.id || '',
-          version: 1,
-          manufacturerName: initialData.manufacturerName,
-          creatorId: '',
-          creatorName: '',
-          name: creative.name,
-          imageUrl: creative.imageUrl,
-          memo: '',
-          createdAt: creative.updatedAt,
-          updatedAt: creative.updatedAt,
-          linkedSheets: [],
-        } as Creative)
-      : null;
   const [formData, setFormData] = useState<EntrySheet>(initialData);
   const [activeTab, setActiveTab] = useState<number>(initialActiveTab); // Index of the product being edited
   const [isSaving, setIsSaving] = useState(false);
@@ -105,16 +80,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   const [productSearchQuery, setProductSearchQuery] = useState('');
   const [productSearchResults, setProductSearchResults] = useState<ProductEntry[]>([]);
   const [isSearchingProducts, setIsSearchingProducts] = useState(false);
-  const [linkedCreative, setLinkedCreative] = useState<Creative | null>(toCreativePreview(initialData.creative));
-  const [creativePickerOpen, setCreativePickerOpen] = useState(false);
-  const [creativePickerQuery, setCreativePickerQuery] = useState('');
-  const [creativeOptions, setCreativeOptions] = useState<Creative[]>([]);
-  const [isLoadingCreativeOptions, setIsLoadingCreativeOptions] = useState(false);
-  const [isRelinkingCreative, setIsRelinkingCreative] = useState(false);
-  const [isPreparingReturn, setIsPreparingReturn] = useState(false);
-  const [isCreativeImageModalOpen, setIsCreativeImageModalOpen] = useState(false);
-  const [relinkError, setRelinkError] = useState('');
-  const [relinkSuccess, setRelinkSuccess] = useState(false);
   const [activePromotionTab, setActivePromotionTab] = useState<number>(0);
   const askedPrefillByProductRef = useRef<Map<number, string>>(new Map());
   const lastAutoTitleRef = useRef('');
@@ -210,20 +175,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   const compactSelectWrapperClass = 'w-full md:max-w-[420px]';
   const compactSelectClass = (highlight = false): string =>
     `${getSelectClass(highlight)} ring-1 ring-inset ${highlight ? 'ring-amber-200' : 'ring-slate-200'}`;
-  const resolveAssigneeFromWorkflow = (
-    entryStatus: EntrySheet['entryStatus'] | EntrySheet['status'] | undefined,
-    creativeStatus: EntrySheet['creativeStatus'] | undefined,
-    changedByRole: UserRole
-  ): 'admin' | 'manufacturer_user' | 'none' => {
-    if (creativeStatus === 'approved') return 'none';
-    if (creativeStatus === 'confirmation_pending') return 'manufacturer_user';
-    if (creativeStatus === 'in_progress') return 'admin';
-    if (creativeStatus === 'returned') {
-      return changedByRole === UserRole.ADMIN ? 'manufacturer_user' : 'admin';
-    }
-    return entryStatus === 'draft' ? 'manufacturer_user' : 'admin';
-  };
-
   const getShelfOptions = (): string[] => {
     return (
       masterData.manufacturerShelfNames?.[formData.manufacturerName] ||
@@ -309,50 +260,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   ]);
 
   useEffect(() => {
-    let mounted = true;
-    if (!initialData.id) {
-      setLinkedCreative(toCreativePreview(initialData.creative));
-      return;
-    }
-    void dataService
-      .getCreativeBySheetId(initialData.id)
-      .then((creative) => {
-        if (!mounted) return;
-        setLinkedCreative(creative || toCreativePreview(initialData.creative));
-      })
-      .catch((error) => {
-        console.error('Failed to load linked creative:', error);
-        if (!mounted) return;
-        setLinkedCreative(toCreativePreview(initialData.creative));
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [initialData.creative, initialData.id, initialData.manufacturerName]);
-
-  useEffect(() => {
-    if (!creativePickerOpen || !isAdminUser) return;
-    let mounted = true;
-    setIsLoadingCreativeOptions(true);
-    void dataService
-      .getCreatives()
-      .then((rows) => {
-        if (!mounted) return;
-        setCreativeOptions(rows);
-      })
-      .catch((error) => {
-        console.error('Failed to load creatives for picker:', error);
-      })
-      .finally(() => {
-        if (!mounted) return;
-        setIsLoadingCreativeOptions(false);
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [creativePickerOpen, isAdminUser]);
-
-  useEffect(() => {
     const nextAutoTitle = buildAutoTitle(selectedStartMonth, formData.caseName);
     if (!nextAutoTitle) return;
 
@@ -393,96 +300,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
 
   const handleHeaderChange = (field: keyof EntrySheet, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const isEligibleAssignee = (
-    assigneeType: EntrySheet['currentAssignee'],
-    user: User | undefined
-  ): boolean => {
-    if (!user) return false;
-    if (assigneeType === 'admin') return user.role === UserRole.ADMIN;
-    if (assigneeType === 'manufacturer_user') {
-      return user.manufacturerName === formData.manufacturerName;
-    }
-    return false;
-  };
-
-  const saveWorkflowChange = async (
-    nextCreativeStatus: EntrySheet['creativeStatus'],
-    nextCurrentAssignee?: EntrySheet['currentAssignee'],
-    nextReturnReason?: string,
-    nextAssigneeUserId?: string
-  ) => {
-    if (isSaving) return;
-
-    const resolvedAssignee =
-      nextCurrentAssignee ||
-      resolveAssigneeFromWorkflow(
-        formData.entryStatus || formData.status,
-        nextCreativeStatus,
-        currentUser.role
-      );
-    const normalizedReturnReason =
-      nextCreativeStatus === 'returned'
-        ? String(nextReturnReason || '').trim()
-        : undefined;
-    const candidateAssigneeUserId = nextAssigneeUserId ?? formData.assigneeUserId;
-    const candidateAssigneeUser = users.find((user) => user.id === candidateAssigneeUserId);
-    const resolvedAssigneeUserId =
-      resolvedAssignee === 'none' || !isEligibleAssignee(resolvedAssignee, candidateAssigneeUser)
-        ? undefined
-        : candidateAssigneeUserId;
-    const workflowPayload: EntrySheet = {
-      ...formData,
-      updatedAt: new Date().toISOString(),
-      creativeStatus: nextCreativeStatus,
-      currentAssignee: resolvedAssignee,
-      assigneeUserId: resolvedAssigneeUserId,
-      returnReason: normalizedReturnReason,
-    };
-
-    setIsSaving(true);
-    try {
-      const savedSheet = await onSaveWorkflow(workflowPayload);
-      setFormData((prev) => ({
-        ...prev,
-        ...savedSheet,
-      }));
-      setIsPreparingReturn(false);
-    } catch (error) {
-      alert(error instanceof Error ? error.message : '進行状況の更新に失敗しました。');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const startReturnFlow = () => {
-    setIsPreparingReturn(true);
-    setFormData((prev) => ({
-      ...prev,
-      returnReason: prev.returnReason || '',
-    }));
-  };
-
-  const cancelReturnFlow = () => {
-    setIsPreparingReturn(false);
-    setFormData((prev) => ({
-      ...prev,
-      returnReason: (prev.creativeStatus || 'none') === 'returned' ? prev.returnReason : undefined,
-    }));
-  };
-
-  const confirmReturnFlow = () => {
-    if (!hasText(formData.returnReason)) {
-      alert('差し戻し理由を入力してください。');
-      return;
-    }
-    void saveWorkflowChange(
-      'returned',
-      resolveAssigneeFromWorkflow(formData.entryStatus || formData.status, 'returned', currentUser.role),
-      formData.returnReason,
-      formData.assigneeUserId
-    );
   };
 
   const handleAdminMemoChange = (field: string, value: string | number | undefined) => {
@@ -1030,29 +847,12 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         }
     }
 
-    const shouldResetReturnedWorkflow =
-      !isAdminUser && status === 'completed' && (formData.creativeStatus || 'none') === 'returned';
-    const nextCreativeStatus = shouldResetReturnedWorkflow ? 'none' : formData.creativeStatus;
-    const nextCurrentAssignee = shouldResetReturnedWorkflow
-      ? resolveAssigneeFromWorkflow(finalStatus, nextCreativeStatus, currentUser.role)
-      : formData.currentAssignee;
-    const nextAssigneeUser = users.find((user) => user.id === formData.assigneeUserId);
-    const nextAssigneeUserId =
-      nextCurrentAssignee === 'none' || !isEligibleAssignee(nextCurrentAssignee, nextAssigneeUser)
-        ? undefined
-        : formData.assigneeUserId;
-    const nextReturnReason = shouldResetReturnedWorkflow ? undefined : formData.returnReason;
-
     setIsSaving(true);
     try {
       await onSave({
         ...formData,
         status: finalStatus,
         entryStatus: finalStatus,
-        creativeStatus: nextCreativeStatus,
-        currentAssignee: nextCurrentAssignee,
-        assigneeUserId: nextAssigneeUserId,
-        returnReason: nextReturnReason,
       });
     } finally {
       setIsSaving(false);
@@ -1138,63 +938,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   }, 0);
   const isShelfWidthOver = selectedFaceMaxWidth ? shelfWidthTotal > selectedFaceMaxWidth : false;
   const workflowStatus = getWorkflowStatusView(formData);
-  const currentCreativeStatus = formData.creativeStatus || 'none';
   const currentEntryStatus = formData.entryStatus || formData.status;
-  const resolvedCurrentAssignee =
-    formData.currentAssignee ||
-    resolveAssigneeFromWorkflow(
-      formData.entryStatus || formData.status,
-      formData.creativeStatus,
-      currentUser.role
-    );
-  const assigneeLabel = getCurrentAssigneeLabel(resolvedCurrentAssignee);
-  const assigneeCandidates = users.filter((user) =>
-    isEligibleAssignee(resolvedCurrentAssignee, user)
-  );
-  const selectedAssigneeUser = assigneeCandidates.find((user) => user.id === formData.assigneeUserId);
-  const canRelinkCreative =
-    isAdminUser &&
-    currentEntryStatus !== 'draft' &&
-    (currentCreativeStatus === 'none' || currentCreativeStatus === 'in_progress');
-  const filteredCreativeOptions = creativeOptions.filter((creative) => {
-    if (creative.manufacturerName !== formData.manufacturerName) return false;
-    const query = normalizeSearchText(creativePickerQuery);
-    if (!query) return true;
-    return [creative.name, creative.memo || '', ...creative.linkedSheets.flatMap((sheet) => [
-      sheet.sheetCode || '',
-      sheet.title,
-      sheet.manufacturerName,
-      sheet.shelfName,
-      sheet.caseName,
-    ])].some((value) => normalizeSearchText(value).includes(query));
-  });
-  const handleRelinkCreative = async (targetCreativeId: string) => {
-    if (!onRelinkCreative || !initialData.id || isRelinkingCreative) return;
-    setRelinkError('');
-    try {
-      setIsRelinkingCreative(true);
-      const result = await onRelinkCreative(initialData.id, targetCreativeId);
-      setLinkedCreative(result.creative);
-      setFormData((prev) => ({
-        ...prev,
-        version: result.sheet.version,
-        updatedAt: result.sheet.updatedAt,
-        creativeStatus: result.sheet.creativeStatus,
-        currentAssignee: result.sheet.currentAssignee,
-        assigneeUserId: result.sheet.assigneeUserId,
-        assigneeUsername: result.sheet.assigneeUsername,
-        returnReason: result.sheet.returnReason,
-      }));
-      setCreativePickerOpen(false);
-      setCreativePickerQuery('');
-      setRelinkSuccess(true);
-      setTimeout(() => setRelinkSuccess(false), 3000);
-    } catch (error) {
-      setRelinkError(error instanceof Error ? error.message : 'クリエイティブの差し替えに失敗しました。');
-    } finally {
-      setIsRelinkingCreative(false);
-    }
-  };
   const getProductTabState = (product: ProductEntry): { label: string; tone: string } => {
     const coreChecks = [
       hasText(product.janCode),
@@ -1219,65 +963,14 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     <div className="pb-24 sm:pb-20">
       {/* Sticky Action Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-        {/* 差し戻し理由入力（フッター上部） */}
-        {isPreparingReturn && (
-          <div className="border-b border-slate-200 bg-rose-50/80 px-3 sm:px-4 py-3">
-            <div className="max-w-7xl mx-auto">
-              <label className="mb-2 block text-sm font-bold text-rose-900">差し戻し理由</label>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <textarea
-                  rows={2}
-                  value={formData.returnReason || ''}
-                  onChange={(event) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      returnReason: event.target.value,
-                    }))
-                  }
-                  placeholder="差し戻しの理由を入力してください"
-                  className="flex-1 rounded-lg border border-rose-300 bg-white px-3 py-2 text-sm focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500"
-                />
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={cancelReturnFlow}
-                    className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-50"
-                  >
-                    キャンセル
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isSaving || !hasText(formData.returnReason)}
-                    onClick={confirmReturnFlow}
-                    className="px-4 py-2 rounded-lg bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    差し戻しを確定
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-        {/* 差し戻し理由表示 */}
-        {currentCreativeStatus === 'returned' && hasText(formData.returnReason) && !isPreparingReturn && (
-          <div className="border-b border-amber-200 bg-amber-50/80 px-3 sm:px-4 py-2">
-            <div className="max-w-7xl mx-auto flex items-start gap-2">
-              <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
-              <div className="text-sm text-amber-900">
-                <span className="font-semibold">差し戻し理由:</span> {formData.returnReason}
-              </div>
-            </div>
-          </div>
-        )}
         {/* メインアクションバー */}
         <div className="p-3 sm:p-4">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-            {/* 左: ステータス + 担当 */}
+            {/* 左: ステータス */}
             <div className="hidden sm:flex items-center gap-3">
               <span className={`inline-flex items-center rounded-full px-3 py-1.5 text-sm font-semibold ${workflowStatus.pillClassName}`}>
                 {workflowStatus.label}
               </span>
-              <span className="text-sm text-slate-600">担当: {assigneeLabel}</span>
             </div>
             {/* モバイル: コンパクト表示 */}
             <div className="flex sm:hidden items-center gap-2">
@@ -1307,69 +1000,15 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                   </button>
                 </>
               )}
-              {/* Admin: 制作を開始 (completed + none) */}
-              {isAdminUser && currentCreativeStatus === 'none' && currentEntryStatus !== 'draft' && (
+              {/* completed: 編集保存 */}
+              {currentEntryStatus !== 'draft' && (
                 <button
-                  type="button"
-                  disabled={isSaving}
-                  onClick={() => { void saveWorkflowChange('in_progress'); }}
-                  className="px-4 sm:px-6 py-2.5 bg-sky-600 text-white font-bold rounded-lg hover:bg-sky-700 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  onClick={() => { void saveSheet(currentEntryStatus); }}
+                  disabled={isSaving || pendingUploads > 0}
+                  className="px-4 sm:px-6 py-2.5 bg-primary text-white font-bold rounded-lg hover:bg-sky-600 shadow-lg shadow-sky-200 flex items-center justify-center gap-2 transition-colors whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed text-sm"
                 >
-                  {isSaving ? '処理中...' : '制作を開始'}
-                </button>
-              )}
-              {/* Admin: 確認依頼 (in_progress) */}
-              {isAdminUser && currentCreativeStatus === 'in_progress' && (
-                <button
-                  type="button"
-                  disabled={isSaving || !linkedCreative}
-                  onClick={() => { void saveWorkflowChange('confirmation_pending'); }}
-                  className="px-4 sm:px-6 py-2.5 bg-violet-600 text-white font-bold rounded-lg hover:bg-violet-700 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                >
-                  {isSaving ? '処理中...' : '確認依頼'}
-                </button>
-              )}
-              {/* Admin: 再編集 (confirmation_pending) */}
-              {isAdminUser && currentCreativeStatus === 'confirmation_pending' && (
-                <button
-                  type="button"
-                  disabled={isSaving}
-                  onClick={() => { void saveWorkflowChange('in_progress'); }}
-                  className="px-4 sm:px-6 py-2.5 bg-slate-600 text-white font-bold rounded-lg hover:bg-slate-700 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                >
-                  {isSaving ? '処理中...' : '再編集'}
-                </button>
-              )}
-              {/* メーカー: 差し戻す + 承認する (confirmation_pending) */}
-              {!isAdminUser && currentCreativeStatus === 'confirmation_pending' && (
-                <>
-                  <button
-                    type="button"
-                    disabled={isSaving}
-                    onClick={startReturnFlow}
-                    className="px-4 py-2.5 bg-rose-100 text-rose-800 font-bold rounded-lg hover:bg-rose-200 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                  >
-                    差し戻す
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isSaving}
-                    onClick={() => { void saveWorkflowChange('approved'); }}
-                    className="px-4 sm:px-6 py-2.5 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                  >
-                    {isSaving ? '処理中...' : '承認する'}
-                  </button>
-                </>
-              )}
-              {/* Admin: 制作に戻す (returned / approved) */}
-              {isAdminUser && (currentCreativeStatus === 'returned' || currentCreativeStatus === 'approved') && (
-                <button
-                  type="button"
-                  disabled={isSaving}
-                  onClick={() => { void saveWorkflowChange('in_progress'); }}
-                  className="px-4 sm:px-6 py-2.5 bg-sky-600 text-white font-bold rounded-lg hover:bg-sky-700 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                >
-                  {isSaving ? '処理中...' : '制作に戻す'}
+                  <Save size={18} />
+                  {pendingUploads > 0 ? 'アップロード中...' : isSaving ? '保存中...' : '保存'}
                 </button>
               )}
             </div>
@@ -1381,47 +1020,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 mb-4 sm:mb-6">
         <div className="mb-4 flex items-center justify-between border-b pb-4">
           <h3 className={pageBlockTitleClass}>シート基本情報</h3>
-          <div className="flex items-center gap-3">
-            <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${workflowStatus.pillClassName}`}>
-              {workflowStatus.label}
-            </span>
-            <div className="flex items-center gap-1.5 text-xs">
-              <span className="text-slate-500">担当:</span>
-              <span className="rounded bg-slate-100 px-2 py-1 font-medium text-slate-700">
-                {assigneeLabel}
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs">
-              <span className="text-slate-500">担当者:</span>
-              <select
-                value={selectedAssigneeUser?.id || ''}
-                onChange={(event) => {
-                  const nextAssigneeUserId = event.target.value || undefined;
-                  const nextAssigneeUser = assigneeCandidates.find((user) => user.id === nextAssigneeUserId);
-                  setFormData((prev) => ({
-                    ...prev,
-                    assigneeUserId: nextAssigneeUserId,
-                    assigneeUsername: nextAssigneeUser?.displayName || nextAssigneeUser?.username,
-                  }));
-                  void saveWorkflowChange(
-                    currentCreativeStatus,
-                    resolvedCurrentAssignee,
-                    currentCreativeStatus === 'returned' ? formData.returnReason : undefined,
-                    nextAssigneeUserId
-                  );
-                }}
-                disabled={isSaving || resolvedCurrentAssignee === 'none'}
-                className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:bg-slate-100 disabled:text-slate-400"
-              >
-                <option value="">未割り当て</option>
-                {assigneeCandidates.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.displayName || user.username}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+          <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${workflowStatus.pillClassName}`}>
+            {workflowStatus.label}
+          </span>
         </div>
 
         <div className="mb-6">
@@ -2292,161 +1893,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         )}
       </div>
 
-      <div className="mt-8">
-        <h4 className={`${sectionTitleClass} mb-4 flex items-center gap-2`}>
-          <span className="w-1 h-5 bg-sky-500 rounded-full"></span>
-          紐づくクリエイティブ
-        </h4>
-        <div className="mb-8 rounded-xl border border-slate-200 bg-white p-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              {linkedCreative ? (
-                <div className="flex items-start gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setIsCreativeImageModalOpen(true)}
-                    className="flex h-40 w-60 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white transition-colors hover:border-sky-400"
-                    style={{ cursor: 'zoom-in' }}
-                  >
-                    <img src={linkedCreative.imageUrl} alt="" className="h-full w-full object-contain" />
-                  </button>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-semibold text-slate-800">{linkedCreative.name}</span>
-                      {currentCreativeStatus === 'in_progress' && (
-                        <span className="inline-flex items-center rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">制作中</span>
-                      )}
-                      {currentCreativeStatus === 'confirmation_pending' && (
-                        <span className="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">確認待ち</span>
-                      )}
-                      {currentCreativeStatus === 'returned' && (
-                        <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">差し戻し</span>
-                      )}
-                      {currentCreativeStatus === 'approved' && (
-                        <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">承認済み</span>
-                      )}
-                    </div>
-                    {linkedCreative.memo && (
-                      <div className="mt-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-600 whitespace-pre-wrap">
-                        {linkedCreative.memo}
-                      </div>
-                    )}
-                    <div className="mt-2 text-sm text-slate-500">
-                      最終更新日: {formatDate(linkedCreative.updatedAt)}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-slate-500">まだクリエイティブは紐づいていません。</p>
-              )}
-            </div>
-            {canRelinkCreative && onRelinkCreative && (
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setCreativePickerOpen((prev) => !prev)}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 font-semibold text-sky-700 shadow-sm transition-all hover:bg-sky-100"
-                >
-                  {linkedCreative ? 'クリエイティブを差し替え' : 'クリエイティブを紐づけ'}
-                </button>
-              </div>
-            )}
-          </div>
-          {canRelinkCreative && creativePickerOpen && onRelinkCreative && (
-            <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-bold text-slate-800">差し替え先クリエイティブを選択</div>
-                  <div className="mt-1 text-xs text-slate-500">
-                    同じメーカーのクリエイティブから選択します。
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setCreativePickerOpen(false)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-              <div className="mt-4">
-                <input
-                  value={creativePickerQuery}
-                  onChange={(event) => setCreativePickerQuery(event.target.value)}
-                  placeholder="クリエイティブ名 / シート名 / ID / 棚割り名 / 案件名で検索"
-                  className={getFieldClass()}
-                />
-              </div>
-              <div className="mt-4 max-h-72 space-y-2 overflow-y-auto">
-                {isLoadingCreativeOptions ? (
-                  <div className="rounded-lg bg-slate-50 px-4 py-6 text-sm text-slate-500">読み込み中...</div>
-                ) : filteredCreativeOptions.length === 0 ? (
-                  <div className="rounded-lg bg-slate-50 px-4 py-6 text-sm text-slate-500">
-                    差し替え可能なクリエイティブが見つかりません。
-                  </div>
-                ) : (
-                  filteredCreativeOptions.map((creative) => {
-                    const isCurrent = creative.id === linkedCreative?.id;
-                    return (
-                      <button
-                        key={creative.id}
-                        type="button"
-                        disabled={isCurrent || isRelinkingCreative}
-                        onClick={() => {
-                          void handleRelinkCreative(creative.id);
-                        }}
-                        className={`flex w-full items-center gap-4 rounded-xl border px-4 py-3 text-left transition ${
-                          isCurrent
-                            ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
-                            : 'border-slate-200 bg-white hover:border-sky-200 hover:bg-sky-50'
-                        }`}
-                      >
-                        <div className="flex h-14 w-20 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
-                          <img src={creative.imageUrl} alt="" className="h-full w-full object-cover" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-semibold text-slate-800">{creative.name}</div>
-                          <div className="mt-1 text-xs text-slate-500">
-                            {creative.linkedSheets.length > 0
-                              ? `${creative.linkedSheets[0].sheetCode || creative.linkedSheets[0].id.slice(0, 8)} | ${creative.linkedSheets[0].title}`
-                              : '未紐づき'}
-                          </div>
-                          <div className="mt-1 text-xs text-slate-500">
-                            更新日: {formatDate(creative.updatedAt)}
-                          </div>
-                        </div>
-                        <div className="shrink-0 text-xs font-semibold text-sky-700">
-                          {isCurrent ? '現在選択中' : isRelinkingCreative ? '差し替え中...' : '差し替え'}
-                        </div>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          )}
-          {relinkError && (
-            <div className="mt-4 flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-              <AlertTriangle size={16} className="shrink-0" />
-              <span>{relinkError}</span>
-              <button
-                type="button"
-                onClick={() => setRelinkError('')}
-                className="ml-auto shrink-0 rounded p-1 hover:bg-rose-100"
-              >
-                <X size={16} />
-              </button>
-            </div>
-          )}
-          {relinkSuccess && (
-            <div className="mt-4 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-              <CheckCircle size={16} className="shrink-0" />
-              <span>クリエイティブを差し替えました</span>
-            </div>
-          )}
-        </div>
-      </div>
-
       {isAdminUser && (
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 mt-4 sm:mt-6">
         <h4 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
@@ -2671,44 +2117,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
           </div>
         </div>
       </div>
-      )}
-
-      {/* クリエイティブ画像拡大モーダル */}
-      {isCreativeImageModalOpen && linkedCreative && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-          onClick={() => setIsCreativeImageModalOpen(false)}
-        >
-          <div className="relative max-h-[90vh] max-w-[90vw] animate-[fadeIn_150ms_ease-out]">
-            <button
-              type="button"
-              onClick={(e: React.MouseEvent) => {
-                e.stopPropagation();
-                setIsCreativeImageModalOpen(false);
-              }}
-              className="absolute -right-3 -top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-600 shadow-lg hover:bg-slate-100"
-            >
-              <X size={20} />
-            </button>
-            <img
-              src={linkedCreative.imageUrl}
-              alt={linkedCreative.name}
-              className="max-h-[85vh] max-w-[85vw] rounded-lg object-contain"
-              onClick={(e: React.MouseEvent) => e.stopPropagation()}
-            />
-            <div className="mt-2 flex items-center justify-center gap-4">
-              <span className="text-sm text-white">{linkedCreative.name}</span>
-              <a
-                href={linkedCreative.imageUrl}
-                download={linkedCreative.name}
-                onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                className="inline-flex items-center gap-1 rounded-lg bg-white/90 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-white"
-              >
-                ダウンロード
-              </a>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );

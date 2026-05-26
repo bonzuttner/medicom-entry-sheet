@@ -1,4 +1,4 @@
-import { canAccessManufacturer, isAdmin, requireUser } from '../_lib/auth.js';
+import { canAccessManufacturer, canAccessManufacturerById, isAdmin, isRetailer, requireUser } from '../_lib/auth.js';
 import { getMethod, methodNotAllowed, readJsonBody, sendError, sendJson } from '../_lib/http.js';
 import { deleteUnusedManagedBlobUrls, normalizeSheetMedia } from '../_lib/media.js';
 import { EntrySheet, EntrySheetAdminMemo } from '../_lib/types.js';
@@ -7,9 +7,8 @@ import * as UserRepository from '../_lib/repositories/users.js';
 
 interface PutSheetBody {
   sheet?: EntrySheet;
-  mode?: 'admin_memo' | 'workflow';
+  mode?: 'admin_memo';
   adminMemo?: EntrySheetAdminMemo;
-  workflow?: Pick<EntrySheet, 'version' | 'creativeStatus' | 'currentAssignee' | 'assigneeUserId' | 'returnReason'>;
   forceOverwrite?: boolean;
   forceJanOverwrite?: boolean;
 }
@@ -27,106 +26,12 @@ const getSheetId = (req: any): string | null => {
 
 const normalizeStatus = (
   value: string | undefined
-): 'draft' | 'completed' | 'completed_no_image' => {
+): 'draft' | 'completed' | 'completed_no_image' | 'revision_requested' | 'approved' => {
   if (value === 'completed') return 'completed';
   if (value === 'completed_no_image') return 'completed_no_image';
-  return 'draft';
-};
-
-const normalizeCreativeStatus = (
-  value: string | undefined
-): 'none' | 'in_progress' | 'confirmation_pending' | 'returned' | 'approved' => {
-  if (value === 'in_progress') return 'in_progress';
-  if (value === 'confirmation_pending') return 'confirmation_pending';
-  if (value === 'returned') return 'returned';
+  if (value === 'revision_requested') return 'revision_requested';
   if (value === 'approved') return 'approved';
-  return 'none';
-};
-
-const normalizeCurrentAssignee = (
-  value: string | undefined
-): 'admin' | 'manufacturer_user' | 'none' => {
-  if (value === 'admin') return 'admin';
-  if (value === 'manufacturer_user') return 'manufacturer_user';
-  return 'none';
-};
-
-const normalizeAssigneeUserId = (value: string | undefined): string | undefined => {
-  const normalized = String(value || '').trim();
-  return normalized || undefined;
-};
-
-const resolveWorkflowCurrentAssignee = (
-  entryStatus: EntrySheet['entryStatus'] | EntrySheet['status'] | undefined,
-  currentCreativeStatus: EntrySheet['creativeStatus'] | undefined,
-  nextCreativeStatus: EntrySheet['creativeStatus'] | undefined
-): 'admin' | 'manufacturer_user' | 'none' => {
-  const normalizedCurrentCreativeStatus = normalizeCreativeStatus(currentCreativeStatus);
-  const normalizedNextCreativeStatus = normalizeCreativeStatus(nextCreativeStatus);
-
-  if (normalizedNextCreativeStatus === 'approved') return 'none';
-  if (normalizedNextCreativeStatus === 'confirmation_pending') return 'manufacturer_user';
-  if (normalizedNextCreativeStatus === 'in_progress') return 'admin';
-  if (normalizedNextCreativeStatus === 'returned') {
-    return normalizedCurrentCreativeStatus === 'confirmation_pending' ? 'admin' : 'manufacturer_user';
-  }
-  return normalizeStatus(entryStatus) === 'draft' ? 'manufacturer_user' : 'admin';
-};
-
-const isAllowedWorkflowTransition = (
-  changedByRole: 'ADMIN' | 'STAFF',
-  entryStatus: EntrySheet['entryStatus'] | EntrySheet['status'] | undefined,
-  currentCreativeStatus: EntrySheet['creativeStatus'] | undefined,
-  nextCreativeStatus: EntrySheet['creativeStatus'] | undefined
-): boolean => {
-  const normalizedCurrentCreativeStatus = normalizeCreativeStatus(currentCreativeStatus);
-  const normalizedNextCreativeStatus = normalizeCreativeStatus(nextCreativeStatus);
-
-  if (normalizedCurrentCreativeStatus === normalizedNextCreativeStatus) {
-    return true;
-  }
-
-  if (changedByRole === 'ADMIN') {
-    if (normalizedCurrentCreativeStatus === 'none') {
-      return (
-        normalizeStatus(entryStatus) !== 'draft' &&
-        (normalizedNextCreativeStatus === 'in_progress' ||
-          normalizedNextCreativeStatus === 'returned')
-      );
-    }
-    if (normalizedCurrentCreativeStatus === 'in_progress') {
-      return (
-        normalizedNextCreativeStatus === 'confirmation_pending' ||
-        normalizedNextCreativeStatus === 'returned'
-      );
-    }
-    if (normalizedCurrentCreativeStatus === 'confirmation_pending') {
-      return normalizedNextCreativeStatus === 'in_progress';
-    }
-    if (normalizedCurrentCreativeStatus === 'returned') {
-      return normalizedNextCreativeStatus === 'in_progress';
-    }
-    if (normalizedCurrentCreativeStatus === 'approved') {
-      return normalizedNextCreativeStatus === 'in_progress';
-    }
-    return false;
-  }
-
-  return (
-    normalizedCurrentCreativeStatus === 'confirmation_pending' &&
-    (normalizedNextCreativeStatus === 'approved' || normalizedNextCreativeStatus === 'returned')
-  );
-};
-
-const isEligibleWorkflowAssignee = (
-  assignee: 'admin' | 'manufacturer_user' | 'none',
-  user: Awaited<ReturnType<typeof UserRepository.findById>> | null,
-  manufacturerName: string
-): boolean => {
-  if (!user) return false;
-  if (assignee === 'admin') return user.role === 'ADMIN';
-  if (assignee === 'manufacturer_user') return user.manufacturerName === manufacturerName;
-  return false;
+  return 'draft';
 };
 
 const normalizeProducts = (
@@ -366,52 +271,6 @@ const buildRevisionSummary = (before: EntrySheet | null, after: EntrySheet): str
   return changes.slice(0, 80).join('\n');
 };
 
-const getWorkflowStatusLabel = (
-  sheet: Pick<EntrySheet, 'status' | 'creativeStatus'>
-): string => {
-  const creativeStatus = sheet.creativeStatus || 'none';
-  if (creativeStatus === 'approved') return '承認済み';
-  if (creativeStatus === 'returned') return '差し戻し';
-  if (creativeStatus === 'confirmation_pending') return '確認待ち';
-  if (creativeStatus === 'in_progress') return 'クリエイティブ作成中';
-  const entryStatus = sheet.status || 'draft';
-  if (entryStatus === 'completed_no_image') return 'エントリー完了（画像なし）';
-  if (entryStatus === 'completed') return 'エントリー完了';
-  return '下書き';
-};
-
-const getAssigneeLabel = (assignee: string | undefined): string => {
-  if (assignee === 'admin') return 'Admin';
-  if (assignee === 'manufacturer_user') return 'メーカー';
-  return 'なし';
-};
-
-const buildWorkflowSummary = (
-  before: EntrySheet,
-  after: EntrySheet
-): string => {
-  const changes: string[] = [];
-  const beforeAssigneeName = before.assigneeUsername || 'なし';
-  const afterAssigneeName = after.assigneeUsername || 'なし';
-  if ((before.creativeStatus || 'none') !== (after.creativeStatus || 'none')) {
-    changes.push(
-      `進行状態: ${getWorkflowStatusLabel(before)} → ${getWorkflowStatusLabel(after)}`
-    );
-  }
-  if ((before.currentAssignee || 'none') !== (after.currentAssignee || 'none')) {
-    changes.push(
-      `担当: ${getAssigneeLabel(before.currentAssignee)} → ${getAssigneeLabel(after.currentAssignee)}`
-    );
-  }
-  if ((before.assigneeUserId || '') !== (after.assigneeUserId || '')) {
-    changes.push(`担当者: ${beforeAssigneeName} → ${afterAssigneeName}`);
-  }
-  if ((before.returnReason || '') !== (after.returnReason || '')) {
-    changes.push('差し戻し理由を更新');
-  }
-  return changes.length > 0 ? changes.join(' / ') : '進行管理を更新';
-};
-
 const stripAdminMemo = (sheet: EntrySheet): EntrySheet => ({
   ...sheet,
   adminMemo: undefined,
@@ -515,114 +374,6 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    if (body.mode === 'workflow') {
-      const existingSheet = await SheetRepository.findById(sheetId);
-      if (!existingSheet) {
-        sendError(res, 404, 'Sheet not found');
-        return;
-      }
-      if (!canAccessManufacturer(currentUser, existingSheet.manufacturerName)) {
-        sendError(res, 403, 'You cannot modify this sheet');
-        return;
-      }
-
-      const currentEntryStatus = normalizeStatus(existingSheet.entryStatus || existingSheet.status);
-      const currentCreativeStatus = normalizeCreativeStatus(existingSheet.creativeStatus);
-      const nextCreativeStatus = normalizeCreativeStatus(body.workflow?.creativeStatus);
-      const hasAssigneeUserIdInPayload =
-        body.workflow != null &&
-        Object.prototype.hasOwnProperty.call(body.workflow, 'assigneeUserId');
-      const requestedAssigneeUserId = hasAssigneeUserIdInPayload
-        ? normalizeAssigneeUserId(body.workflow?.assigneeUserId)
-        : existingSheet.assigneeUserId;
-      const nextReturnReason =
-        nextCreativeStatus === 'returned'
-          ? String(body.workflow?.returnReason || '').trim()
-          : undefined;
-
-      if (!isAllowedWorkflowTransition(currentUser.role, currentEntryStatus, currentCreativeStatus, nextCreativeStatus)) {
-        sendError(res, 403, 'You cannot modify this workflow status');
-        return;
-      }
-
-      if (nextCreativeStatus === 'returned' && !nextReturnReason) {
-        sendError(res, 400, '差し戻し理由を入力してください。');
-        return;
-      }
-
-      const nextCurrentAssignee =
-        nextCreativeStatus === currentCreativeStatus
-          ? normalizeCurrentAssignee(existingSheet.currentAssignee)
-          : resolveWorkflowCurrentAssignee(
-              currentEntryStatus,
-              currentCreativeStatus,
-              nextCreativeStatus
-            );
-      const canEditAssigneeUserId =
-        isAdmin(currentUser) || nextCurrentAssignee === 'manufacturer_user';
-      const candidateAssigneeUserId = canEditAssigneeUserId
-        ? requestedAssigneeUserId
-        : existingSheet.assigneeUserId;
-      const candidateAssigneeUser = candidateAssigneeUserId
-        ? await UserRepository.findById(candidateAssigneeUserId)
-        : null;
-      const nextAssigneeUserId = isEligibleWorkflowAssignee(
-        nextCurrentAssignee,
-        candidateAssigneeUser,
-        existingSheet.manufacturerName
-      )
-        ? candidateAssigneeUserId
-        : undefined;
-
-      const workflowSheet: EntrySheet = {
-        ...existingSheet,
-        version:
-          Number.isInteger(Number(body.workflow?.version)) && Number(body.workflow?.version) > 0
-            ? Number(body.workflow?.version)
-            : existingSheet.version,
-        creativeStatus: nextCreativeStatus,
-        currentAssignee: nextCurrentAssignee,
-        assigneeUserId: nextAssigneeUserId,
-        assigneeUsername:
-          nextAssigneeUserId && candidateAssigneeUser
-            ? candidateAssigneeUser.displayName || candidateAssigneeUser.username
-            : undefined,
-        returnReason: nextReturnReason,
-        updatedAt: new Date().toISOString(),
-      };
-
-      try {
-        await SheetRepository.upsert(workflowSheet, {
-          changedByUserId: currentUser.id,
-          changedByName: currentUser.displayName || currentUser.username,
-          summary: buildWorkflowSummary(existingSheet, workflowSheet),
-          keepLatestCount: 30,
-          updateAdminMemo: false,
-          expectedVersion: workflowSheet.version,
-          forceOverwrite: body.forceOverwrite === true,
-        });
-      } catch (error) {
-        if (
-          error instanceof Error &&
-          (error.message === 'VERSION_CONFLICT' || error.message === 'ADMIN_MEMO_VERSION_CONFLICT')
-        ) {
-          sendError(res, 409, 'VERSION_CONFLICT');
-          return;
-        }
-        const message = error instanceof Error ? error.message : 'Failed to save workflow';
-        sendError(res, 500, message);
-        return;
-      }
-
-      const updatedSheet = await SheetRepository.findById(sheetId);
-      if (!updatedSheet) {
-        sendError(res, 500, 'Failed to reload saved sheet');
-        return;
-      }
-      sendJson(res, 200, { ok: true, sheet: isAdmin(currentUser) ? updatedSheet : stripAdminMemo(updatedSheet) });
-      return;
-    }
-
     const sheet = body.sheet;
     if (!sheet) {
       sendError(res, 400, 'sheet is required');
@@ -660,8 +411,6 @@ export default async function handler(req: any, res: any) {
       creatorName: String(sheet.creatorName || existingSheet?.creatorName || currentUser.displayName || '').trim(),
       email: String(sheet.email || existingSheet?.email || currentUser.email || '').trim(),
       phoneNumber: String(sheet.phoneNumber || existingSheet?.phoneNumber || currentUser.phoneNumber || '').trim(),
-      assigneeUserId: sheet.assigneeUserId || existingSheet?.assigneeUserId,
-      assigneeUsername: sheet.assigneeUsername || existingSheet?.assigneeUsername,
       title: String(sheet.title || '').trim(),
       caseName: String(sheet.caseName || existingSheet?.caseName || '').trim(),
       notes: sheet.notes ? String(sheet.notes).trim() : '',

@@ -1,6 +1,6 @@
 import React from 'react';
 import { User, Page, UserRole } from '../types';
-import { LogOut, LayoutGrid, Users, Settings, FileText, ListChecks, Image as ImageIcon } from 'lucide-react';
+import { LogOut, LayoutGrid, Users, Settings, FileText, ListChecks, ClipboardCheck } from 'lucide-react';
 
 interface LayoutProps {
   currentUser: User;
@@ -28,7 +28,7 @@ export const Layout: React.FC<LayoutProps> = ({ currentUser, currentPage, onNavi
               <div className="hidden md:flex flex-col items-end text-sm">
                 <span className="font-semibold text-slate-700">{currentUser.displayName}</span>
                 <span className="text-slate-500">{currentUser.manufacturerName}</span>
-                <span className="text-xs text-slate-400">{currentUser.role === UserRole.ADMIN ? '管理者' : '一般'}</span>
+                <span className="text-xs text-slate-400">{currentUser.role === UserRole.ADMIN ? '管理者' : currentUser.role === UserRole.RETAILER ? '小売店' : '一般'}</span>
               </div>
               
               <button 
@@ -47,34 +47,37 @@ export const Layout: React.FC<LayoutProps> = ({ currentUser, currentPage, onNavi
         {/* Main Nav (Simple Toolbar) */}
         <div className="border-t border-slate-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-4 sm:space-x-6 overflow-x-auto scrollbar-hide">
-            <NavButton
-              active={currentPage === Page.LIST || currentPage === Page.EDIT}
-              onClick={() => onNavigate(Page.LIST)}
-              icon={<LayoutGrid size={17} />}
-              label="シート一覧"
-              fullLabel="エントリーシート一覧"
-            />
-
-            {/* Account Management - All users can manage accounts in their own company */}
-            <NavButton
-              active={currentPage === Page.ACCOUNTS}
-              onClick={() => onNavigate(Page.ACCOUNTS)}
-              icon={<Users size={17} />}
-              label="アカウント"
-              fullLabel="アカウント管理"
-            />
-
-            {/* Master Management - Explicitly Admin Only */}
-            {currentUser.role === UserRole.ADMIN && (
+            {/* RETAILER sees only review list */}
+            {currentUser.role === UserRole.RETAILER ? (
               <NavButton
-                active={currentPage === Page.CREATIVES}
-                onClick={() => onNavigate(Page.CREATIVES)}
-                icon={<ImageIcon size={17} />}
-                label="クリエイティブ"
-                fullLabel="クリエイティブ"
+                active={currentPage === Page.RETAILER_LIST || currentPage === Page.EDIT}
+                onClick={() => onNavigate(Page.RETAILER_LIST)}
+                icon={<ClipboardCheck size={17} />}
+                label="レビュー"
+                fullLabel="シートレビュー"
+              />
+            ) : (
+              <NavButton
+                active={currentPage === Page.LIST || currentPage === Page.EDIT}
+                onClick={() => onNavigate(Page.LIST)}
+                icon={<LayoutGrid size={17} />}
+                label="シート一覧"
+                fullLabel="エントリーシート一覧"
               />
             )}
 
+            {/* Account Management - Admin and Staff only */}
+            {currentUser.role !== UserRole.RETAILER && (
+              <NavButton
+                active={currentPage === Page.ACCOUNTS}
+                onClick={() => onNavigate(Page.ACCOUNTS)}
+                icon={<Users size={17} />}
+                label="アカウント"
+                fullLabel="アカウント管理"
+              />
+            )}
+
+            {/* Master Management - Explicitly Admin Only */}
             {currentUser.role === UserRole.ADMIN && (
               <NavButton
                 active={currentPage === Page.MASTERS}

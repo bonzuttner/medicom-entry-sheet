@@ -1,4 +1,4 @@
-import { Creative, CreativeCandidateSheet, EntrySheet, EntrySheetRevision, MasterData, ProductEntry, User } from '../types';
+import { EntrySheet, EntrySheetRevision, MasterData, ProductEntry, ReviewComment, User } from '../types';
 import { apiClient } from './apiClient';
 
 export interface PagedResult<T> {
@@ -25,11 +25,6 @@ export interface DataService {
     adminMemo: EntrySheet['adminMemo'],
     options?: { forceOverwrite?: boolean }
   ) => Promise<EntrySheet>;
-  saveSheetWorkflow: (
-    sheetId: string,
-    workflow: Pick<EntrySheet, 'version' | 'creativeStatus' | 'currentAssignee' | 'assigneeUserId' | 'returnReason'>,
-    options?: { forceOverwrite?: boolean }
-  ) => Promise<EntrySheet>;
   deleteSheet: (id: string) => Promise<void>;
   getSheetRevisions: (sheetId: string) => Promise<EntrySheetRevision[]>;
   searchProducts: (params: {
@@ -39,24 +34,8 @@ export interface DataService {
   }) => Promise<ProductEntry[]>;
   getMasterData: () => Promise<MasterData>;
   saveMasterData: (data: MasterData) => Promise<MasterData>;
-  getCreatives: () => Promise<Creative[]>;
-  searchCreativeCandidateSheets: (params: {
-    query?: string;
-    ids?: string[];
-    manufacturerName?: string;
-    offset?: number;
-    limit?: number;
-  }) => Promise<PagedResult<CreativeCandidateSheet>>;
-  getCreativeBySheetId: (sheetId: string) => Promise<Creative | null>;
-  saveCreative: (
-    creative: Creative,
-    options?: { forceOverwrite?: boolean }
-  ) => Promise<Creative>;
-  deleteCreative: (id: string) => Promise<void>;
-  relinkSheetCreative: (
-    sheetId: string,
-    targetCreativeId: string
-  ) => Promise<{ sheet: EntrySheet; creative: Creative }>;
+  reviewSheet: (sheetId: string, action: 'approve' | 'request_revision', comment?: string) => Promise<EntrySheet>;
+  getReviewComments: (sheetId: string) => Promise<ReviewComment[]>;
 }
 
 const apiDataService: DataService = {
@@ -94,14 +73,6 @@ const apiDataService: DataService = {
         forceOverwrite: options?.forceOverwrite === true,
       })
       .then((result) => result.sheet),
-  saveSheetWorkflow: async (sheetId, workflow, options) =>
-    apiClient
-      .put<{ ok: boolean; sheet: EntrySheet }>(`/api/sheets/${sheetId}`, {
-        mode: 'workflow',
-        workflow,
-        forceOverwrite: options?.forceOverwrite === true,
-      })
-      .then((result) => result.sheet),
   deleteSheet: async (id) => {
     await apiClient.delete<void>(`/api/sheets/${id}`);
   },
@@ -115,36 +86,12 @@ const apiDataService: DataService = {
     ),
   getMasterData: async () => apiClient.get<MasterData>('/api/master'),
   saveMasterData: async (data) => apiClient.put<MasterData>('/api/master', { data }),
-  getCreatives: async () => apiClient.get<Creative[]>('/api/creatives'),
-  searchCreativeCandidateSheets: async ({ query = '', ids = [], manufacturerName = '', offset = 0, limit = 30 }) => {
-    const search = new URLSearchParams();
-    search.set('mode', 'creative-candidates');
-    search.set('offset', String(offset));
-    search.set('limit', String(limit));
-    if (query.trim()) search.set('q', query);
-    if (manufacturerName.trim()) search.set('manufacturerName', manufacturerName);
-    ids.forEach((id) => search.append('id', id));
-    return apiClient.get<PagedResult<CreativeCandidateSheet>>(`/api/sheets?${search.toString()}`);
-  },
-  getCreativeBySheetId: async (sheetId) =>
-    apiClient.get<Creative | null>(`/api/creatives?sheetId=${encodeURIComponent(sheetId)}`),
-  saveCreative: async (creative, options) =>
+  reviewSheet: async (sheetId, action, comment) =>
     apiClient
-      .put<{ ok: boolean; creative: Creative }>(`/api/creatives`, {
-        mode: 'save',
-        creative,
-        forceOverwrite: options?.forceOverwrite === true,
-      })
-      .then((result) => result.creative),
-  deleteCreative: async (id) => {
-    await apiClient.delete<void>(`/api/creatives?id=${encodeURIComponent(id)}`);
-  },
-  relinkSheetCreative: async (sheetId, targetCreativeId) =>
-    apiClient.put<{ ok: boolean; sheet: EntrySheet; creative: Creative }>('/api/creatives', {
-      mode: 'relink',
-      sheetId,
-      targetCreativeId,
-    }),
+      .put<{ ok: boolean; sheet: EntrySheet }>(`/api/sheets/${sheetId}/review`, { action, comment })
+      .then((result) => result.sheet),
+  getReviewComments: async (sheetId) =>
+    apiClient.get<ReviewComment[]>(`/api/sheets/${sheetId}/comments`),
 };
 
 export const isApiDataSource = true;

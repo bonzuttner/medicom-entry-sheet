@@ -1,4 +1,4 @@
-export type UserRole = 'ADMIN' | 'STAFF';
+export type UserRole = 'ADMIN' | 'RETAILER' | 'STAFF';
 
 export interface User {
   id: string;
@@ -6,9 +6,12 @@ export interface User {
   password?: string;
   displayName: string;
   manufacturerName: string;
+  manufacturerId?: string;
   email: string;
   phoneNumber: string;
   role: UserRole;
+  assignedManufacturerIds?: string[];
+  assignedManufacturerNames?: string[];
 }
 
 export interface MasterData {
@@ -28,9 +31,7 @@ export interface FaceOption {
   maxWidth: number;
 }
 
-export type EntryStatus = 'draft' | 'completed' | 'completed_no_image';
-export type CreativeStatus = 'none' | 'in_progress' | 'confirmation_pending' | 'returned' | 'approved';
-export type CurrentAssignee = 'admin' | 'manufacturer_user' | 'none';
+export type EntryStatus = 'draft' | 'completed' | 'completed_no_image' | 'revision_requested' | 'approved';
 
 export interface EntrySheetAdminMemo {
   version?: number;
@@ -101,13 +102,7 @@ export interface EntrySheet {
   attachments?: Attachment[];
   status: EntryStatus;
   entryStatus?: EntryStatus;
-  creativeStatus?: CreativeStatus;
-  currentAssignee?: CurrentAssignee;
-  assigneeUserId?: string;
-  assigneeUsername?: string;
-  returnReason?: string;
   adminMemo?: EntrySheetAdminMemo;
-  creative?: CreativeSummary;
   products: ProductEntry[];
   promotions?: Promotion[];
 }
@@ -135,40 +130,13 @@ export interface Attachment {
   dataUrl?: string;
 }
 
-export interface CreativeLinkedSheet {
+export interface ReviewComment {
   id: string;
-  sheetCode?: string;
-  title: string;
-  manufacturerName: string;
-  shelfName: string;
-  caseName: string;
-}
-
-export interface CreativeCandidateSheet extends CreativeLinkedSheet {
-  updatedAt: string;
-  entryStatus?: string;
-  status: string;
-  creativeStatus?: CreativeStatus;
-  linkedCreativeId?: string;
-}
-
-export interface CreativeSummary {
-  id: string;
-  name: string;
-  imageUrl: string;
-  updatedAt: string;
-}
-
-export interface Creative {
-  id: string;
-  version: number;
-  manufacturerName: string;
-  creatorId: string;
-  creatorName: string;
-  name: string;
-  imageUrl: string;
-  memo?: string;
+  sheetId: string;
+  userId: string;
+  userNameSnapshot: string;
+  userRoleSnapshot: UserRole;
+  comment: string;
   createdAt: string;
-  updatedAt: string;
-  linkedSheets: CreativeLinkedSheet[];
 }
+

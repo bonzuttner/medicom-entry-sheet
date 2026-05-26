@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import JSZip from 'jszip';
 import { EntrySheet, User, UserRole } from '../types';
 import { Plus, Copy, Edit3, Trash2, Search, FileWarning, ChevronDown, ChevronUp, Download, CheckSquare, Square, Image as ImageIcon, X, AlertCircle, AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
-import { getCurrentAssigneeLabel, getWorkflowStatusView } from '../lib/sheetWorkflow';
+import { getWorkflowStatusView } from '../lib/sheetWorkflow';
 
 interface EntryListProps {
   sheets: EntrySheet[];
@@ -738,7 +738,6 @@ export const EntryList: React.FC<EntryListProps> = ({
                 const isExpanded = expandedSheets.has(sheet.id);
                 const isSelected = selectedSheets.has(sheet.id);
                 const workflowStatus = getWorkflowStatusView(sheet);
-                const assigneeLabel = getCurrentAssigneeLabel(sheet.currentAssignee);
 
                 return (
                     <div key={sheet.id} className={`bg-white rounded-xl border ${isSelected ? 'border-primary ring-1 ring-primary' : 'border-slate-200'} shadow-sm overflow-hidden`}>
@@ -764,9 +763,6 @@ export const EntryList: React.FC<EntryListProps> = ({
                                 </div>
                                 <div className="text-xs text-slate-600 mt-0.5 break-words">
                                     棚割り: {getSheetShelfNames(sheet)}
-                                </div>
-                                <div className="text-xs text-slate-500 mt-0.5">
-                                    担当: {assigneeLabel}
                                 </div>
                             </div>
                         </div>
@@ -881,7 +877,6 @@ export const EntryList: React.FC<EntryListProps> = ({
                      const isExpanded = expandedSheets.has(sheet.id);
                      const isSelected = selectedSheets.has(sheet.id);
                      const workflowStatus = getWorkflowStatusView(sheet);
-                     const assigneeLabel = getCurrentAssigneeLabel(sheet.currentAssignee);
 
                      return (
                       <React.Fragment key={sheet.id}>
@@ -901,12 +896,9 @@ export const EntryList: React.FC<EntryListProps> = ({
                             {getDisplaySheetId(sheet)}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap">
-                            <div className="space-y-1">
-                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${workflowStatus.pillClassName}`}>
-                                {workflowStatus.label}
-                              </span>
-                              <div className="text-[11px] text-slate-500">担当: {assigneeLabel}</div>
-                            </div>
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${workflowStatus.pillClassName}`}>
+                              {workflowStatus.label}
+                            </span>
                           </td>
                           <td className="px-6 py-4">
                             <div className="text-sm font-bold text-slate-900 line-clamp-2 break-words leading-tight">{sheet.title}</div>

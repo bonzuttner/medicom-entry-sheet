@@ -1,5 +1,6 @@
 import * as db from '../db.js';
-import { User } from '../types.js';
+import { User, UserRole } from '../types.js';
+import * as RetailerRepository from './retailers.js';
 
 /**
  * User Repository
@@ -122,9 +123,10 @@ const rowToUser = (row: UserRow): User => ({
   password: row.password_hash,
   displayName: row.display_name,
   manufacturerName: row.manufacturer_name,
+  manufacturerId: row.manufacturer_id,
   email: row.email,
   phoneNumber: row.phone_number,
-  role: row.role as 'ADMIN' | 'STAFF',
+  role: row.role as UserRole,
 });
 
 /**
@@ -142,7 +144,16 @@ export const findById = async (userId: string): Promise<User | null> => {
   );
 
   if (result.rows.length === 0) return null;
-  return rowToUser(result.rows[0]);
+  const user = rowToUser(result.rows[0]);
+
+  // RETAILER の場合は担当メーカーを取得
+  if (user.role === 'RETAILER') {
+    const assignments = await RetailerRepository.getAssignedManufacturers(userId);
+    user.assignedManufacturerIds = assignments.map((a) => a.manufacturerId);
+    user.assignedManufacturerNames = assignments.map((a) => a.manufacturerName);
+  }
+
+  return user;
 };
 
 /**
@@ -160,7 +171,16 @@ export const findByUsername = async (username: string): Promise<User | null> => 
   );
 
   if (result.rows.length === 0) return null;
-  return rowToUser(result.rows[0]);
+  const user = rowToUser(result.rows[0]);
+
+  // RETAILER の場合は担当メーカーを取得
+  if (user.role === 'RETAILER') {
+    const assignments = await RetailerRepository.getAssignedManufacturers(user.id);
+    user.assignedManufacturerIds = assignments.map((a) => a.manufacturerId);
+    user.assignedManufacturerNames = assignments.map((a) => a.manufacturerName);
+  }
+
+  return user;
 };
 
 /**
@@ -176,7 +196,18 @@ export const findAll = async (): Promise<User[]> => {
     `
   );
 
-  return result.rows.map(rowToUser);
+  const users = result.rows.map(rowToUser);
+
+  // RETAILER ユーザーの担当メーカーを取得
+  for (const user of users) {
+    if (user.role === 'RETAILER') {
+      const assignments = await RetailerRepository.getAssignedManufacturers(user.id);
+      user.assignedManufacturerIds = assignments.map((a) => a.manufacturerId);
+      user.assignedManufacturerNames = assignments.map((a) => a.manufacturerName);
+    }
+  }
+
+  return users;
 };
 
 /**
@@ -315,7 +346,23 @@ export const upsert = async (user: User): Promise<User> => {
     ]
   );
 
-  return rowToUser(result.rows[0]);
+  const savedUser = rowToUser(result.rows[0]);
+
+  // RETAILER の場合は担当メーカーを設定
+  if (user.role === 'RETAILER' && user.assignedManufacturerIds) {
+    await RetailerRepository.setAssignedManufacturers(
+      savedUser.id,
+      user.assignedManufacturerIds
+    );
+    const assignments = await RetailerRepository.getAssignedManufacturers(savedUser.id);
+    savedUser.assignedManufacturerIds = assignments.map((a) => a.manufacturerId);
+    savedUser.assignedManufacturerNames = assignments.map((a) => a.manufacturerName);
+  } else if (user.role !== 'RETAILER') {
+    // RETAILER 以外に変更された場合は紐づけを削除
+    await RetailerRepository.setAssignedManufacturers(savedUser.id, []);
+  }
+
+  return savedUser;
 };
 
 /**

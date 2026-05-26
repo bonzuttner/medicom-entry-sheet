@@ -161,6 +161,7 @@ export const AccountManage: React.FC<AccountManageProps> = ({
         phoneNumber: normalizedPhone,
         role: editingUser.role || UserRole.STAFF,
         password: editingUser.password?.trim() || (isNewUser ? '' : existingUser?.password),
+        assignedManufacturerNames: editingUser.role === UserRole.RETAILER ? editingUser.assignedManufacturerNames : undefined,
     };
     try {
       setIsSaving(true);
@@ -250,7 +251,7 @@ export const AccountManage: React.FC<AccountManageProps> = ({
                         {currentUser.role !== UserRole.ADMIN ? (
                           <div>
                             <div className="w-full border border-slate-200 p-2 rounded bg-slate-100 text-slate-700">
-                              {editingUser.role === UserRole.ADMIN ? '管理者' : '一般'}
+                              {editingUser.role === UserRole.ADMIN ? '管理者' : editingUser.role === UserRole.RETAILER ? '小売店' : '一般'}
                             </div>
                             <p className="text-xs text-slate-500 mt-1">※ 自動入力（一般固定）</p>
                           </div>
@@ -258,13 +259,46 @@ export const AccountManage: React.FC<AccountManageProps> = ({
                           <select
                               className="w-full border p-2 rounded bg-white"
                               value={editingUser.role || UserRole.STAFF}
-                              onChange={e => setEditingUser({ ...editingUser, role: e.target.value as UserRole })}
+                              onChange={e => setEditingUser({ ...editingUser, role: e.target.value as UserRole, assignedManufacturerIds: e.target.value === UserRole.RETAILER ? (editingUser.assignedManufacturerIds || []) : undefined })}
                           >
                               <option value={UserRole.STAFF}>一般</option>
+                              <option value={UserRole.RETAILER}>小売店</option>
                               <option value={UserRole.ADMIN}>管理者</option>
                           </select>
                         )}
                     </div>
+                    {/* Manufacturer assignment for RETAILER */}
+                    {currentUser.role === UserRole.ADMIN && editingUser.role === UserRole.RETAILER && (
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-slate-700 mb-2">担当メーカー（複数選択可）</label>
+                        <div className="border rounded p-3 max-h-40 overflow-y-auto bg-slate-50">
+                          {manufacturerOptions.length === 0 ? (
+                            <p className="text-sm text-slate-500">メーカーがありません</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {manufacturerOptions.map((name) => (
+                                <label key={name} className="flex items-center gap-2 cursor-pointer hover:bg-white p-1 rounded">
+                                  <input
+                                    type="checkbox"
+                                    checked={(editingUser.assignedManufacturerNames || []).includes(name)}
+                                    onChange={(e) => {
+                                      const currentNames = editingUser.assignedManufacturerNames || [];
+                                      const newNames = e.target.checked
+                                        ? [...currentNames, name]
+                                        : currentNames.filter((n) => n !== name);
+                                      setEditingUser({ ...editingUser, assignedManufacturerNames: newNames });
+                                    }}
+                                    className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary"
+                                  />
+                                  <span className="text-sm text-slate-700">{name}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">※ 小売店ユーザーがレビューできるメーカーを選択してください</p>
+                      </div>
+                    )}
                      <div>
                         <label className="block text-sm font-medium text-slate-700">メールアドレス <span className="text-red-500">*</span></label>
                         <input
@@ -349,8 +383,8 @@ export const AccountManage: React.FC<AccountManageProps> = ({
                                 <div className="font-bold text-slate-800">{u.displayName}</div>
                                 <div className="text-sm text-slate-500">{u.username}</div>
                             </div>
-                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${u.role === UserRole.ADMIN ? 'bg-purple-100 text-purple-800' : 'bg-slate-100 text-slate-700'}`}>
-                                {u.role === UserRole.ADMIN ? '管理者' : '一般'}
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${u.role === UserRole.ADMIN ? 'bg-purple-100 text-purple-800' : u.role === UserRole.RETAILER ? 'bg-teal-100 text-teal-800' : 'bg-slate-100 text-slate-700'}`}>
+                                {u.role === UserRole.ADMIN ? '管理者' : u.role === UserRole.RETAILER ? '小売店' : '一般'}
                             </span>
                         </div>
                         <div className="text-sm text-slate-600 mb-3">{u.manufacturerName}</div>
@@ -403,8 +437,8 @@ export const AccountManage: React.FC<AccountManageProps> = ({
                                 <td className="p-4 text-slate-500">{u.username}</td>
                                 <td className="p-4">{u.manufacturerName}</td>
                                 <td className="p-4">
-                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${u.role === UserRole.ADMIN ? 'bg-purple-100 text-purple-800' : 'bg-slate-100 text-slate-700'}`}>
-                                        {u.role === UserRole.ADMIN ? '管理者' : '一般'}
+                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${u.role === UserRole.ADMIN ? 'bg-purple-100 text-purple-800' : u.role === UserRole.RETAILER ? 'bg-teal-100 text-teal-800' : 'bg-slate-100 text-slate-700'}`}>
+                                        {u.role === UserRole.ADMIN ? '管理者' : u.role === UserRole.RETAILER ? '小売店' : '一般'}
                                     </span>
                                 </td>
                                 <td className="p-4 text-right flex justify-end gap-2">

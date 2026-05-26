@@ -4,12 +4,11 @@ import { Login } from './components/Login';
 import { EntryList } from './components/EntryList';
 import { EntryForm } from './components/EntryForm';
 import { AdminEntryList } from './components/AdminEntryList';
+import { RetailerEntryList } from './components/RetailerEntryList';
 import { AccountManage } from './components/AccountManage';
-import { CreativeManage } from './components/CreativeManage';
 import { MasterManage } from './components/MasterManage';
 import { dataService } from './services/dataService';
 import {
-  Creative,
   User,
   Page,
   EntrySheet,
@@ -106,10 +105,6 @@ const toComparableSheetCore = (sheet: EntrySheet) => ({
   faceMaxWidth: normalizeOptionalNumber(sheet.faceMaxWidth),
   status: sheet.status,
   entryStatus: sheet.entryStatus || sheet.status,
-  creativeStatus: sheet.creativeStatus || 'none',
-  currentAssignee: sheet.currentAssignee || 'none',
-  assigneeUserId: normalizeOptionalString(sheet.assigneeUserId),
-  returnReason: normalizeOptionalString(sheet.returnReason),
   products: toComparableProducts(sheet.products),
   attachments: toComparableAttachments(sheet.attachments),
 });
@@ -205,7 +200,6 @@ const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>(Page.LOGIN);
   const [sheets, setSheets] = useState<EntrySheet[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [creatives, setCreatives] = useState<Creative[]>([]);
   const [masterData, setMasterData] = useState<MasterData>(EMPTY_MASTER_DATA);
   const [editingSheet, setEditingSheet] = useState<EntrySheet | null>(null);
   const [initialProductIndex, setInitialProductIndex] = useState<number>(0);
@@ -214,21 +208,28 @@ const App: React.FC = () => {
   const [totalSheetCount, setTotalSheetCount] = useState<number>(0);
   const [sheetOffset, setSheetOffset] = useState<number>(0);
   const [isLoadingMoreSheets, setIsLoadingMoreSheets] = useState<boolean>(false);
-  const [isLoadingCreatives, setIsLoadingCreatives] = useState<boolean>(false);
   const [editingSheetRevisions, setEditingSheetRevisions] = useState<EntrySheetRevision[]>([]);
   const masterSaveSeqRef = useRef(0);
 
   const handleNavigate = (page: Page) => {
     if (!currentUser) return;
     if (page === Page.MASTERS && currentUser.role !== UserRole.ADMIN) {
-      setCurrentPage(Page.LIST);
+      setCurrentPage(currentUser.role === UserRole.RETAILER ? Page.RETAILER_LIST : Page.LIST);
       return;
     }
     if (page === Page.ADMIN_LIST && currentUser.role !== UserRole.ADMIN) {
-      setCurrentPage(Page.LIST);
+      setCurrentPage(currentUser.role === UserRole.RETAILER ? Page.RETAILER_LIST : Page.LIST);
       return;
     }
-    if (page === Page.CREATIVES && currentUser.role !== UserRole.ADMIN) {
+    if (page === Page.ACCOUNTS && currentUser.role === UserRole.RETAILER) {
+      setCurrentPage(Page.RETAILER_LIST);
+      return;
+    }
+    if (page === Page.LIST && currentUser.role === UserRole.RETAILER) {
+      setCurrentPage(Page.RETAILER_LIST);
+      return;
+    }
+    if (page === Page.RETAILER_LIST && currentUser.role !== UserRole.RETAILER && currentUser.role !== UserRole.ADMIN) {
       setCurrentPage(Page.LIST);
       return;
     }
@@ -294,19 +295,6 @@ const App: React.FC = () => {
     }
   };
 
-  const loadCreatives = async (): Promise<void> => {
-    if (!currentUser || currentUser.role !== UserRole.ADMIN) return;
-    setIsLoadingCreatives(true);
-    try {
-      const creativeRows = await dataService.getCreatives();
-      setCreatives(creativeRows);
-    } catch (error) {
-      console.error('Failed to load creatives:', error);
-    } finally {
-      setIsLoadingCreatives(false);
-    }
-  };
-
   // Initialize
   useEffect(() => {
     let mounted = true;
@@ -319,7 +307,8 @@ const App: React.FC = () => {
 
         if (savedUser) {
           setCurrentUser(savedUser);
-          setCurrentPage(Page.LIST);
+          // RETAILER users go to RETAILER_LIST, others go to LIST
+          setCurrentPage(savedUser.role === UserRole.RETAILER ? Page.RETAILER_LIST : Page.LIST);
           try {
             await loadInitialSheets();
             if (!mounted) return;
@@ -358,16 +347,11 @@ const App: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
-    if (!currentUser || currentUser.role !== UserRole.ADMIN) return;
-    if (currentPage !== Page.CREATIVES) return;
-    void loadCreatives();
-  }, [currentPage, currentUser]);
-
   const handleLogin = async (user: User) => {
     try {
       setCurrentUser(user);
-      setCurrentPage(Page.LIST);
+      // RETAILER users go to RETAILER_LIST, others go to LIST
+      setCurrentPage(user.role === UserRole.RETAILER ? Page.RETAILER_LIST : Page.LIST);
       await dataService.setCurrentUser(user);
       await loadInitialSheets();
       void loadAuxiliaryData()
@@ -386,7 +370,6 @@ const App: React.FC = () => {
       setCurrentUser(null);
       setSheets([]);
       setUsers([]);
-      setCreatives([]);
       setMasterData(EMPTY_MASTER_DATA);
       setHasMoreSheets(false);
       setSheetOffset(0);
@@ -521,10 +504,6 @@ const App: React.FC = () => {
         updatedAt: new Date().toISOString(),
         status: 'draft',
         entryStatus: 'draft',
-        creativeStatus: 'none',
-        currentAssignee: 'none',
-        returnReason: undefined,
-        creative: undefined,
         products: duplicatedProducts,
       };
       const saved = await saveSheetWithConflictHandling(duplicated);
@@ -596,52 +575,6 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSaveSheetWorkflow = async (
-    sheet: EntrySheet
-  ): Promise<EntrySheet> => {
-    try {
-      const savedSheet = await dataService.saveSheetWorkflow(
-        sheet.id,
-        {
-          version: sheet.version,
-          creativeStatus: sheet.creativeStatus,
-          currentAssignee: sheet.currentAssignee,
-          assigneeUserId: sheet.assigneeUserId,
-          returnReason: sheet.returnReason,
-        }
-      );
-      setSheets((prev) => upsertSheetInList(prev, savedSheet));
-      setEditingSheet((prev) => (prev && prev.id === savedSheet.id ? savedSheet : prev));
-      refreshFirstSheetsPage();
-      return savedSheet;
-    } catch (error) {
-      if (isVersionConflictError(error)) {
-        const confirmOverwrite = window.confirm(
-          '他のユーザーが先に進行状況を更新しました。\n上書き保存しますか？'
-        );
-        if (confirmOverwrite) {
-          const savedSheet = await dataService.saveSheetWorkflow(
-            sheet.id,
-            {
-              version: sheet.version,
-              creativeStatus: sheet.creativeStatus,
-              currentAssignee: sheet.currentAssignee,
-              assigneeUserId: sheet.assigneeUserId,
-              returnReason: sheet.returnReason,
-            },
-            { forceOverwrite: true }
-          );
-          setSheets((prev) => upsertSheetInList(prev, savedSheet));
-          setEditingSheet((prev) => (prev && prev.id === savedSheet.id ? savedSheet : prev));
-          refreshFirstSheetsPage();
-          return savedSheet;
-        }
-      }
-      console.error('Failed to save workflow:', error);
-      throw error instanceof Error ? error : new Error('Failed to save workflow');
-    }
-  };
-
   const handleDeleteSheet = async (id: string) => {
     try {
       await dataService.deleteSheet(id);
@@ -652,59 +585,6 @@ const App: React.FC = () => {
       alert(error instanceof Error ? error.message : 'エントリーシートの削除に失敗しました。');
       throw error instanceof Error ? error : new Error('Failed to delete sheet');
     }
-  };
-
-  const handleSaveCreative = async (creative: Creative) => {
-    try {
-      const saved = await dataService.saveCreative(creative);
-      const affectedSheetIds = new Set([
-        ...creative.linkedSheets.map((sheet) => sheet.id),
-        ...saved.linkedSheets.map((sheet) => sheet.id),
-      ]);
-      setCreatives((prev) => {
-        const idx = prev.findIndex((row) => row.id === saved.id);
-        if (idx === -1) return [saved, ...prev];
-        const next = [...prev];
-        next[idx] = saved;
-        return next;
-      });
-      const latestSheets = await dataService.getSheets();
-      setSheets((prev) =>
-        prev.map((sheet) => {
-          if (!affectedSheetIds.has(sheet.id)) return sheet;
-          return latestSheets.find((row) => row.id === sheet.id) || sheet;
-        })
-      );
-      setEditingSheet((prev) => {
-        if (!prev || !affectedSheetIds.has(prev.id)) return prev;
-        return latestSheets.find((row) => row.id === prev.id) || prev;
-      });
-      refreshFirstSheetsPage();
-    } catch (error) {
-      console.error('Failed to save creative:', error);
-      throw error;
-    }
-  };
-
-  const handleDeleteCreative = async (id: string) => {
-    try {
-      await dataService.deleteCreative(id);
-      setCreatives((prev) => prev.filter((creative) => creative.id !== id));
-    } catch (error) {
-      console.error('Failed to delete creative:', error);
-      alert(error instanceof Error ? error.message : 'クリエイティブの削除に失敗しました。');
-    }
-  };
-
-  const handleRelinkSheetCreative = async (
-    sheetId: string,
-    targetCreativeId: string
-  ): Promise<{ sheet: EntrySheet; creative: Creative }> => {
-    const result = await dataService.relinkSheetCreative(sheetId, targetCreativeId);
-    setSheets((prev) => upsertSheetInList(prev, result.sheet));
-    setEditingSheet((prev) => (prev && prev.id === result.sheet.id ? result.sheet : prev));
-    refreshFirstSheetsPage();
-    return result;
   };
 
   // User Management
@@ -756,7 +636,9 @@ const App: React.FC = () => {
   }
 
   // Filter sheets based on user role and manufacturer
-  const visibleSheets = currentUser.role === UserRole.ADMIN
+  // ADMIN and RETAILER: show all sheets returned by API (RETAILER's sheets are already filtered by API)
+  // STAFF: filter by manufacturer name
+  const visibleSheets = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.RETAILER
     ? sheets
     : sheets.filter(
       (sheet) =>
@@ -813,6 +695,19 @@ const App: React.FC = () => {
         />
       )}
 
+      {currentPage === Page.RETAILER_LIST && currentUser.role === UserRole.RETAILER && (
+        <RetailerEntryList
+          sheets={visibleSheets}
+          currentUser={currentUser}
+          onView={handleEditSheet}
+          onRefresh={refreshFirstSheetsPage}
+          hasMore={hasMoreSheets}
+          onLoadMore={loadMoreSheets}
+          isLoadingMore={isLoadingMoreSheets}
+          totalCount={totalSheetCount}
+        />
+      )}
+
       {currentPage === Page.EDIT && editingSheet && (
         <EntryForm
           initialData={editingSheet}
@@ -826,13 +721,11 @@ const App: React.FC = () => {
             dataService.searchProducts({ query, manufacturerName, limit: 30 })
           }
           onSave={handleSaveSheet}
-          onSaveWorkflow={handleSaveSheetWorkflow}
-          onOpenCreatives={() => setCurrentPage(Page.CREATIVES)}
-          onRelinkCreative={handleRelinkSheetCreative}
           onCancel={() => {
             setEditingSheet(null);
             setEditingSheetRevisions([]);
-            setCurrentPage(Page.LIST);
+            // Return to appropriate list based on user role
+            setCurrentPage(currentUser.role === UserRole.RETAILER ? Page.RETAILER_LIST : Page.LIST);
           }}
         />
       )}
@@ -844,16 +737,6 @@ const App: React.FC = () => {
           currentUser={currentUser}
           onSaveUser={handleSaveUser}
           onDeleteUser={handleDeleteUser}
-        />
-      )}
-
-      {currentPage === Page.CREATIVES && currentUser.role === UserRole.ADMIN && (
-        <CreativeManage
-          creatives={creatives}
-          currentUser={currentUser}
-          onSaveCreative={handleSaveCreative}
-          onDeleteCreative={handleDeleteCreative}
-          isLoading={isLoadingCreatives}
         />
       )}
 
