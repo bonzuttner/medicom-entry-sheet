@@ -2,6 +2,7 @@ import { requireUser, canReviewSheet } from '../../_lib/auth.js';
 import { sendError, sendJson } from '../../_lib/http.js';
 import * as db from '../../_lib/db.js';
 import * as ReviewCommentRepository from '../../_lib/repositories/reviewComments.js';
+import * as SheetRepository from '../../_lib/repositories/sheets.js';
 import { EntryStatus } from '../../_lib/types.js';
 
 type ReviewAction = 'approve' | 'request_revision';
@@ -27,6 +28,8 @@ export default async function handler(req: any, res: any) {
     sendError(res, 400, 'Sheet ID is required');
     return;
   }
+
+  await SheetRepository.ensureSheetWorkflowInfrastructure();
 
   // シートの存在確認とメーカー取得
   const sheetRow = await db.queryOne<{

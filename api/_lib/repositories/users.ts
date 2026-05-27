@@ -23,8 +23,26 @@ interface UserRow {
 }
 
 let ensureManufacturerCodeInfrastructurePromise: Promise<void> | null = null;
+let ensureUserRoleConstraintPromise: Promise<void> | null = null;
 
 const formatManufacturerCode = (value: number): string => String(value).padStart(3, '0');
+
+const ensureUserRoleConstraint = async (): Promise<void> => {
+  if (!ensureUserRoleConstraintPromise) {
+    ensureUserRoleConstraintPromise = (async () => {
+      await db.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check`);
+      await db.query(
+        `ALTER TABLE users
+         ADD CONSTRAINT users_role_check
+         CHECK (role IN ('ADMIN', 'RETAILER', 'STAFF'))`
+      );
+    })().catch((error) => {
+      ensureUserRoleConstraintPromise = null;
+      throw error;
+    });
+  }
+  await ensureUserRoleConstraintPromise;
+};
 
 const ensureManufacturerCodeInfrastructure = async (): Promise<void> => {
   if (!ensureManufacturerCodeInfrastructurePromise) {
@@ -187,6 +205,7 @@ export const findByUsername = async (username: string): Promise<User | null> => 
  * Get all users (for ADMIN)
  */
 export const findAll = async (): Promise<User[]> => {
+  await ensureUserRoleConstraint();
   const result = await db.query<UserRow>(
     `
     SELECT u.*, m.name as manufacturer_name
@@ -312,6 +331,7 @@ export const ensureManufacturer = async (manufacturerName: string): Promise<stri
  * Upsert a single user
  */
 export const upsert = async (user: User): Promise<User> => {
+  await ensureUserRoleConstraint();
   const manufacturerId = await ensureManufacturer(user.manufacturerName);
 
   const result = await db.query<UserRow>(

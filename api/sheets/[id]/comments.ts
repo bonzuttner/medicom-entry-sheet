@@ -40,7 +40,7 @@ export default async function handler(req: any, res: any) {
 
   try {
     const comments = await ReviewCommentRepository.getCommentsBySheetId(sheetId);
-    sendJson(res, 200, { comments });
+    sendJson(res, 200, comments);
   } catch (error) {
     console.error('Failed to get comments:', error);
     sendError(res, 500, 'Failed to get comments');

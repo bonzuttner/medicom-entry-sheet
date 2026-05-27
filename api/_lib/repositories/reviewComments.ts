@@ -11,7 +11,42 @@ interface ReviewCommentRow {
   created_at: Date;
 }
 
+let ensureReviewCommentsTablePromise: Promise<void> | null = null;
+
+const ensureReviewCommentsTable = async (): Promise<void> => {
+  if (!ensureReviewCommentsTablePromise) {
+    ensureReviewCommentsTablePromise = (async () => {
+      await db.query(
+        `
+        CREATE TABLE IF NOT EXISTS sheet_review_comments (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          sheet_id UUID NOT NULL REFERENCES entry_sheets(id) ON DELETE CASCADE,
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          user_name_snapshot VARCHAR(200) NOT NULL,
+          user_role_snapshot VARCHAR(20) NOT NULL,
+          comment TEXT NOT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+        `
+      );
+      await db.query(
+        `CREATE INDEX IF NOT EXISTS idx_review_comments_sheet
+         ON sheet_review_comments(sheet_id)`
+      );
+      await db.query(
+        `CREATE INDEX IF NOT EXISTS idx_review_comments_created
+         ON sheet_review_comments(sheet_id, created_at DESC)`
+      );
+    })().catch((error) => {
+      ensureReviewCommentsTablePromise = null;
+      throw error;
+    });
+  }
+  await ensureReviewCommentsTablePromise;
+};
+
 export const getCommentsBySheetId = async (sheetId: string): Promise<ReviewComment[]> => {
+  await ensureReviewCommentsTable();
   const result = await db.query<ReviewCommentRow>(
     `SELECT
       id,
@@ -46,6 +81,7 @@ export const addComment = async (
   userRole: UserRole,
   comment: string
 ): Promise<ReviewComment> => {
+  await ensureReviewCommentsTable();
   const result = await db.query<ReviewCommentRow>(
     `INSERT INTO sheet_review_comments (
       sheet_id,
@@ -80,6 +116,7 @@ export const addComment = async (
 };
 
 export const deleteCommentsBySheetId = async (sheetId: string): Promise<void> => {
+  await ensureReviewCommentsTable();
   await db.query(
     `DELETE FROM sheet_review_comments
     WHERE sheet_id = $1`,

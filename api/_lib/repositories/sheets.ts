@@ -114,6 +114,23 @@ interface PromotionRow {
   promo_image_url: string | null;
 }
 
+const REVIEWABLE_ENTRY_STATUSES = [
+  'draft',
+  'completed',
+  'completed_no_image',
+  'revision_requested',
+  'approved',
+] as const;
+
+type ReviewableEntryStatus = (typeof REVIEWABLE_ENTRY_STATUSES)[number];
+
+const isReviewableEntryStatus = (value: unknown): value is ReviewableEntryStatus =>
+  typeof value === 'string' &&
+  REVIEWABLE_ENTRY_STATUSES.includes(value as ReviewableEntryStatus);
+
+const normalizeEntryStatus = (value: unknown): ReviewableEntryStatus =>
+  isReviewableEntryStatus(value) ? value : 'draft';
+
 const toIsoString = (value: Date | string | null | undefined): string => {
   if (!value) return new Date().toISOString();
   if (value instanceof Date) return value.toISOString();
@@ -395,7 +412,7 @@ const ensureWorkflowColumns = async (): Promise<void> => {
         `
         ALTER TABLE entry_sheets
           ADD CONSTRAINT entry_sheets_entry_status_check
-          CHECK (entry_status IS NULL OR entry_status IN ('draft', 'completed', 'completed_no_image'))
+          CHECK (entry_status IS NULL OR entry_status IN ('draft', 'completed', 'completed_no_image', 'revision_requested', 'approved'))
         `
       );
       await db.query(
@@ -685,7 +702,7 @@ const ensureSheetStatusConstraint = async (): Promise<void> => {
         `
         ALTER TABLE entry_sheets
         ADD CONSTRAINT entry_sheets_status_check
-        CHECK (status IN ('draft', 'completed', 'completed_no_image'))
+        CHECK (status IN ('draft', 'completed', 'completed_no_image', 'revision_requested', 'approved'))
         `
       );
     })().catch((error) => {
@@ -718,6 +735,13 @@ const ensureSheetCreatorReference = async (): Promise<void> => {
     });
   }
   await ensureCreatorReferencePromise;
+};
+
+export const ensureSheetWorkflowInfrastructure = async (): Promise<void> => {
+  await ensureSheetVersionColumn();
+  await ensureSheetRevisionTable();
+  await ensureSheetStatusConstraint();
+  await ensureWorkflowColumns();
 };
 
 interface IngredientRow {
@@ -806,8 +830,8 @@ const rowsToSheet = (
     faceLabel: sheetRow.face_label || undefined,
     faceMaxWidth: sheetRow.face_max_width ?? undefined,
     adminMemo: adminMemoBySheetId.get(sheetRow.id),
-    status: sheetRow.status as 'draft' | 'completed' | 'completed_no_image',
-    entryStatus: (sheetRow.entry_status || sheetRow.status) as 'draft' | 'completed' | 'completed_no_image',
+    status: normalizeEntryStatus(sheetRow.status),
+    entryStatus: normalizeEntryStatus(sheetRow.entry_status || sheetRow.status),
     createdAt: toIsoString(sheetRow.created_at),
     updatedAt: toIsoString(sheetRow.updated_at),
     products,
@@ -1087,6 +1111,7 @@ export const findAll = async (limit?: number, offset: number = 0): Promise<Entry
   await ensureSheetSnapshotColumns();
   await ensureAdminMemoTable();
   await ensureSheetVersionColumn();
+  await ensureSheetStatusConstraint();
   await ensureDeploymentColumns();
   await ensureWorkflowColumns();
   await ensureSheetCodeInfrastructure();
@@ -1194,6 +1219,7 @@ export const findByManufacturerId = async (
   await ensureSheetSnapshotColumns();
   await ensureAdminMemoTable();
   await ensureSheetVersionColumn();
+  await ensureSheetStatusConstraint();
   await ensureDeploymentColumns();
   await ensureWorkflowColumns();
   await ensureSheetCodeInfrastructure();
@@ -1331,6 +1357,7 @@ export const findByManufacturerIds = async (
   await ensureSheetSnapshotColumns();
   await ensureAdminMemoTable();
   await ensureSheetVersionColumn();
+  await ensureSheetStatusConstraint();
   await ensureDeploymentColumns();
   await ensureWorkflowColumns();
   await ensureSheetCodeInfrastructure();
@@ -1435,6 +1462,7 @@ export const findById = async (sheetId: string): Promise<EntrySheet | null> => {
   await ensureSheetSnapshotColumns();
   await ensureAdminMemoTable();
   await ensureSheetVersionColumn();
+  await ensureSheetStatusConstraint();
   await ensureDeploymentColumns();
   await ensureWorkflowColumns();
   await ensureSheetCodeInfrastructure();
@@ -1575,22 +1603,8 @@ export const upsert = async (
       manufacturerName: String(sheet.manufacturerName || '').trim(),
       createdAt: toSafeIso(sheet.createdAt, nowIso),
       updatedAt: nowIso,
-      status:
-        sheet.status === 'completed'
-          ? 'completed'
-          : sheet.status === 'completed_no_image'
-            ? 'completed_no_image'
-            : 'draft',
-      entryStatus:
-        sheet.entryStatus === 'completed'
-          ? 'completed'
-          : sheet.entryStatus === 'completed_no_image'
-            ? 'completed_no_image'
-            : sheet.status === 'completed'
-              ? 'completed'
-              : sheet.status === 'completed_no_image'
-                ? 'completed_no_image'
-                : 'draft',
+      status: normalizeEntryStatus(sheet.status),
+      entryStatus: normalizeEntryStatus(sheet.entryStatus || sheet.status),
       adminMemo: {
         version:
           Number.isInteger(Number(sheet.adminMemo?.version)) && Number(sheet.adminMemo?.version) > 0
