@@ -36,6 +36,7 @@ const INITIAL_USERS: User[] = [
 
 const INITIAL_MASTER: MasterData = {
   manufacturerNames: ['メディコム', '大江戸製薬', '富士ファーマ'],
+  retailerNames: [],
   shelfNames: ['胃腸薬', '風邪薬', '鎮痛剤', 'ビタミン剤', '目薬', '皮膚用薬'],
   caseNames: [],
   riskClassifications: [

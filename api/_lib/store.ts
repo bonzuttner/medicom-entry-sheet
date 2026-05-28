@@ -10,6 +10,7 @@ const STORE_PATH = path.join('/tmp', 'pharmapop-api-store.json');
 
 const normalizeMasterData = (data: Partial<MasterData>, fallback: MasterData): MasterData => ({
   manufacturerNames: data.manufacturerNames ?? fallback.manufacturerNames,
+  retailerNames: data.retailerNames ?? fallback.retailerNames,
   shelfNames: data.shelfNames ?? fallback.shelfNames,
   caseNames: data.caseNames ?? fallback.caseNames,
   riskClassifications: data.riskClassifications ?? fallback.riskClassifications,
@@ -18,6 +19,8 @@ const normalizeMasterData = (data: Partial<MasterData>, fallback: MasterData): M
   manufacturerCaseNames: data.manufacturerCaseNames ?? fallback.manufacturerCaseNames,
   manufacturerDefaultStartMonths:
     data.manufacturerDefaultStartMonths ?? fallback.manufacturerDefaultStartMonths,
+  manufacturerFaceOptions: data.manufacturerFaceOptions ?? fallback.manufacturerFaceOptions,
+  manufacturerRetailer: data.manufacturerRetailer ?? fallback.manufacturerRetailer,
 });
 
 const readStoreFromFile = async (): Promise<StoreData> => {

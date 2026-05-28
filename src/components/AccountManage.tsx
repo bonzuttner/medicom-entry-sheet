@@ -222,7 +222,7 @@ export const AccountManage: React.FC<AccountManageProps> = ({
                         <input className="w-full border p-2 rounded" value={editingUser.displayName || ''} onChange={e => setEditingUser({...editingUser, displayName: e.target.value})} />
                     </div>
                      <div>
-                        <label className="block text-sm font-medium text-slate-700">メーカー名 <span className="text-red-500">*</span></label>
+                        <label className="block text-sm font-medium text-slate-700">所属（メーカー名） <span className="text-red-500">*</span></label>
                         {currentUser.role === UserRole.STAFF ? (
                           <div>
                             <div className="w-full border border-slate-200 p-2 rounded bg-slate-100 text-slate-700">
@@ -267,38 +267,6 @@ export const AccountManage: React.FC<AccountManageProps> = ({
                           </select>
                         )}
                     </div>
-                    {/* Manufacturer assignment for RETAILER */}
-                    {currentUser.role === UserRole.ADMIN && editingUser.role === UserRole.RETAILER && (
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-slate-700 mb-2">担当メーカー（複数選択可）</label>
-                        <div className="border rounded p-3 max-h-40 overflow-y-auto bg-slate-50">
-                          {manufacturerOptions.length === 0 ? (
-                            <p className="text-sm text-slate-500">メーカーがありません</p>
-                          ) : (
-                            <div className="space-y-2">
-                              {manufacturerOptions.map((name) => (
-                                <label key={name} className="flex items-center gap-2 cursor-pointer hover:bg-white p-1 rounded">
-                                  <input
-                                    type="checkbox"
-                                    checked={(editingUser.assignedManufacturerNames || []).includes(name)}
-                                    onChange={(e) => {
-                                      const currentNames = editingUser.assignedManufacturerNames || [];
-                                      const newNames = e.target.checked
-                                        ? [...currentNames, name]
-                                        : currentNames.filter((n) => n !== name);
-                                      setEditingUser({ ...editingUser, assignedManufacturerNames: newNames });
-                                    }}
-                                    className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary"
-                                  />
-                                  <span className="text-sm text-slate-700">{name}</span>
-                                </label>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-500 mt-1">※ 小売店ユーザーがレビューできるメーカーを選択してください</p>
-                      </div>
-                    )}
                      <div>
                         <label className="block text-sm font-medium text-slate-700">メールアドレス <span className="text-red-500">*</span></label>
                         <input
@@ -423,7 +391,7 @@ export const AccountManage: React.FC<AccountManageProps> = ({
                     <tr>
                         <th className="p-4 text-left">担当者名</th>
                         <th className="p-4 text-left">ID</th>
-                        <th className="p-4 text-left">メーカー名</th>
+                        <th className="p-4 text-left">所属（メーカー名）</th>
                         <th className="p-4 text-left">権限</th>
                         <th className="p-4 text-right">操作</th>
                     </tr>

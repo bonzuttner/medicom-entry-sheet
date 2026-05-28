@@ -43,6 +43,7 @@ let ensureManufacturerShelfTablePromise: Promise<void> | null = null;
 let ensureManufacturerCaseTablePromise: Promise<void> | null = null;
 let ensureManufacturerDefaultStartMonthsTablePromise: Promise<void> | null = null;
 let ensureManufacturerFaceOptionsTablePromise: Promise<void> | null = null;
+let ensureManufacturerRetailerTablePromise: Promise<void> | null = null;
 
 const ensureManufacturerShelfTable = async (): Promise<void> => {
   if (!ensureManufacturerShelfTablePromise) {
@@ -161,8 +162,37 @@ const ensureManufacturerFaceOptionsTable = async (): Promise<void> => {
   await ensureManufacturerFaceOptionsTablePromise;
 };
 
+const ensureManufacturerRetailerTable = async (): Promise<void> => {
+  if (!ensureManufacturerRetailerTablePromise) {
+    ensureManufacturerRetailerTablePromise = (async () => {
+      await db.query(
+        `
+        CREATE TABLE IF NOT EXISTS manufacturer_retailer (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          manufacturer_id UUID NOT NULL REFERENCES manufacturers(id) ON DELETE CASCADE,
+          retailer_name VARCHAR(200) NOT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          UNIQUE (manufacturer_id)
+        )
+        `
+      );
+      await db.query(
+        `
+        CREATE INDEX IF NOT EXISTS idx_manufacturer_retailer_manufacturer
+        ON manufacturer_retailer(manufacturer_id)
+        `
+      );
+    })().catch((error) => {
+      ensureManufacturerRetailerTablePromise = null;
+      throw error;
+    });
+  }
+  await ensureManufacturerRetailerTablePromise;
+};
+
 const MASTER_CATEGORY = {
   manufacturerNames: 'manufacturer_name',
+  retailerNames: 'retailer_name',
   shelfNames: 'shelf_name',
   riskClassifications: 'risk_classification',
   specificIngredients: 'specific_ingredient',
@@ -172,6 +202,7 @@ type MasterListKey = keyof typeof MASTER_CATEGORY;
 
 const LEGACY_CATEGORY_VALUES = {
   manufacturerNames: ['manufacturer_name', 'manufacturerNames'],
+  retailerNames: ['retailer_name', 'retailerNames'],
   shelfNames: ['shelf_name', 'shelfNames'],
   riskClassifications: ['risk_classification', 'riskClassifications'],
   specificIngredients: ['specific_ingredient', 'specificIngredients'],
@@ -179,10 +210,12 @@ const LEGACY_CATEGORY_VALUES = {
 
 const LEGACY_CATEGORY_ALIASES: Record<string, MasterListKey> = {
   manufacturerNames: 'manufacturerNames',
+  retailerNames: 'retailerNames',
   shelfNames: 'shelfNames',
   riskClassifications: 'riskClassifications',
   specificIngredients: 'specificIngredients',
   manufacturer_name: 'manufacturerNames',
+  retailer_name: 'retailerNames',
   shelf_name: 'shelfNames',
   risk_classification: 'riskClassifications',
   specific_ingredient: 'specificIngredients',
@@ -203,6 +236,7 @@ export const getAll = async (): Promise<MasterData> => {
   );
 
   const manufacturerNames: string[] = [];
+  const retailerNames: string[] = [];
   const shelfNames: string[] = [];
   const riskClassifications: string[] = [];
   const specificIngredients: string[] = [];
@@ -212,6 +246,9 @@ export const getAll = async (): Promise<MasterData> => {
     switch (normalizedCategory) {
       case 'manufacturerNames':
         manufacturerNames.push(row.value);
+        break;
+      case 'retailerNames':
+        retailerNames.push(row.value);
         break;
       case 'shelfNames':
         shelfNames.push(row.value);
@@ -229,6 +266,7 @@ export const getAll = async (): Promise<MasterData> => {
 
   return {
     manufacturerNames,
+    retailerNames,
     shelfNames,
     caseNames: [],
     riskClassifications,
@@ -524,12 +562,65 @@ export const updateManufacturerFaceOptionsMap = async (
   });
 };
 
+interface ManufacturerRetailerRow {
+  manufacturer_name: string;
+  retailer_name: string;
+}
+
+export const getManufacturerRetailerMap = async (): Promise<Record<string, string>> => {
+  await ensureManufacturerRetailerTable();
+  const result = await db.query<ManufacturerRetailerRow>(
+    `
+    SELECT m.name as manufacturer_name, mr.retailer_name
+    FROM manufacturer_retailer mr
+    JOIN manufacturers m ON mr.manufacturer_id = m.id
+    `
+  );
+
+  const map: Record<string, string> = {};
+  for (const row of result.rows) {
+    map[row.manufacturer_name] = row.retailer_name;
+  }
+  return map;
+};
+
+export const updateManufacturerRetailerMap = async (
+  nextMap: Record<string, string>
+): Promise<void> => {
+  await ensureManufacturerRetailerTable();
+  await db.transaction(async () => {
+    for (const [manufacturerName, retailerName] of Object.entries(nextMap)) {
+      const normalizedManufacturerName = String(manufacturerName || '').trim();
+      if (!normalizedManufacturerName) continue;
+
+      const manufacturerId = await ensureManufacturer(normalizedManufacturerName);
+      const normalizedRetailerName = String(retailerName || '').trim();
+
+      if (!normalizedRetailerName) {
+        await db.query(`DELETE FROM manufacturer_retailer WHERE manufacturer_id = $1`, [
+          manufacturerId,
+        ]);
+      } else {
+        await db.query(
+          `
+          INSERT INTO manufacturer_retailer (manufacturer_id, retailer_name)
+          VALUES ($1, $2)
+          ON CONFLICT (manufacturer_id) DO UPDATE SET retailer_name = EXCLUDED.retailer_name
+          `,
+          [manufacturerId, normalizedRetailerName]
+        );
+      }
+    }
+  });
+};
+
 /**
  * Update all master data (diff strategy)
  */
 export const updateAll = async (masterData: MasterData): Promise<MasterData> => {
   const normalizedData: MasterData = {
     manufacturerNames: [...new Set(masterData.manufacturerNames.map((v) => v.trim()).filter(Boolean))],
+    retailerNames: [...new Set((masterData.retailerNames || []).map((v) => v.trim()).filter(Boolean))],
     shelfNames: [...new Set(masterData.shelfNames.map((v) => v.trim()).filter(Boolean))],
     caseNames: [...new Set((masterData.caseNames || []).map((v) => v.trim()).filter(Boolean))],
     riskClassifications: [
@@ -591,6 +682,7 @@ export const updateAll = async (masterData: MasterData): Promise<MasterData> => 
 
   await db.transaction(async () => {
     await syncCategory('manufacturerNames', MASTER_CATEGORY.manufacturerNames);
+    await syncCategory('retailerNames', MASTER_CATEGORY.retailerNames);
     await syncCategory('riskClassifications', MASTER_CATEGORY.riskClassifications);
     await syncCategory('specificIngredients', MASTER_CATEGORY.specificIngredients);
   });
@@ -641,6 +733,7 @@ export default {
   getManufacturerCaseNamesMap,
   getManufacturerDefaultStartMonthsMap,
   getManufacturerFaceOptionsMap,
+  getManufacturerRetailerMap,
   getShelfNamesByManufacturerName,
   getCaseNamesByManufacturerName,
   getFaceOptionsByManufacturerName,
@@ -648,6 +741,7 @@ export default {
   updateManufacturerCaseNamesMap,
   updateManufacturerDefaultStartMonthsMap,
   updateManufacturerFaceOptionsMap,
+  updateManufacturerRetailerMap,
   updateAll,
   addValue,
   removeValue,

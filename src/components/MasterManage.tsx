@@ -11,12 +11,14 @@ interface MasterManageProps {
 
 type SavingSection =
   | 'manufacturerNames'
+  | 'retailerNames'
   | 'riskClassifications'
   | 'specificIngredients'
   | 'manufacturerShelf'
   | 'manufacturerCase'
   | 'manufacturerFace'
   | 'manufacturerMonth'
+  | 'manufacturerRetailer'
   | null;
 
 export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
@@ -238,6 +240,20 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
     await persist({ ...localData, manufacturerDefaultStartMonths }, 'manufacturerMonth');
   };
 
+  const getRetailerForSelectedManufacturer = (): string => {
+    if (!selectedManufacturer || selectedManufacturer === ALL_MANUFACTURERS) return '';
+    return localData.manufacturerRetailer?.[selectedManufacturer] || '';
+  };
+
+  const setManufacturerRetailer = async (retailerName: string) => {
+    if (!selectedManufacturer || selectedManufacturer === ALL_MANUFACTURERS) return;
+    const manufacturerRetailer = {
+      ...(localData.manufacturerRetailer || {}),
+      [selectedManufacturer]: retailerName,
+    };
+    await persist({ ...localData, manufacturerRetailer }, 'manufacturerRetailer');
+  };
+
   return (
     <div className="space-y-8">
         <h2 className="text-2xl font-bold text-slate-800">マスタ管理</h2>
@@ -249,6 +265,14 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
             onAdd={(v) => addItem('manufacturerNames', v, 'manufacturerNames')}
             onRemove={(v) => removeItem('manufacturerNames', v, 'manufacturerNames')}
             isSaving={savingSection === 'manufacturerNames'}
+        />
+
+        <MasterSection
+            title="小売店名"
+            items={localData.retailerNames || []}
+            onAdd={(v) => addItem('retailerNames', v, 'retailerNames')}
+            onRemove={(v) => removeItem('retailerNames', v, 'retailerNames')}
+            isSaving={savingSection === 'retailerNames'}
         />
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
@@ -267,6 +291,26 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
                 ))}
               </select>
             </div>
+
+            {selectedManufacturer && selectedManufacturer !== ALL_MANUFACTURERS && (
+              <div className="rounded-lg border border-slate-200 p-3">
+                <h4 className="font-semibold text-slate-800 mb-2">所属小売店</h4>
+                <select
+                  className="w-full sm:w-72 border border-slate-300 rounded-md px-3 py-1.5 text-sm"
+                  value={getRetailerForSelectedManufacturer()}
+                  onChange={(e) => void setManufacturerRetailer(e.target.value)}
+                  disabled={savingSection === 'manufacturerRetailer'}
+                >
+                  <option value="">未設定</option>
+                  {(localData.retailerNames || []).map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-500 mt-1">※ このメーカーが所属する小売店を選択してください</p>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
               <div className="rounded-lg border border-slate-200 p-3 h-full">

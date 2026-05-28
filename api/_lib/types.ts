@@ -16,6 +16,7 @@ export interface User {
 
 export interface MasterData {
   manufacturerNames: string[];
+  retailerNames: string[];
   shelfNames: string[];
   caseNames: string[];
   riskClassifications: string[];
@@ -24,6 +25,7 @@ export interface MasterData {
   manufacturerCaseNames?: Record<string, string[]>;
   manufacturerDefaultStartMonths?: Record<string, number[]>;
   manufacturerFaceOptions?: Record<string, FaceOption[]>;
+  manufacturerRetailer?: Record<string, string>;
 }
 
 export interface FaceOption {

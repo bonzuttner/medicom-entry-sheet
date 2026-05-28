@@ -21,6 +21,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 const EMPTY_MASTER_DATA: MasterData = {
   manufacturerNames: [],
+  retailerNames: [],
   shelfNames: [],
   caseNames: [],
   riskClassifications: [],
@@ -29,6 +30,7 @@ const EMPTY_MASTER_DATA: MasterData = {
   manufacturerCaseNames: {},
   manufacturerDefaultStartMonths: {},
   manufacturerFaceOptions: {},
+  manufacturerRetailer: {},
 };
 
 const SHEET_PAGE_SIZE = 30;
