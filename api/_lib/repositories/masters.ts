@@ -182,6 +182,13 @@ const ensureManufacturerRetailerTable = async (): Promise<void> => {
         ON manufacturer_retailer(manufacturer_id)
         `
       );
+      // Index for efficient lookup by retailer name (for RETAILER user permissions)
+      await db.query(
+        `
+        CREATE INDEX IF NOT EXISTS idx_manufacturer_retailer_retailer_name
+        ON manufacturer_retailer(retailer_name)
+        `
+      );
     })().catch((error) => {
       ensureManufacturerRetailerTablePromise = null;
       throw error;
@@ -584,6 +591,34 @@ export const getManufacturerRetailerMap = async (): Promise<Record<string, strin
   return map;
 };
 
+/**
+ * Get manufacturers assigned to a retailer by retailer name.
+ * This is used to automatically derive RETAILER user's review permissions.
+ * Returns both manufacturer IDs and names for efficiency (single query).
+ */
+export const getManufacturersByRetailerName = async (
+  retailerName: string
+): Promise<{ manufacturerId: string; manufacturerName: string }[]> => {
+  await ensureManufacturerRetailerTable();
+  const result = await db.query<{
+    manufacturer_id: string;
+    manufacturer_name: string;
+  }>(
+    `
+    SELECT m.id as manufacturer_id, m.name as manufacturer_name
+    FROM manufacturer_retailer mr
+    JOIN manufacturers m ON mr.manufacturer_id = m.id
+    WHERE mr.retailer_name = $1
+    ORDER BY m.name
+    `,
+    [retailerName]
+  );
+  return result.rows.map((row) => ({
+    manufacturerId: row.manufacturer_id,
+    manufacturerName: row.manufacturer_name,
+  }));
+};
+
 export const updateManufacturerRetailerMap = async (
   nextMap: Record<string, string>
 ): Promise<void> => {
@@ -734,6 +769,7 @@ export default {
   getManufacturerDefaultStartMonthsMap,
   getManufacturerFaceOptionsMap,
   getManufacturerRetailerMap,
+  getManufacturersByRetailerName,
   getShelfNamesByManufacturerName,
   getCaseNamesByManufacturerName,
   getFaceOptionsByManufacturerName,

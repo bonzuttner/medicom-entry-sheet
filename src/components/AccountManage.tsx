@@ -67,13 +67,35 @@ export const AccountManage: React.FC<AccountManageProps> = ({
       Array.from(
         new Set([
           ...masterData.manufacturerNames,
-          ...users.map((u) => u.manufacturerName),
+          ...users
+            .filter((u) => u.role !== UserRole.RETAILER)
+            .map((u) => u.manufacturerName),
           currentUser.manufacturerName,
-          editingUser?.manufacturerName || '',
+          editingUser?.role !== UserRole.RETAILER ? editingUser?.manufacturerName || '' : '',
         ].filter(Boolean))
       ),
-    [masterData.manufacturerNames, users, currentUser.manufacturerName, editingUser?.manufacturerName]
+    [masterData.manufacturerNames, users, currentUser.manufacturerName, editingUser?.role, editingUser?.manufacturerName]
   );
+  const retailerOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...(masterData.retailerNames || []),
+          ...users
+            .filter((u) => u.role === UserRole.RETAILER)
+            .map((u) => u.manufacturerName),
+          editingUser?.role === UserRole.RETAILER ? editingUser?.manufacturerName || '' : '',
+        ].filter(Boolean))
+      ),
+    [masterData.retailerNames, users, editingUser?.role, editingUser?.manufacturerName]
+  );
+
+  const isEditingRetailer = editingUser?.role === UserRole.RETAILER;
+  const organizationOptions = isEditingRetailer ? retailerOptions : manufacturerOptions;
+  const organizationLabel = isEditingRetailer ? '所属（小売店名）' : '所属（メーカー名）';
+  const emptyOrganizationMessage = isEditingRetailer
+    ? '小売店名をマスタ管理で登録してください'
+    : 'メーカー名をマスタ管理で登録してください';
 
   // Permission check: Can the current user edit/delete this user?
   const canModifyUser = (targetUser: User): boolean => {
@@ -90,7 +112,7 @@ export const AccountManage: React.FC<AccountManageProps> = ({
     const isNewUser = !editingUser?.id;
 
     if (!editingUser?.username || !editingUser?.displayName || !editingUser?.manufacturerName) {
-      setValidationError('ログインID、担当者名、メーカー名は必須です');
+      setValidationError('ログインID、担当者名、所属は必須です');
       return;
     }
 
@@ -161,7 +183,6 @@ export const AccountManage: React.FC<AccountManageProps> = ({
         phoneNumber: normalizedPhone,
         role: editingUser.role || UserRole.STAFF,
         password: editingUser.password?.trim() || (isNewUser ? '' : existingUser?.password),
-        assignedManufacturerNames: editingUser.role === UserRole.RETAILER ? editingUser.assignedManufacturerNames : undefined,
     };
     try {
       setIsSaving(true);
@@ -222,7 +243,7 @@ export const AccountManage: React.FC<AccountManageProps> = ({
                         <input className="w-full border p-2 rounded" value={editingUser.displayName || ''} onChange={e => setEditingUser({...editingUser, displayName: e.target.value})} />
                     </div>
                      <div>
-                        <label className="block text-sm font-medium text-slate-700">所属（メーカー名） <span className="text-red-500">*</span></label>
+                        <label className="block text-sm font-medium text-slate-700">{organizationLabel} <span className="text-red-500">*</span></label>
                         {currentUser.role === UserRole.STAFF ? (
                           <div>
                             <div className="w-full border border-slate-200 p-2 rounded bg-slate-100 text-slate-700">
@@ -236,10 +257,10 @@ export const AccountManage: React.FC<AccountManageProps> = ({
                               value={editingUser.manufacturerName || ''}
                               onChange={e => setEditingUser({...editingUser, manufacturerName: e.target.value})}
                           >
-                              {manufacturerOptions.length === 0 ? (
-                                  <option value="">メーカー名をマスタ管理で登録してください</option>
+                              {organizationOptions.length === 0 ? (
+                                  <option value="">{emptyOrganizationMessage}</option>
                               ) : (
-                                  manufacturerOptions.map((name) => (
+                                  organizationOptions.map((name) => (
                                       <option key={name} value={name}>{name}</option>
                                   ))
                               )}
@@ -259,7 +280,20 @@ export const AccountManage: React.FC<AccountManageProps> = ({
                           <select
                               className="w-full border p-2 rounded bg-white"
                               value={editingUser.role || UserRole.STAFF}
-                              onChange={e => setEditingUser({ ...editingUser, role: e.target.value as UserRole, assignedManufacturerIds: e.target.value === UserRole.RETAILER ? (editingUser.assignedManufacturerIds || []) : undefined })}
+                              onChange={e => {
+                                const nextRole = e.target.value as UserRole;
+                                const nextOptions = nextRole === UserRole.RETAILER ? retailerOptions : manufacturerOptions;
+                                const currentOrganization = editingUser.manufacturerName || '';
+                                setEditingUser({
+                                  ...editingUser,
+                                  role: nextRole,
+                                  manufacturerName: nextOptions.includes(currentOrganization)
+                                    ? currentOrganization
+                                    : nextOptions[0] || '',
+                                  assignedManufacturerIds: undefined,
+                                  assignedManufacturerNames: undefined,
+                                });
+                              }}
                           >
                               <option value={UserRole.STAFF}>一般</option>
                               <option value={UserRole.RETAILER}>小売店</option>

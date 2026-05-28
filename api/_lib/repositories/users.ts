@@ -1,6 +1,6 @@
 import * as db from '../db.js';
 import { User, UserRole } from '../types.js';
-import * as RetailerRepository from './retailers.js';
+import * as MasterRepository from './masters.js';
 
 /**
  * User Repository
@@ -164,9 +164,10 @@ export const findById = async (userId: string): Promise<User | null> => {
   if (result.rows.length === 0) return null;
   const user = rowToUser(result.rows[0]);
 
-  // RETAILER の場合は担当メーカーを取得
+  // RETAILER の場合は担当メーカーをマスタ設定から自動導出
   if (user.role === 'RETAILER') {
-    const assignments = await RetailerRepository.getAssignedManufacturers(userId);
+    // manufacturerName は小売店ユーザーの場合、所属会社名（小売店名）
+    const assignments = await MasterRepository.getManufacturersByRetailerName(user.manufacturerName);
     user.assignedManufacturerIds = assignments.map((a) => a.manufacturerId);
     user.assignedManufacturerNames = assignments.map((a) => a.manufacturerName);
   }
@@ -191,9 +192,10 @@ export const findByUsername = async (username: string): Promise<User | null> => 
   if (result.rows.length === 0) return null;
   const user = rowToUser(result.rows[0]);
 
-  // RETAILER の場合は担当メーカーを取得
+  // RETAILER の場合は担当メーカーをマスタ設定から自動導出
   if (user.role === 'RETAILER') {
-    const assignments = await RetailerRepository.getAssignedManufacturers(user.id);
+    // manufacturerName は小売店ユーザーの場合、所属会社名（小売店名）
+    const assignments = await MasterRepository.getManufacturersByRetailerName(user.manufacturerName);
     user.assignedManufacturerIds = assignments.map((a) => a.manufacturerId);
     user.assignedManufacturerNames = assignments.map((a) => a.manufacturerName);
   }
@@ -217,10 +219,20 @@ export const findAll = async (): Promise<User[]> => {
 
   const users = result.rows.map(rowToUser);
 
-  // RETAILER ユーザーの担当メーカーを取得
+  // RETAILER ユーザーの担当メーカーをマスタ設定から自動導出
+  // パフォーマンス最適化: 同じ小売店名のユーザーには同じ結果をキャッシュ
+  const retailerAssignmentsCache: Record<string, { manufacturerId: string; manufacturerName: string }[]> = {};
+
   for (const user of users) {
     if (user.role === 'RETAILER') {
-      const assignments = await RetailerRepository.getAssignedManufacturers(user.id);
+      const retailerName = user.manufacturerName;
+
+      // キャッシュにあればそれを使用
+      if (!retailerAssignmentsCache[retailerName]) {
+        retailerAssignmentsCache[retailerName] = await MasterRepository.getManufacturersByRetailerName(retailerName);
+      }
+
+      const assignments = retailerAssignmentsCache[retailerName];
       user.assignedManufacturerIds = assignments.map((a) => a.manufacturerId);
       user.assignedManufacturerNames = assignments.map((a) => a.manufacturerName);
     }
@@ -368,18 +380,12 @@ export const upsert = async (user: User): Promise<User> => {
 
   const savedUser = rowToUser(result.rows[0]);
 
-  // RETAILER の場合は担当メーカーを設定
-  if (user.role === 'RETAILER' && user.assignedManufacturerIds) {
-    await RetailerRepository.setAssignedManufacturers(
-      savedUser.id,
-      user.assignedManufacturerIds
-    );
-    const assignments = await RetailerRepository.getAssignedManufacturers(savedUser.id);
+  // RETAILER の場合は担当メーカーをマスタ設定から自動導出
+  // (旧: ユーザーレベルの紐づけ → 新: マスタ設定の所属小売店から自動導出)
+  if (savedUser.role === 'RETAILER') {
+    const assignments = await MasterRepository.getManufacturersByRetailerName(savedUser.manufacturerName);
     savedUser.assignedManufacturerIds = assignments.map((a) => a.manufacturerId);
     savedUser.assignedManufacturerNames = assignments.map((a) => a.manufacturerName);
-  } else if (user.role !== 'RETAILER') {
-    // RETAILER 以外に変更された場合は紐づけを削除
-    await RetailerRepository.setAssignedManufacturers(savedUser.id, []);
   }
 
   return savedUser;
