@@ -1110,8 +1110,28 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                   </button>
                 </>
               )}
-              {/* completed: 編集保存 */}
-              {currentEntryStatus !== 'draft' && (
+              {/* revision_requested: 一時保存 + 再提出 */}
+              {currentEntryStatus === 'revision_requested' && (
+                <>
+                  <button
+                    onClick={() => { void saveSheet('revision_requested'); }}
+                    disabled={isSaving || pendingUploads > 0}
+                    className="px-3 sm:px-4 py-2.5 bg-slate-200 text-slate-700 font-bold rounded-lg hover:bg-slate-300 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    {pendingUploads > 0 ? 'アップロード中...' : isSaving ? '保存中...' : '一時保存'}
+                  </button>
+                  <button
+                    onClick={() => { void saveSheet('completed'); }}
+                    disabled={isSaving || pendingUploads > 0}
+                    className="px-4 sm:px-6 py-2.5 bg-primary text-white font-bold rounded-lg hover:bg-sky-600 shadow-lg shadow-sky-200 flex items-center justify-center gap-2 transition-colors whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed text-sm"
+                  >
+                    <Save size={18} />
+                    {pendingUploads > 0 ? 'アップロード中...' : isSaving ? '保存中...' : '再提出'}
+                  </button>
+                </>
+              )}
+              {/* completed/completed_no_image/approved: 編集保存 */}
+              {currentEntryStatus !== 'draft' && currentEntryStatus !== 'revision_requested' && (
                 <button
                   onClick={() => { void saveSheet(currentEntryStatus); }}
                   disabled={isSaving || pendingUploads > 0}
