@@ -101,7 +101,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   const [isReviewSubmitting, setIsReviewSubmitting] = useState(false);
   const [latestReviewComment, setLatestReviewComment] = useState<ReviewComment | null>(null);
 
-  // Load latest review comment on mount
+  // Load latest review comment on mount (全ユーザーに表示)
   useEffect(() => {
     const loadLatestComment = async () => {
       try {
@@ -114,10 +114,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         console.error('Failed to load review comments:', error);
       }
     };
-    if (canReviewSheet) {
-      void loadLatestComment();
-    }
-  }, [formData.id, canReviewSheet]);
+    void loadLatestComment();
+  }, [formData.id]);
 
   const openReviewModal = (action: 'approve' | 'request_revision') => {
     setReviewAction(action);
