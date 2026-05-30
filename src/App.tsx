@@ -668,6 +668,7 @@ const App: React.FC = () => {
         <EntryList
           sheets={visibleSheets}
           currentUser={currentUser}
+          masterData={masterData}
           onCreate={handleCreateSheet}
           onEdit={handleEditSheet}
           onDuplicate={handleDuplicateSheet}

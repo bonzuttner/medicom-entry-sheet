@@ -46,6 +46,9 @@ export const canReviewSheet = (user: User, manufacturerId: string): boolean => {
 
 export const canModifySheet = (user: User, manufacturerId: string): boolean => {
   if (isAdmin(user)) return true;
+  if (isRetailer(user)) {
+    return user.assignedManufacturerIds?.includes(manufacturerId) ?? false;
+  }
   if (isStaff(user)) {
     return user.manufacturerId === manufacturerId;
   }

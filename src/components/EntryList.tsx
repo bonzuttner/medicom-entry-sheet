@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import JSZip from 'jszip';
-import { EntrySheet, User, UserRole } from '../types';
+import { EntrySheet, User, UserRole, MasterData } from '../types';
 import { Plus, Copy, Edit3, Trash2, Search, FileWarning, ChevronDown, ChevronUp, Download, CheckSquare, Square, Image as ImageIcon, X, AlertCircle, AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { getWorkflowStatusView } from '../lib/sheetWorkflow';
 
 interface EntryListProps {
   sheets: EntrySheet[];
   currentUser: User;
+  masterData: MasterData;
   onCreate: () => void;
   onEdit: (sheet: EntrySheet, productIndex?: number) => void;
   onDuplicate: (sheet: EntrySheet) => void;
@@ -59,6 +60,7 @@ const SkeletonCard: React.FC = () => (
 export const EntryList: React.FC<EntryListProps> = ({
   sheets,
   currentUser,
+  masterData,
   onCreate,
   onEdit,
   onDuplicate,
@@ -105,6 +107,11 @@ export const EntryList: React.FC<EntryListProps> = ({
   // Permission check: Can the current user edit/delete this sheet?
   const canModifySheet = (sheet: EntrySheet): boolean => {
     if (currentUser.role === UserRole.ADMIN) return true;
+    // Retailer can edit sheets from manufacturers assigned to them
+    if (currentUser.role === UserRole.RETAILER) {
+      const assignedRetailer = masterData.manufacturerRetailer?.[sheet.manufacturerName];
+      return assignedRetailer === currentUser.manufacturerName;
+    }
     return (
       normalizeManufacturerKey(sheet.manufacturerName) ===
       normalizeManufacturerKey(currentUser.manufacturerName)
