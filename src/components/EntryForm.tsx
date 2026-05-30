@@ -259,6 +259,17 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     );
   };
 
+  const getProjectOptions = (): string[] => {
+    const projects = masterData.manufacturerProjects?.[formData.manufacturerName] || [];
+    const currentProject = formData.project?.trim();
+    return Array.from(
+      new Set([
+        ...projects,
+        ...(currentProject ? [currentProject] : []),
+      ])
+    );
+  };
+
   const getFaceOptions = (): FaceOption[] =>
     masterData.manufacturerFaceOptions?.[formData.manufacturerName] || [];
 
@@ -1219,10 +1230,10 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                     />
                 </div>
                 <div className="col-span-1 md:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-2">案件 <span className="text-danger font-bold">*</span></label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">提出先</label>
                     <div className={compactSelectWrapperClass}>
                       <select
-                          className={compactSelectClass(!hasText(formData.caseName))}
+                          className={compactSelectClass(false)}
                           value={formData.caseName || ''}
                           onChange={(e) => handleHeaderChange('caseName', e.target.value)}
                       >
@@ -1231,6 +1242,21 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                       </select>
                     </div>
                 </div>
+                {getProjectOptions().length > 0 && (
+                <div className="col-span-1 md:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">案件</label>
+                    <div className={compactSelectWrapperClass}>
+                      <select
+                          className={compactSelectClass(false)}
+                          value={formData.project || ''}
+                          onChange={(e) => handleHeaderChange('project', e.target.value)}
+                      >
+                          <option value="">未設定</option>
+                          {getProjectOptions().map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    </div>
+                </div>
+                )}
                 <div className="col-span-1 md:col-span-2 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6 items-start">
                       <div>

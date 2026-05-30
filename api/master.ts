@@ -88,6 +88,18 @@ const findTooLongMasterValue = (data: MasterData): string | null => {
     }
   }
 
+  const projectsMap = data.manufacturerProjects || {};
+  for (const [manufacturerName, projects] of Object.entries(projectsMap)) {
+    if (manufacturerName.length > MAX_MASTER_VALUE_LENGTH) {
+      return 'メーカー名';
+    }
+    for (const value of projects) {
+      if (typeof value === 'string' && value.length > MAX_MASTER_VALUE_LENGTH) {
+        return '案件';
+      }
+    }
+  }
+
   return null;
 };
 
@@ -128,6 +140,7 @@ export default async function handler(req: any, res: any) {
       await MasterRepository.getManufacturerDefaultStartMonthsMap();
     const manufacturerFaceOptions = await MasterRepository.getManufacturerFaceOptionsMap();
     const manufacturerRetailer = await MasterRepository.getManufacturerRetailerMap();
+    const manufacturerProjects = await MasterRepository.getManufacturerProjectsMap();
     sendJson(res, 200, {
       ...masterData,
       shelfNames: shelfNamesForCurrentUser,
@@ -137,6 +150,7 @@ export default async function handler(req: any, res: any) {
       manufacturerDefaultStartMonths,
       manufacturerFaceOptions,
       manufacturerRetailer,
+      manufacturerProjects,
     });
     return;
   }
@@ -200,6 +214,13 @@ export default async function handler(req: any, res: any) {
       );
       await MasterRepository.updateManufacturerRetailerMap(normalizedRetailerMap);
     }
+    if (Object.prototype.hasOwnProperty.call(body.data, 'manufacturerProjects')) {
+      const projectsMap = body.data.manufacturerProjects || {};
+      const normalizedProjectsMap = Object.fromEntries(
+        (body.data.manufacturerNames || []).map((name) => [name, projectsMap[name] || []])
+      );
+      await MasterRepository.updateManufacturerProjectsMap(normalizedProjectsMap);
+    }
     const shelfNamesForCurrentUser = await MasterRepository.getShelfNamesByManufacturerName(
       currentUser.manufacturerName
     );
@@ -215,6 +236,7 @@ export default async function handler(req: any, res: any) {
       await MasterRepository.getManufacturerDefaultStartMonthsMap();
     const manufacturerFaceOptions = await MasterRepository.getManufacturerFaceOptionsMap();
     const manufacturerRetailer = await MasterRepository.getManufacturerRetailerMap();
+    const manufacturerProjects = await MasterRepository.getManufacturerProjectsMap();
     sendJson(res, 200, {
       ...updated,
       shelfNames: shelfNamesForCurrentUser,
@@ -226,6 +248,7 @@ export default async function handler(req: any, res: any) {
       manufacturerCaseNames,
       manufacturerDefaultStartMonths,
       manufacturerRetailer,
+      manufacturerProjects,
     });
     return;
   }

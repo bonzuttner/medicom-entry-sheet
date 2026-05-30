@@ -17,6 +17,7 @@ type SavingSection =
   | 'manufacturerShelf'
   | 'manufacturerFace'
   | 'manufacturerMonth'
+  | 'manufacturerProjects'
   | null;
 
 export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
@@ -117,6 +118,64 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
   };
 
   const monthLabels = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+
+  // Projects functions (案件 - selected from retailers)
+  const getProjectsForSelectedManufacturer = (): string[] => {
+    if (!selectedManufacturer || selectedManufacturer === ALL_MANUFACTURERS) return [];
+    return localData.manufacturerProjects?.[selectedManufacturer] || [];
+  };
+
+  const getAllProjects = (): Array<{ manufacturer: string; project: string }> => {
+    return localData.manufacturerNames.flatMap((manufacturer) =>
+      (localData.manufacturerProjects?.[manufacturer] || []).map((project) => ({
+        manufacturer,
+        project,
+      }))
+    );
+  };
+
+  const addProject = async (projectName: string) => {
+    const value = normalizeItem(projectName);
+    if (!value || !selectedManufacturer || selectedManufacturer === ALL_MANUFACTURERS) return;
+    const current = getProjectsForSelectedManufacturer();
+    if (current.some((existing) => existing.trim() === value)) {
+      return;
+    }
+    const manufacturerProjects = {
+      ...(localData.manufacturerProjects || {}),
+      [selectedManufacturer]: [...current, value],
+    };
+    await persist({ ...localData, manufacturerProjects }, 'manufacturerProjects');
+  };
+
+  const removeProject = async (value: string) => {
+    if (!selectedManufacturer || selectedManufacturer === ALL_MANUFACTURERS) return;
+    if (!window.confirm(`「${value}」を削除しますか？`)) return;
+    const current = getProjectsForSelectedManufacturer();
+    const manufacturerProjects = {
+      ...(localData.manufacturerProjects || {}),
+      [selectedManufacturer]: current.filter((v) => v !== value),
+    };
+    await persist({ ...localData, manufacturerProjects }, 'manufacturerProjects');
+  };
+
+  const removeProjectByManufacturer = async (manufacturer: string, value: string) => {
+    if (!window.confirm(`「${manufacturer} / ${value}」を削除しますか？`)) return;
+    const current = localData.manufacturerProjects?.[manufacturer] || [];
+    const manufacturerProjects = {
+      ...(localData.manufacturerProjects || {}),
+      [manufacturer]: current.filter((v) => v !== value),
+    };
+    await persist({ ...localData, manufacturerProjects }, 'manufacturerProjects');
+  };
+
+  // Available retailers to add as projects (excluding already added ones)
+  const getAvailableRetailersForProjects = (): string[] => {
+    if (!selectedManufacturer || selectedManufacturer === ALL_MANUFACTURERS) return [];
+    const currentProjects = getProjectsForSelectedManufacturer();
+    return (localData.retailerNames || []).filter((retailer) => !currentProjects.includes(retailer));
+  };
+
   const getFaceOptionsForSelectedManufacturer = (): FaceOption[] => {
     if (!selectedManufacturer || selectedManufacturer === ALL_MANUFACTURERS) return [];
     return localData.manufacturerFaceOptions?.[selectedManufacturer] || [];
@@ -400,6 +459,83 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
                     );
                   })}
                 </div>
+              )}
+            </div>
+
+            <div className="mt-4 rounded-lg border border-slate-200 p-3">
+              <h4 className="font-semibold text-slate-800 mb-2">案件（小売店から選択）</h4>
+              {selectedManufacturer === ALL_MANUFACTURERS ? (
+                <div className="space-y-2 max-h-64 overflow-auto">
+                  {getAllProjects().length === 0 ? (
+                    <p className="text-xs text-slate-500">案件はまだありません。</p>
+                  ) : (
+                    getAllProjects().map((item, index) => (
+                      <div
+                        key={`${item.manufacturer}-${item.project}-${index}`}
+                        className="px-2.5 py-1.5 rounded-md bg-slate-50 border border-slate-200 text-xs flex items-center justify-between gap-2"
+                      >
+                        <div className="min-w-0">
+                          <span className="font-semibold text-slate-700">{item.manufacturer}</span>
+                          <span className="text-slate-400 mx-1.5">/</span>
+                          <span className="text-slate-700">{item.project}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void removeProjectByManufacturer(item.manufacturer, item.project);
+                          }}
+                          className="text-slate-400 hover:text-danger shrink-0"
+                          title="削除"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {getProjectsForSelectedManufacturer().map((item) => (
+                      <span
+                        key={item}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-full text-slate-700 text-xs"
+                      >
+                        {item}
+                        <button onClick={() => void removeProject(item)} className="hover:text-danger">
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  {getAvailableRetailersForProjects().length > 0 ? (
+                    <div className="flex gap-2">
+                      <select
+                        className="flex-1 border border-slate-300 rounded-md px-3 py-1.5 text-sm"
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            void addProject(e.target.value);
+                            e.target.value = '';
+                          }
+                        }}
+                        defaultValue=""
+                      >
+                        <option value="">小売店を選択して追加...</option>
+                        {getAvailableRetailersForProjects().map((retailer) => (
+                          <option key={retailer} value={retailer}>
+                            {retailer}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500">
+                      {(localData.retailerNames || []).length === 0
+                        ? '小売店名マスタにまだ登録がありません。'
+                        : 'すべての小売店が追加済みです。'}
+                    </p>
+                  )}
+                </>
               )}
             </div>
         </div>

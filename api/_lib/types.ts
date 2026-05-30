@@ -26,6 +26,7 @@ export interface MasterData {
   manufacturerDefaultStartMonths?: Record<string, number[]>;
   manufacturerFaceOptions?: Record<string, FaceOption[]>;
   manufacturerRetailer?: Record<string, string>;
+  manufacturerProjects?: Record<string, string[]>;
 }
 
 export interface FaceOption {
@@ -96,6 +97,7 @@ export interface EntrySheet {
   shelfName: string;
   title: string;
   caseName: string;
+  project?: string;
   notes?: string;
   deploymentStartMonth?: number;
   deploymentEndMonth?: number;

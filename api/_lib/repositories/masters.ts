@@ -39,11 +39,18 @@ interface ManufacturerFaceOptionRow {
   display_order: number;
 }
 
+interface ManufacturerProjectRow {
+  manufacturer_name: string;
+  project_name: string;
+  display_order: number;
+}
+
 let ensureManufacturerShelfTablePromise: Promise<void> | null = null;
 let ensureManufacturerCaseTablePromise: Promise<void> | null = null;
 let ensureManufacturerDefaultStartMonthsTablePromise: Promise<void> | null = null;
 let ensureManufacturerFaceOptionsTablePromise: Promise<void> | null = null;
 let ensureManufacturerRetailerTablePromise: Promise<void> | null = null;
+let ensureManufacturerProjectsTablePromise: Promise<void> | null = null;
 
 const ensureManufacturerShelfTable = async (): Promise<void> => {
   if (!ensureManufacturerShelfTablePromise) {
@@ -195,6 +202,35 @@ const ensureManufacturerRetailerTable = async (): Promise<void> => {
     });
   }
   await ensureManufacturerRetailerTablePromise;
+};
+
+const ensureManufacturerProjectsTable = async (): Promise<void> => {
+  if (!ensureManufacturerProjectsTablePromise) {
+    ensureManufacturerProjectsTablePromise = (async () => {
+      await db.query(
+        `
+        CREATE TABLE IF NOT EXISTS manufacturer_projects (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          manufacturer_id UUID NOT NULL REFERENCES manufacturers(id) ON DELETE CASCADE,
+          project_name VARCHAR(200) NOT NULL,
+          display_order INTEGER NOT NULL DEFAULT 0,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          UNIQUE (manufacturer_id, project_name)
+        )
+        `
+      );
+      await db.query(
+        `
+        CREATE INDEX IF NOT EXISTS idx_manufacturer_projects_manufacturer
+        ON manufacturer_projects(manufacturer_id, display_order)
+        `
+      );
+    })().catch((error) => {
+      ensureManufacturerProjectsTablePromise = null;
+      throw error;
+    });
+  }
+  await ensureManufacturerProjectsTablePromise;
 };
 
 const MASTER_CATEGORY = {
@@ -619,6 +655,60 @@ export const getManufacturersByRetailerName = async (
   }));
 };
 
+export const getManufacturerProjectsMap = async (): Promise<Record<string, string[]>> => {
+  await ensureManufacturerProjectsTable();
+  const result = await db.query<ManufacturerProjectRow>(
+    `
+    SELECT m.name as manufacturer_name, mp.project_name, mp.display_order
+    FROM manufacturer_projects mp
+    JOIN manufacturers m ON mp.manufacturer_id = m.id
+    ORDER BY m.name, mp.display_order
+    `
+  );
+
+  const map: Record<string, string[]> = {};
+  for (const row of result.rows) {
+    if (!map[row.manufacturer_name]) {
+      map[row.manufacturer_name] = [];
+    }
+    map[row.manufacturer_name].push(row.project_name);
+  }
+  return map;
+};
+
+export const updateManufacturerProjectsMap = async (
+  nextMap: Record<string, string[]>
+): Promise<void> => {
+  await ensureManufacturerProjectsTable();
+  await db.transaction(async () => {
+    for (const [manufacturerName, values] of Object.entries(nextMap)) {
+      const normalizedManufacturerName = String(manufacturerName || '').trim();
+      if (!normalizedManufacturerName) continue;
+
+      const manufacturerId = await ensureManufacturer(normalizedManufacturerName);
+      const desired = [...new Set(values.map((v) => String(v || '').trim()).filter(Boolean))];
+
+      await db.query(`DELETE FROM manufacturer_projects WHERE manufacturer_id = $1`, [
+        manufacturerId,
+      ]);
+
+      if (desired.length > 0) {
+        await db.query(
+          `
+          INSERT INTO manufacturer_projects (manufacturer_id, project_name, display_order)
+          SELECT
+            $1,
+            items.value,
+            (items.ord - 1)::int
+          FROM unnest($2::text[]) WITH ORDINALITY AS items(value, ord)
+          `,
+          [manufacturerId, desired]
+        );
+      }
+    }
+  });
+};
+
 export const updateManufacturerRetailerMap = async (
   nextMap: Record<string, string>
 ): Promise<void> => {
@@ -769,6 +859,7 @@ export default {
   getManufacturerDefaultStartMonthsMap,
   getManufacturerFaceOptionsMap,
   getManufacturerRetailerMap,
+  getManufacturerProjectsMap,
   getManufacturersByRetailerName,
   getShelfNamesByManufacturerName,
   getCaseNamesByManufacturerName,
@@ -778,6 +869,7 @@ export default {
   updateManufacturerDefaultStartMonthsMap,
   updateManufacturerFaceOptionsMap,
   updateManufacturerRetailerMap,
+  updateManufacturerProjectsMap,
   updateAll,
   addValue,
   removeValue,

@@ -27,6 +27,7 @@ interface SheetRow {
   creator_phone: string;
   shelf_name: string | null;
   case_name: string | null;
+  project: string | null;
   title: string;
   notes: string | null;
   deployment_start_month: number | null;
@@ -378,6 +379,10 @@ const ensureDeploymentColumns = async (): Promise<void> => {
       await db.query(
         `ALTER TABLE entry_sheets
          ADD COLUMN IF NOT EXISTS case_name VARCHAR(200)`
+      );
+      await db.query(
+        `ALTER TABLE entry_sheets
+         ADD COLUMN IF NOT EXISTS project VARCHAR(200)`
       );
       await db.query(
         `ALTER TABLE entry_sheets
@@ -821,6 +826,7 @@ const rowsToSheet = (
     manufacturerName: sheetRow.manufacturer_name,
     shelfName: sheetRow.shelf_name || '',
     caseName: sheetRow.case_name || '',
+    project: sheetRow.project || undefined,
     email: sheetRow.creator_email,
     phoneNumber: sheetRow.creator_phone,
     title: sheetRow.title,
@@ -1122,7 +1128,7 @@ export const findAll = async (limit?: number, offset: number = 0): Promise<Entry
     SELECT
       s.id, s.sheet_code, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
       s.entry_status,
-      s.shelf_name, s.case_name, s.deployment_start_month, s.deployment_end_month,
+      s.shelf_name, s.case_name, s.project, s.deployment_start_month, s.deployment_end_month,
       s.face_label, s.face_max_width,
       s.created_at, s.updated_at,
       COALESCE(s.creator_name_snapshot, u.display_name, '') as creator_name,
@@ -1230,7 +1236,7 @@ export const findByManufacturerId = async (
     SELECT
       s.id, s.sheet_code, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
       s.entry_status,
-      s.shelf_name, s.case_name, s.deployment_start_month, s.deployment_end_month,
+      s.shelf_name, s.case_name, s.project, s.deployment_start_month, s.deployment_end_month,
       s.face_label, s.face_max_width,
       s.created_at, s.updated_at,
       COALESCE(s.creator_name_snapshot, u.display_name, '') as creator_name,
@@ -1368,7 +1374,7 @@ export const findByManufacturerIds = async (
     SELECT
       s.id, s.sheet_code, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
       s.entry_status,
-      s.shelf_name, s.case_name, s.deployment_start_month, s.deployment_end_month,
+      s.shelf_name, s.case_name, s.project, s.deployment_start_month, s.deployment_end_month,
       s.face_label, s.face_max_width,
       s.created_at, s.updated_at,
       COALESCE(s.creator_name_snapshot, u.display_name, '') as creator_name,
@@ -1473,7 +1479,7 @@ export const findById = async (sheetId: string): Promise<EntrySheet | null> => {
     SELECT
       s.id, s.sheet_code, s.version, s.creator_id, s.manufacturer_id, s.title, s.notes, s.status,
       s.entry_status,
-      s.shelf_name, s.case_name, s.deployment_start_month, s.deployment_end_month,
+      s.shelf_name, s.case_name, s.project, s.deployment_start_month, s.deployment_end_month,
       s.face_label, s.face_max_width,
       s.created_at, s.updated_at,
       COALESCE(s.creator_name_snapshot, u.display_name, '') as creator_name,
@@ -1580,6 +1586,7 @@ export const upsert = async (
       creatorName: String(sheet.creatorName || '').trim(),
       title: String(sheet.title || '').trim(),
       caseName: String(sheet.caseName || '').trim(),
+      project: sheet.project ? String(sheet.project).trim() : '',
       notes: sheet.notes ? String(sheet.notes).trim() : '',
       deploymentStartMonth:
         Number.isInteger(Number(sheet.deploymentStartMonth)) &&
@@ -1693,10 +1700,10 @@ export const upsert = async (
       INSERT INTO entry_sheets (
         id, sheet_code, version, creator_id, manufacturer_id,
         creator_name_snapshot, creator_email_snapshot, creator_phone_snapshot,
-        title, case_name, notes, shelf_name, deployment_start_month, deployment_end_month,
+        title, case_name, project, notes, shelf_name, deployment_start_month, deployment_end_month,
         face_label, face_max_width, status, entry_status,
         created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
       ON CONFLICT (id) DO UPDATE SET
         sheet_code = COALESCE(entry_sheets.sheet_code, EXCLUDED.sheet_code),
         version = EXCLUDED.version,
@@ -1705,6 +1712,7 @@ export const upsert = async (
         creator_phone_snapshot = EXCLUDED.creator_phone_snapshot,
         title = EXCLUDED.title,
         case_name = EXCLUDED.case_name,
+        project = EXCLUDED.project,
         notes = EXCLUDED.notes,
         shelf_name = EXCLUDED.shelf_name,
         deployment_start_month = EXCLUDED.deployment_start_month,
@@ -1726,6 +1734,7 @@ export const upsert = async (
         normalizedSheet.phoneNumber || null,
         normalizedSheet.title,
         normalizedSheet.caseName || null,
+        normalizedSheet.project || null,
         normalizedSheet.notes || null,
         normalizedSheet.shelfName || null,
         normalizedSheet.deploymentStartMonth ?? null,
