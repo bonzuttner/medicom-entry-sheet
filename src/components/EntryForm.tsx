@@ -9,6 +9,10 @@ import { getWorkflowStatusView } from '../lib/sheetWorkflow';
 const getRevisionIcon = (summary: string): { icon: React.ReactNode; color: string } => {
   const s = summary.toLowerCase();
 
+  // Revision request - distinct warning icon with orange color
+  if (s.includes('修正依頼')) {
+    return { icon: <AlertTriangle size={14} />, color: 'text-orange-600 bg-orange-100' };
+  }
   // Status/workflow changes
   if (s.includes('ステータス') || s.includes('状態') || s.includes('→')) {
     return { icon: <RefreshCw size={14} />, color: 'text-amber-500 bg-amber-50' };
