@@ -109,8 +109,7 @@ export const EntryList: React.FC<EntryListProps> = ({
     if (currentUser.role === UserRole.ADMIN) return true;
     // Retailer can edit sheets from manufacturers assigned to them
     if (currentUser.role === UserRole.RETAILER) {
-      const assignedRetailer = masterData.manufacturerRetailer?.[sheet.manufacturerName];
-      return assignedRetailer === currentUser.manufacturerName;
+      return currentUser.assignedManufacturerNames?.includes(sheet.manufacturerName) ?? false;
     }
     return (
       normalizeManufacturerKey(sheet.manufacturerName) ===

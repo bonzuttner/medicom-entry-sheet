@@ -90,7 +90,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   const isAdminUser = currentUser.role === UserRole.ADMIN;
   const isRetailerUser = currentUser.role === UserRole.RETAILER;
   // Retailer can only review sheets from manufacturers assigned to them
-  const isRetailerAssignedToManufacturer = isRetailerUser && masterData.manufacturerRetailer?.[formData.manufacturerName] === currentUser.manufacturerName;
+  const isRetailerAssignedToManufacturer = isRetailerUser && (currentUser.assignedManufacturerNames?.includes(formData.manufacturerName) ?? false);
   const canReviewSheet = isAdminUser || isRetailerAssignedToManufacturer;
   const isReviewableStatus = formData.status === 'completed' || formData.status === 'completed_no_image';
 
@@ -1048,8 +1048,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     <div className="pb-24 sm:pb-20">
       {/* Sticky Action Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-        {/* 直近のレビューコメント表示 (修正依頼時は全員に表示) */}
-        {(canReviewSheet || formData.status === 'revision_requested') && latestReviewComment && (
+        {/* 直近のレビューコメント表示 (全ユーザーに表示) */}
+        {latestReviewComment && (
           <div className="border-b border-slate-200 bg-rose-50 px-3 sm:px-4 py-2">
             <div className="max-w-7xl mx-auto flex items-start gap-2">
               <MessageSquare size={14} className="text-rose-600 mt-0.5 flex-shrink-0" />
