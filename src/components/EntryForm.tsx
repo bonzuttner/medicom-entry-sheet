@@ -85,7 +85,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   const lastAutoTitleRef = useRef('');
   const isAdminUser = currentUser.role === UserRole.ADMIN;
   const isRetailerUser = currentUser.role === UserRole.RETAILER;
-  const canReviewSheet = isAdminUser || isRetailerUser;
+  // Retailer can only review sheets from manufacturers assigned to them
+  const isRetailerAssignedToManufacturer = isRetailerUser && masterData.manufacturerRetailer?.[formData.manufacturerName] === currentUser.manufacturerName;
+  const canReviewSheet = isAdminUser || isRetailerAssignedToManufacturer;
   const isReviewableStatus = formData.status === 'completed' || formData.status === 'completed_no_image';
 
   // Review state
