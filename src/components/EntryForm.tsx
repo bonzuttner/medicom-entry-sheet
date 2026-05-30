@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { EntrySheet, EntrySheetRevision, FaceOption, MasterData, ProductEntry, Promotion, User, UserRole } from '../types';
-import { Save, Plus, Trash2, AlertTriangle, Image as ImageIcon, Search, ChevronRight, FileText, PlusCircle, RefreshCw, Package, CheckCircle, RotateCcw, Edit3, X } from 'lucide-react';
+import { EntrySheet, EntrySheetRevision, FaceOption, MasterData, ProductEntry, Promotion, ReviewComment, User, UserRole } from '../types';
+import { Save, Plus, Trash2, AlertTriangle, Image as ImageIcon, Search, ChevronRight, FileText, PlusCircle, RefreshCw, Package, CheckCircle, RotateCcw, Edit3, X, MessageSquare, Clock } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { dataService } from '../services/dataService';
 import { getWorkflowStatusView } from '../lib/sheetWorkflow';
@@ -84,6 +84,71 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   const askedPrefillByProductRef = useRef<Map<number, string>>(new Map());
   const lastAutoTitleRef = useRef('');
   const isAdminUser = currentUser.role === UserRole.ADMIN;
+  const isRetailerUser = currentUser.role === UserRole.RETAILER;
+  const canReviewSheet = isAdminUser || isRetailerUser;
+  const isReviewableStatus = formData.status === 'completed' || formData.status === 'completed_no_image';
+
+  // Review state
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewAction, setReviewAction] = useState<'approve' | 'request_revision' | null>(null);
+  const [reviewComment, setReviewComment] = useState('');
+  const [isReviewSubmitting, setIsReviewSubmitting] = useState(false);
+  const [latestReviewComment, setLatestReviewComment] = useState<ReviewComment | null>(null);
+
+  // Load latest review comment on mount
+  useEffect(() => {
+    const loadLatestComment = async () => {
+      try {
+        const comments = await dataService.getReviewComments(formData.id);
+        if (comments.length > 0) {
+          // Get the most recent comment
+          setLatestReviewComment(comments[0]);
+        }
+      } catch (error) {
+        console.error('Failed to load review comments:', error);
+      }
+    };
+    if (canReviewSheet) {
+      void loadLatestComment();
+    }
+  }, [formData.id, canReviewSheet]);
+
+  const openReviewModal = (action: 'approve' | 'request_revision') => {
+    setReviewAction(action);
+    setReviewComment('');
+    setReviewModalOpen(true);
+  };
+
+  const closeReviewModal = () => {
+    setReviewModalOpen(false);
+    setReviewAction(null);
+    setReviewComment('');
+  };
+
+  const handleSubmitReview = async () => {
+    if (!reviewAction) return;
+    if (reviewAction === 'request_revision' && !reviewComment.trim()) {
+      alert('修正依頼にはコメントが必要です。');
+      return;
+    }
+
+    setIsReviewSubmitting(true);
+    try {
+      await dataService.reviewSheet(
+        formData.id,
+        reviewAction,
+        reviewComment.trim() || undefined
+      );
+      closeReviewModal();
+      // Refresh form data by calling onCancel which will reload
+      onCancel();
+    } catch (error) {
+      console.error('Failed to submit review:', error);
+      alert('レビューの送信に失敗しました。');
+    } finally {
+      setIsReviewSubmitting(false);
+    }
+  };
 
   const selectableStartMonths = (() => {
     const base = new Date(formData.createdAt || new Date().toISOString());
@@ -184,10 +249,13 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   };
 
   const getCaseOptions = (): string[] => {
-    return (
-      masterData.manufacturerCaseNames?.[formData.manufacturerName] ||
-      masterData.caseNames ||
-      []
+    const retailerNames = masterData.retailerNames || [];
+    const currentCaseName = formData.caseName?.trim();
+    return Array.from(
+      new Set([
+        ...retailerNames,
+        ...(currentCaseName ? [currentCaseName] : []),
+      ])
     );
   };
 
@@ -963,6 +1031,22 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     <div className="pb-24 sm:pb-20">
       {/* Sticky Action Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+        {/* 直近のレビューコメント表示 */}
+        {canReviewSheet && latestReviewComment && (
+          <div className="border-b border-slate-200 bg-slate-50 px-3 sm:px-4 py-2">
+            <div className="max-w-7xl mx-auto flex items-start gap-2">
+              <MessageSquare size={14} className="text-slate-500 mt-0.5 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
+                  <span className="font-semibold">{latestReviewComment.userNameSnapshot}</span>
+                  <span>·</span>
+                  <span>{new Date(latestReviewComment.createdAt).toLocaleDateString('ja-JP')}</span>
+                </div>
+                <p className="text-sm text-slate-700 line-clamp-2">{latestReviewComment.comment}</p>
+              </div>
+            </div>
+          </div>
+        )}
         {/* メインアクションバー */}
         <div className="p-3 sm:p-4">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
@@ -971,6 +1055,19 @@ export const EntryForm: React.FC<EntryFormProps> = ({
               <span className={`inline-flex items-center rounded-full px-3 py-1.5 text-sm font-semibold ${workflowStatus.pillClassName}`}>
                 {workflowStatus.label}
               </span>
+              {/* 承認済み/修正待ちの場合はステータス表示 */}
+              {formData.status === 'approved' && (
+                <span className="flex items-center gap-1 text-emerald-700 text-sm font-semibold">
+                  <CheckCircle size={16} />
+                  承認済み
+                </span>
+              )}
+              {formData.status === 'revision_requested' && (
+                <span className="flex items-center gap-1 text-rose-700 text-sm font-semibold">
+                  <Clock size={16} />
+                  修正待ち
+                </span>
+              )}
             </div>
             {/* モバイル: コンパクト表示 */}
             <div className="flex sm:hidden items-center gap-2">
@@ -1010,6 +1107,25 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                   <Save size={18} />
                   {pendingUploads > 0 ? 'アップロード中...' : isSaving ? '保存中...' : '保存'}
                 </button>
+              )}
+              {/* レビューボタン (Admin/Retailer のみ、completed/completed_no_image 時のみ) */}
+              {canReviewSheet && isReviewableStatus && (
+                <>
+                  <button
+                    onClick={() => openReviewModal('approve')}
+                    className="px-3 sm:px-4 py-2.5 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 transition-colors whitespace-nowrap text-sm flex items-center gap-1.5"
+                  >
+                    <CheckCircle size={16} />
+                    <span className="hidden sm:inline">承認</span>
+                  </button>
+                  <button
+                    onClick={() => openReviewModal('request_revision')}
+                    className="px-3 sm:px-4 py-2.5 bg-rose-600 text-white font-bold rounded-lg hover:bg-rose-700 transition-colors whitespace-nowrap text-sm flex items-center gap-1.5"
+                  >
+                    <RotateCcw size={16} />
+                    <span className="hidden sm:inline">修正依頼</span>
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -2117,6 +2233,89 @@ export const EntryForm: React.FC<EntryFormProps> = ({
           </div>
         </div>
       </div>
+      )}
+
+      {/* Review Modal */}
+      {reviewModalOpen && reviewAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-xl font-bold text-slate-800">
+                {reviewAction === 'approve' ? 'シートを承認' : '修正依頼を送信'}
+              </h3>
+              <button
+                onClick={closeReviewModal}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="mb-4 p-3 bg-slate-50 rounded-lg">
+              <div className="text-sm text-slate-600">
+                <strong>シート:</strong> {formData.title || '（タイトル未設定）'}
+              </div>
+              <div className="text-sm text-slate-600">
+                <strong>メーカー:</strong> {formData.manufacturerName}
+              </div>
+            </div>
+
+            {reviewAction === 'request_revision' && (
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  修正依頼コメント <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 p-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+                  rows={4}
+                  placeholder="修正が必要な点を記載してください..."
+                />
+              </div>
+            )}
+
+            {reviewAction === 'approve' && (
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  コメント（任意）
+                </label>
+                <textarea
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 p-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+                  rows={3}
+                  placeholder="承認時のコメント（任意）..."
+                />
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={closeReviewModal}
+                disabled={isReviewSubmitting}
+                className="px-4 py-2.5 rounded-lg border border-slate-300 bg-white text-slate-700 font-semibold hover:bg-slate-50 disabled:opacity-50"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={() => { void handleSubmitReview(); }}
+                disabled={isReviewSubmitting}
+                className={`px-4 py-2.5 rounded-lg font-semibold text-white disabled:opacity-50 ${
+                  reviewAction === 'approve'
+                    ? 'bg-emerald-600 hover:bg-emerald-700'
+                    : 'bg-rose-600 hover:bg-rose-700'
+                }`}
+              >
+                {isReviewSubmitting
+                  ? '送信中...'
+                  : reviewAction === 'approve'
+                  ? '承認する'
+                  : '修正依頼を送信'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

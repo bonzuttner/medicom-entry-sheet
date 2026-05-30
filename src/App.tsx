@@ -4,7 +4,6 @@ import { Login } from './components/Login';
 import { EntryList } from './components/EntryList';
 import { EntryForm } from './components/EntryForm';
 import { AdminEntryList } from './components/AdminEntryList';
-import { RetailerEntryList } from './components/RetailerEntryList';
 import { AccountManage } from './components/AccountManage';
 import { MasterManage } from './components/MasterManage';
 import { dataService } from './services/dataService';
@@ -216,22 +215,19 @@ const App: React.FC = () => {
   const handleNavigate = (page: Page) => {
     if (!currentUser) return;
     if (page === Page.MASTERS && currentUser.role !== UserRole.ADMIN) {
-      setCurrentPage(currentUser.role === UserRole.RETAILER ? Page.RETAILER_LIST : Page.LIST);
+      setCurrentPage(Page.LIST);
       return;
     }
     if (page === Page.ADMIN_LIST && currentUser.role !== UserRole.ADMIN) {
-      setCurrentPage(currentUser.role === UserRole.RETAILER ? Page.RETAILER_LIST : Page.LIST);
+      setCurrentPage(Page.LIST);
       return;
     }
     if (page === Page.ACCOUNTS && currentUser.role === UserRole.RETAILER) {
-      setCurrentPage(Page.RETAILER_LIST);
+      setCurrentPage(Page.LIST);
       return;
     }
-    if (page === Page.LIST && currentUser.role === UserRole.RETAILER) {
-      setCurrentPage(Page.RETAILER_LIST);
-      return;
-    }
-    if (page === Page.RETAILER_LIST && currentUser.role !== UserRole.RETAILER && currentUser.role !== UserRole.ADMIN) {
+    // RETAILER now uses LIST (same as general accounts)
+    if (page === Page.RETAILER_LIST) {
       setCurrentPage(Page.LIST);
       return;
     }
@@ -309,8 +305,8 @@ const App: React.FC = () => {
 
         if (savedUser) {
           setCurrentUser(savedUser);
-          // RETAILER users go to RETAILER_LIST, others go to LIST
-          setCurrentPage(savedUser.role === UserRole.RETAILER ? Page.RETAILER_LIST : Page.LIST);
+          // All users go to LIST (RETAILER now uses the same list view)
+          setCurrentPage(Page.LIST);
           try {
             await loadInitialSheets();
             if (!mounted) return;
@@ -352,8 +348,8 @@ const App: React.FC = () => {
   const handleLogin = async (user: User) => {
     try {
       setCurrentUser(user);
-      // RETAILER users go to RETAILER_LIST, others go to LIST
-      setCurrentPage(user.role === UserRole.RETAILER ? Page.RETAILER_LIST : Page.LIST);
+      // All users go to LIST (RETAILER now uses the same list view)
+      setCurrentPage(Page.LIST);
       await dataService.setCurrentUser(user);
       await loadInitialSheets();
       void loadAuxiliaryData()
@@ -387,8 +383,7 @@ const App: React.FC = () => {
     if (!currentUser) return;
     const shelfOptions =
       masterData.manufacturerShelfNames?.[currentUser.manufacturerName] || masterData.shelfNames;
-    const caseOptions =
-      masterData.manufacturerCaseNames?.[currentUser.manufacturerName] || masterData.caseNames;
+    const caseOptions = masterData.retailerNames || [];
     const newSheet: EntrySheet = {
       id: uuidv4(),
       sheetCode: undefined,
@@ -697,19 +692,6 @@ const App: React.FC = () => {
         />
       )}
 
-      {currentPage === Page.RETAILER_LIST && currentUser.role === UserRole.RETAILER && (
-        <RetailerEntryList
-          sheets={visibleSheets}
-          currentUser={currentUser}
-          onView={handleEditSheet}
-          onRefresh={refreshFirstSheetsPage}
-          hasMore={hasMoreSheets}
-          onLoadMore={loadMoreSheets}
-          isLoadingMore={isLoadingMoreSheets}
-          totalCount={totalSheetCount}
-        />
-      )}
-
       {currentPage === Page.EDIT && editingSheet && (
         <EntryForm
           initialData={editingSheet}
@@ -726,8 +708,8 @@ const App: React.FC = () => {
           onCancel={() => {
             setEditingSheet(null);
             setEditingSheetRevisions([]);
-            // Return to appropriate list based on user role
-            setCurrentPage(currentUser.role === UserRole.RETAILER ? Page.RETAILER_LIST : Page.LIST);
+            // Return to LIST (all users use the same list view now)
+            setCurrentPage(Page.LIST);
           }}
         />
       )}

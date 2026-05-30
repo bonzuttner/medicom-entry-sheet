@@ -1,6 +1,6 @@
 import React from 'react';
 import { User, Page, UserRole } from '../types';
-import { LogOut, LayoutGrid, Users, Settings, FileText, ListChecks, ClipboardCheck } from 'lucide-react';
+import { LogOut, LayoutGrid, Users, Settings, FileText, ListChecks } from 'lucide-react';
 
 interface LayoutProps {
   currentUser: User;
@@ -47,24 +47,14 @@ export const Layout: React.FC<LayoutProps> = ({ currentUser, currentPage, onNavi
         {/* Main Nav (Simple Toolbar) */}
         <div className="border-t border-slate-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-4 sm:space-x-6 overflow-x-auto scrollbar-hide">
-            {/* RETAILER sees only review list */}
-            {currentUser.role === UserRole.RETAILER ? (
-              <NavButton
-                active={currentPage === Page.RETAILER_LIST || currentPage === Page.EDIT}
-                onClick={() => onNavigate(Page.RETAILER_LIST)}
-                icon={<ClipboardCheck size={17} />}
-                label="レビュー"
-                fullLabel="シートレビュー"
-              />
-            ) : (
-              <NavButton
-                active={currentPage === Page.LIST || currentPage === Page.EDIT}
-                onClick={() => onNavigate(Page.LIST)}
-                icon={<LayoutGrid size={17} />}
-                label="シート一覧"
-                fullLabel="エントリーシート一覧"
-              />
-            )}
+            {/* All users see the same sheet list */}
+            <NavButton
+              active={currentPage === Page.LIST || currentPage === Page.EDIT}
+              onClick={() => onNavigate(Page.LIST)}
+              icon={<LayoutGrid size={17} />}
+              label="シート一覧"
+              fullLabel="エントリーシート一覧"
+            />
 
             {/* Account Management - Admin and Staff only */}
             {currentUser.role !== UserRole.RETAILER && (
