@@ -1042,18 +1042,20 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     <div className="pb-24 sm:pb-20">
       {/* Sticky Action Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-        {/* 直近のレビューコメント表示 */}
-        {canReviewSheet && latestReviewComment && (
-          <div className="border-b border-slate-200 bg-slate-50 px-3 sm:px-4 py-2">
+        {/* 直近のレビューコメント表示 (修正依頼時は全員に表示) */}
+        {(canReviewSheet || formData.status === 'revision_requested') && latestReviewComment && (
+          <div className="border-b border-slate-200 bg-rose-50 px-3 sm:px-4 py-2">
             <div className="max-w-7xl mx-auto flex items-start gap-2">
-              <MessageSquare size={14} className="text-slate-500 mt-0.5 flex-shrink-0" />
+              <MessageSquare size={14} className="text-rose-600 mt-0.5 flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-                  <span className="font-semibold">{latestReviewComment.userNameSnapshot}</span>
+                  <span className="font-semibold text-rose-700">修正依頼</span>
+                  <span>·</span>
+                  <span>{latestReviewComment.userNameSnapshot}</span>
                   <span>·</span>
                   <span>{new Date(latestReviewComment.createdAt).toLocaleDateString('ja-JP')}</span>
                 </div>
-                <p className="text-sm text-slate-700 line-clamp-2">{latestReviewComment.comment}</p>
+                <p className="text-sm text-slate-700">{latestReviewComment.comment}</p>
               </div>
             </div>
           </div>
