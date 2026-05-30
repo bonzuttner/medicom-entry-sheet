@@ -102,18 +102,15 @@ export default async function handler(req: any, res: any) {
     const shelfNamesForCurrentUser = await MasterRepository.getShelfNamesByManufacturerName(
       currentUser.manufacturerName
     );
-    const caseNamesForCurrentUser = await MasterRepository.getCaseNamesByManufacturerName(
-      currentUser.manufacturerName
-    );
     const faceOptionsForCurrentUser = await MasterRepository.getFaceOptionsByManufacturerName(
       currentUser.manufacturerName
     );
     if (!isAdmin(currentUser)) {
       sendJson(res, 200, {
         manufacturerNames: [],
-        retailerNames: [],
+        retailerNames: masterData.retailerNames,
         shelfNames: shelfNamesForCurrentUser,
-        caseNames: caseNamesForCurrentUser,
+        caseNames: masterData.retailerNames,
         riskClassifications: masterData.riskClassifications,
         specificIngredients: masterData.specificIngredients,
         manufacturerFaceOptions: {
@@ -122,6 +119,9 @@ export default async function handler(req: any, res: any) {
       });
       return;
     }
+    const caseNamesForCurrentUser = await MasterRepository.getCaseNamesByManufacturerName(
+      currentUser.manufacturerName
+    );
     const manufacturerShelfNames = await MasterRepository.getManufacturerShelfNamesMap();
     const manufacturerCaseNames = await MasterRepository.getManufacturerCaseNamesMap();
     const manufacturerDefaultStartMonths =
