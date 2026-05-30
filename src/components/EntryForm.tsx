@@ -1116,8 +1116,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                   </button>
                 </>
               )}
-              {/* revision_requested: 一時保存 + 再提出 */}
-              {currentEntryStatus === 'revision_requested' && (
+              {/* revision_requested: 一時保存 + 再提出 (STAFF のみ、小売店には表示しない) */}
+              {currentEntryStatus === 'revision_requested' && !isRetailerUser && (
                 <>
                   <button
                     onClick={() => { void saveSheet('revision_requested'); }}
