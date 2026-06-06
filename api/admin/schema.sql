@@ -365,7 +365,7 @@ CREATE TABLE IF NOT EXISTS master_data (
 
 CREATE INDEX IF NOT EXISTS idx_master_category ON master_data(category, display_order);
 
--- メーカー別棚割り名マスタ
+-- メーカー別カテゴリ名マスタ
 CREATE TABLE IF NOT EXISTS manufacturer_shelf_names (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   manufacturer_id UUID NOT NULL REFERENCES manufacturers(id) ON DELETE CASCADE,

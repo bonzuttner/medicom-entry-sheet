@@ -326,7 +326,7 @@ export const EntryList: React.FC<EntryListProps> = ({
         '展開期間終了',
         'シート添付ファイル名一覧',
         'シート添付ファイルURL一覧',
-        '棚割名',
+        'カテゴリ名',
         '販促物件数',
         '商品メーカー名',
         'JANコード',
@@ -342,7 +342,7 @@ export const EntryList: React.FC<EntryListProps> = ({
         '高さ(mm)',
         '奥行(mm)',
         'フェイシング数',
-        '送込み店舗着日要望',
+        '納品日',
       ]
     ];
 
@@ -584,7 +584,7 @@ export const EntryList: React.FC<EntryListProps> = ({
                         </div>
                         <div className="text-sm font-bold text-slate-800 truncate" title={prod.productName}>{prod.productName || '(名称未設定)'}</div>
                         <div className="text-xs text-slate-500 font-mono mt-1">
-                            送込み店舗着日要望: {prod.arrivalDate ? new Date(prod.arrivalDate).toLocaleDateString() : '未設定'}
+                            納品日: {prod.arrivalDate ? new Date(prod.arrivalDate).toLocaleDateString() : '未設定'}
                         </div>
                     </div>
                 </div>
@@ -768,7 +768,7 @@ export const EntryList: React.FC<EntryListProps> = ({
                                     展開期間: {getDeploymentPeriodLabel(sheet)}
                                 </div>
                                 <div className="text-xs text-slate-600 mt-0.5 break-words">
-                                    棚割り: {getSheetShelfNames(sheet)}
+                                    カテゴリ名: {getSheetShelfNames(sheet)}
                                 </div>
                             </div>
                         </div>
@@ -853,7 +853,7 @@ export const EntryList: React.FC<EntryListProps> = ({
                     <th scope="col" className="sticky top-0 z-10 w-20 border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">状態</th>
                     <th scope="col" className="sticky top-0 z-10 w-[440px] border-b border-slate-200 bg-slate-50 px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">タイトル</th>
                     <th scope="col" className="sticky top-0 z-10 w-28 border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">展開期間</th>
-                    <th scope="col" className="sticky top-0 z-10 w-32 border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">棚割り</th>
+                    <th scope="col" className="sticky top-0 z-10 w-32 border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">カテゴリ名</th>
                     <th scope="col" className={`sticky top-0 z-10 w-36 border-b border-slate-200 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider ${sortBy === 'manufacturer' ? 'text-primary bg-sky-50' : 'text-slate-500 bg-slate-50'}`}>
                       <button
                         onClick={() => toggleSort('manufacturer')}

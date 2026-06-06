@@ -287,11 +287,11 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
               <div className="rounded-lg border border-slate-200 p-3 h-full">
-                <h4 className="font-semibold text-slate-800 mb-2">棚割名</h4>
+                <h4 className="font-semibold text-slate-800 mb-2">カテゴリ名</h4>
                 {selectedManufacturer === ALL_MANUFACTURERS ? (
                   <div className="space-y-2 max-h-64 overflow-auto">
                     {getAllShelfNames().length === 0 ? (
-                      <p className="text-xs text-slate-500">棚割名はまだありません。</p>
+                      <p className="text-xs text-slate-500">カテゴリ名はまだありません。</p>
                     ) : (
                       getAllShelfNames().map((item, index) => (
                         <div
@@ -335,7 +335,7 @@ export const MasterManage: React.FC<MasterManageProps> = ({ data, onSave }) => {
                     <div className="flex gap-2">
                       <input
                         className="flex-1 border border-slate-300 rounded-md px-3 py-1.5 text-sm"
-                        placeholder="棚割名を追加"
+                        placeholder="カテゴリ名を追加"
                         value={shelfInput}
                         onChange={(e) => setShelfInput(e.target.value)}
                       />

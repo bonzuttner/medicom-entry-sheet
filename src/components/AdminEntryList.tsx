@@ -383,7 +383,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
         'シート添付ファイル名一覧',
         'シート添付ファイルURL一覧',
         '展開期間',
-        '棚割名',
+        'カテゴリ名',
         '販促CD',
         'ボードピッキングJAN',
         '期限表URL',
@@ -487,7 +487,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             className={searchInputClass}
-            placeholder="シート名、メーカー名、棚割名で検索..."
+            placeholder="シート名、メーカー名、カテゴリ名で検索..."
           />
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
@@ -566,7 +566,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
                   <h3 className="text-base font-bold text-slate-900 leading-tight mb-1 line-clamp-2">{sheet.title}</h3>
                   <div className="text-xs text-slate-500">{sheet.manufacturerName}</div>
                   <div className="text-xs text-slate-600 mt-1">展開期間: {getDeploymentPeriodLabel(sheet)}</div>
-                  <div className="text-xs text-slate-600 mt-0.5">棚割り: {getShelfNames(sheet)}</div>
+                  <div className="text-xs text-slate-600 mt-0.5">カテゴリ名: {getShelfNames(sheet)}</div>
                 </div>
               </div>
 
@@ -748,7 +748,7 @@ export const AdminEntryList: React.FC<AdminEntryListProps> = ({
               <th className="sticky top-0 z-10 w-[168px] border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">状態</th>
               <th className="sticky top-0 z-10 w-[360px] border-b border-slate-200 bg-slate-50 px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">タイトル</th>
               <th className="sticky top-0 z-10 w-[104px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">展開期間</th>
-              <th className="sticky top-0 z-10 w-[110px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">棚割り</th>
+              <th className="sticky top-0 z-10 w-[110px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">カテゴリ名</th>
               <th className="sticky top-0 z-10 w-[116px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-left text-xs font-bold text-slate-500">メーカー名</th>
               <th className="sticky top-0 z-10 w-[72px] border-b border-slate-200 bg-slate-50 px-3 py-3 text-center text-xs font-bold text-slate-500">期限表</th>
               <th className="sticky top-0 z-10 w-[120px] border-b border-slate-200 bg-slate-50 px-3 py-3 text-left text-xs font-bold text-slate-500">販促CD</th>

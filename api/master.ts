@@ -13,7 +13,7 @@ const findTooLongMasterValue = (data: MasterData): string | null => {
   const categories: Array<{ label: string; values: string[] }> = [
     { label: 'メーカー名', values: data.manufacturerNames || [] },
     { label: '小売店名', values: data.retailerNames || [] },
-    { label: '棚割名', values: data.shelfNames || [] },
+    { label: 'カテゴリ名', values: data.shelfNames || [] },
     { label: '案件', values: data.caseNames || [] },
     { label: 'リスク分類', values: data.riskClassifications || [] },
     { label: '特定成分', values: data.specificIngredients || [] },
@@ -34,7 +34,7 @@ const findTooLongMasterValue = (data: MasterData): string | null => {
     }
     for (const value of shelfNames) {
       if (typeof value === 'string' && value.length > MAX_MASTER_VALUE_LENGTH) {
-        return '棚割名';
+        return 'カテゴリ名';
       }
     }
   }

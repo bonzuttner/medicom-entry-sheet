@@ -40,7 +40,7 @@
   - `creator_phone_snapshot`: 作成者電話番号のスナップショット
   - `title`: シートタイトル
   - `notes`: 補足情報
-  - `shelf_name`: シート単位の棚割名
+  - `shelf_name`: シート単位のカテゴリ名
   - `case_name`: 案件名
   - `deployment_start_month`: 展開スタート月（1〜12）
   - `deployment_end_month`: 展開終了月（1〜12）
@@ -147,7 +147,7 @@
 
 ## 10. `manufacturer_shelf_names`
 
-- 目的: メーカー別棚割り名マスタ
+- 目的: メーカー別カテゴリ名マスタ
 - 主キー: `id (UUID)`
 - 外部キー:
   - `manufacturer_id -> manufacturers.id`

@@ -55,7 +55,7 @@ const findTooLongField = (sheet: EntrySheet): string | null => {
   if (isTooLong(sheet.title)) return 'タイトル';
   if (isTooLong(sheet.caseName)) return '案件';
   if (isTooLong(sheet.notes)) return 'エントリシート補足情報';
-  if (isTooLong(sheet.shelfName)) return '棚割名';
+  if (isTooLong(sheet.shelfName)) return 'カテゴリ名';
   if (isTooLong(sheet.email)) return '作成者メール';
   if (isTooLong(sheet.phoneNumber)) return '作成者電話番号';
   if (isTooLong(sheet.adminMemo?.bandPattern)) return '帯パターン';
@@ -243,7 +243,7 @@ const buildRevisionSummary = (before: EntrySheet | null, after: EntrySheet): str
   pushChange('タイトル', before.title, after.title);
   pushChange('案件', before.caseName || '', after.caseName || '');
   pushChange('補足', before.notes || '', after.notes || '');
-  pushChange('棚割名', before.shelfName || '', after.shelfName || '');
+  pushChange('カテゴリ名', before.shelfName || '', after.shelfName || '');
   pushChange('作成者名', before.creatorName, after.creatorName);
   pushChange('作成者メール', before.email, after.email);
   pushChange('作成者電話', before.phoneNumber, after.phoneNumber);

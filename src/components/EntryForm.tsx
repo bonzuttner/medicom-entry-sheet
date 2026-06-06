@@ -176,13 +176,17 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   );
   const buildAutoTitle = (
     startMonth: { year: number; month: number; label: string } | undefined,
-    caseName?: string
+    caseName?: string,
+    shelfName?: string
   ): string => {
     const parts = [
       startMonth ? `${startMonth.year}年${startMonth.month}月` : 'YYYY年MM月',
     ];
     if (caseName?.trim()) {
       parts.push(caseName.trim());
+    }
+    if (shelfName?.trim()) {
+      parts.push(shelfName.trim());
     }
     parts.push(AUTO_TITLE_BRAND_PLACEHOLDER);
     return parts.join(' ');
@@ -343,7 +347,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   ]);
 
   useEffect(() => {
-    const nextAutoTitle = buildAutoTitle(selectedStartMonth, formData.caseName);
+    const nextAutoTitle = buildAutoTitle(selectedStartMonth, formData.caseName, formData.shelfName);
     if (!nextAutoTitle) return;
 
     setFormData((prev) => {
@@ -364,7 +368,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         title: nextAutoTitle,
       };
     });
-  }, [formData.caseName, selectedStartMonth]);
+  }, [formData.caseName, formData.shelfName, selectedStartMonth]);
 
   useEffect(() => {
     const faceOptions = getFaceOptions();
@@ -872,7 +876,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     return { label: '未入力', tone: 'bg-slate-100 text-slate-500' };
   };
 
-  const saveSheet = async (status: 'draft' | 'completed') => {
+  const saveSheet = async (status: 'draft' | 'completed' | 'revision_requested') => {
     if (isSaving) return;
     if (pendingUploads > 0) {
         alert("ファイルアップロード中です。完了後に保存してください。");
@@ -1233,7 +1237,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <div className="col-span-1 md:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-2">棚割名 <span className="text-danger font-bold">*</span></label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">カテゴリ名 <span className="text-danger font-bold">*</span></label>
                     <div className={compactSelectWrapperClass}>
                       <select
                           className={compactSelectClass(!hasText(formData.shelfName))}
@@ -1545,64 +1549,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
             </button>
         </div>
 
-        <section className="mb-5 sm:mb-6 mt-4 sm:mt-0 pr-12 sm:pr-14">
-          <div className="rounded-lg border border-slate-200 bg-white p-3 sm:p-4">
-            <div className="flex items-center gap-2 mb-2.5">
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white text-slate-500 border border-slate-200">
-                <Search size={11} />
-              </span>
-              <h4 className="text-xs sm:text-sm font-semibold text-slate-700 tracking-wide">過去商品検索</h4>
-            </div>
-            <form
-              className="flex flex-col sm:flex-row gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void runProductSearch();
-              }}
-            >
-              <input
-                type="text"
-                className="flex-1 border-slate-300 rounded-md py-2 px-2.5 bg-white text-sm"
-                value={productSearchQuery}
-                onChange={(e) => setProductSearchQuery(e.target.value)}
-                placeholder="商品名またはJANで検索"
-              />
-              <button
-                type="submit"
-                disabled={isSearchingProducts}
-                className="px-3 py-2 rounded-md bg-slate-700 text-white hover:bg-slate-800 disabled:opacity-60 text-sm"
-              >
-                {isSearchingProducts ? '検索中...' : '検索'}
-              </button>
-            </form>
-            {productSearchResults.length > 0 && (
-              <ul className="mt-2.5 max-h-44 overflow-auto space-y-1.5">
-                {productSearchResults.map((item) => (
-                  <li
-                    key={item.id}
-                    className="bg-white border border-slate-200 rounded-md"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => applySearchedProduct(activeTab, item)}
-                      className="w-full text-left px-2.5 py-2 transition-colors hover:bg-sky-50 focus:bg-sky-50 rounded-md group cursor-pointer"
-                    >
-                      <div className="text-xs sm:text-sm min-w-0">
-                        <div className="font-medium text-slate-700 truncate underline-offset-2 group-hover:underline group-focus:underline">
-                          {item.productName}
-                        </div>
-                        <div className="text-[11px] text-slate-500 truncate">
-                          JAN: {item.janCode}
-                        </div>
-                      </div>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </section>
-
         {/* Product: Basic Info */}
         <section className="mb-8 sm:mb-10">
             <h4 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
@@ -1620,6 +1566,49 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                         onChange={(e) => handleProductChange(activeTab, 'janCode', normalizeJanCodeInput(e.target.value))}
                         maxLength={16}
                      />
+                     <form
+                        className="mt-2 flex gap-2"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          void runProductSearch();
+                        }}
+                     >
+                        <input
+                          type="text"
+                          className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm focus:border-sky-500 focus:ring-2 focus:ring-sky-500"
+                          value={productSearchQuery}
+                          onChange={(e) => setProductSearchQuery(e.target.value)}
+                          placeholder="過去商品検索"
+                        />
+                        <button
+                          type="submit"
+                          disabled={isSearchingProducts}
+                          className="inline-flex flex-shrink-0 items-center justify-center gap-1.5 rounded-md bg-slate-700 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <Search size={14} />
+                          {isSearchingProducts ? '検索中' : '検索'}
+                        </button>
+                     </form>
+                     {productSearchResults.length > 0 && (
+                       <ul className="mt-2 max-h-36 overflow-auto rounded-md border border-slate-200 bg-white divide-y divide-slate-100">
+                         {productSearchResults.map((item) => (
+                           <li key={item.id}>
+                             <button
+                               type="button"
+                               onClick={() => applySearchedProduct(activeTab, item)}
+                               className="w-full px-2.5 py-2 text-left transition-colors hover:bg-sky-50 focus:bg-sky-50"
+                             >
+                               <span className="block truncate text-sm font-medium text-slate-700">
+                                 {item.productName}
+                               </span>
+                               <span className="block truncate text-[11px] text-slate-500">
+                                 JAN: {item.janCode}
+                               </span>
+                             </button>
+                           </li>
+                         ))}
+                       </ul>
+                     )}
                 </div>
                  <div className="md:col-span-2">
                      <label className="block text-sm font-bold text-slate-700 mb-2">商品名 <span className="text-danger font-bold">*</span></label>
@@ -1763,11 +1752,11 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         <section className="mb-10">
             <h4 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
                 <span className="w-1 h-6 bg-cyan-500 rounded-full"></span>
-                送込み店舗着日要望
+                納品日
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                     <label className="block text-sm font-bold text-slate-700 mb-2">送込み店舗着日要望</label>
+                     <label className="block text-sm font-bold text-slate-700 mb-2">納品日</label>
                      <input 
                         type="date" 
                         className={getFieldClass()}
@@ -1799,16 +1788,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                      />
                 </div>
             </div>
-        </section>
-
-        <hr className="my-8 border-slate-200" />
-
-        {/* Product: Promotion Info */}
-        <section className="mb-6">
-            <h4 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                <span className="w-1 h-6 bg-orange-500 rounded-full"></span>
-                販促物情報
-            </h4>
         </section>
 
         <hr className="my-8 border-slate-200" />
