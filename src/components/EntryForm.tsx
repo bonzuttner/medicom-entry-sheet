@@ -1936,15 +1936,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                       onChange={(e) => handlePromotionChange(activePromotionTab, 'specialFixture', e.target.value)}
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">納品日</label>
-                    <input
-                      type="date"
-                      className="w-full p-3 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-                      value={activePromotion.deliveryDate || ''}
-                      onChange={(e) => handlePromotionChange(activePromotionTab, 'deliveryDate', e.target.value)}
-                    />
-                  </div>
                 </div>
               </section>
 
@@ -2020,6 +2011,23 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                       画像を選択...
                     </button>
                   </div>
+                </div>
+              </section>
+
+              <hr className="my-8 border-slate-200" />
+
+              <section className="mb-10">
+                <h4 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                  <span className="w-1 h-6 bg-orange-500 rounded-full"></span>
+                  納品日
+                </h4>
+                <div>
+                  <input
+                    type="date"
+                    className="w-full p-3 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                    value={activePromotion.deliveryDate || ''}
+                    onChange={(e) => handlePromotionChange(activePromotionTab, 'deliveryDate', e.target.value)}
+                  />
                 </div>
               </section>
             </div>
