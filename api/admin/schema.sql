@@ -223,6 +223,7 @@ CREATE TABLE IF NOT EXISTS promotions (
   promo_height NUMERIC(10, 2),
   promo_depth NUMERIC(10, 2),
   promo_image_url TEXT,
+  delivery_date DATE,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );

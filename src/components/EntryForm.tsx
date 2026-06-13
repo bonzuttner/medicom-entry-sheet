@@ -811,12 +811,12 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     const newPromotion: Promotion = {
       id: uuidv4(),
       hasPromoMaterial: 'yes',
-      promoSample: '',
       specialFixture: '',
       promoWidth: undefined,
       promoHeight: undefined,
       promoDepth: undefined,
       promoImage: '',
+      deliveryDate: '',
     };
     setFormData(prev => ({
       ...prev,
@@ -870,7 +870,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     if (hasImage && hasDimensions) {
       return { label: '完了', tone: 'bg-emerald-100 text-emerald-700' };
     }
-    if (hasImage || hasDimensions || promo.promoSample || promo.specialFixture) {
+    if (hasImage || hasDimensions || promo.specialFixture || promo.deliveryDate) {
       return { label: '入力中', tone: 'bg-amber-100 text-amber-700' };
     }
     return { label: '未入力', tone: 'bg-slate-100 text-slate-500' };
@@ -1927,23 +1927,22 @@ export const EntryForm: React.FC<EntryFormProps> = ({
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">サンプル仕様</label>
-                    <input
-                      type="text"
-                      className="w-full p-3 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-                      placeholder="例：商品サンプル同梱"
-                      value={activePromotion.promoSample || ''}
-                      onChange={(e) => handlePromotionChange(activePromotionTab, 'promoSample', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">特別什器等</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">香り見本・陳列売什器</label>
                     <input
                       type="text"
                       className="w-full p-3 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
                       placeholder="例：専用什器"
                       value={activePromotion.specialFixture || ''}
                       onChange={(e) => handlePromotionChange(activePromotionTab, 'specialFixture', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">納品日</label>
+                    <input
+                      type="date"
+                      className="w-full p-3 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                      value={activePromotion.deliveryDate || ''}
+                      onChange={(e) => handlePromotionChange(activePromotionTab, 'deliveryDate', e.target.value)}
                     />
                   </div>
                 </div>

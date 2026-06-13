@@ -56,12 +56,12 @@ export interface Promotion {
   id: string;
   sheetId?: string;
   hasPromoMaterial: 'yes' | 'no';
-  promoSample?: string;
   specialFixture?: string;
   promoWidth?: number;
   promoHeight?: number;
   promoDepth?: number;
   promoImage?: string;
+  deliveryDate?: string;
 }
 
 export interface ProductEntry {

@@ -107,12 +107,12 @@ interface PromotionRow {
   id: string;
   sheet_id: string;
   has_promo_material: boolean;
-  promo_sample: string | null;
   special_fixture: string | null;
   promo_width: number | null;
   promo_height: number | null;
   promo_depth: number | null;
   promo_image_url: string | null;
+  delivery_date: string | null;
 }
 
 const REVIEWABLE_ENTRY_STATUSES = [
@@ -678,6 +678,7 @@ const ensurePromotionsTable = async (): Promise<void> => {
           promo_height NUMERIC(10, 2),
           promo_depth NUMERIC(10, 2),
           promo_image_url TEXT,
+          delivery_date DATE,
           created_at TIMESTAMP NOT NULL DEFAULT NOW(),
           updated_at TIMESTAMP NOT NULL DEFAULT NOW()
         )
@@ -685,6 +686,10 @@ const ensurePromotionsTable = async (): Promise<void> => {
       );
       await db.query(
         `CREATE INDEX IF NOT EXISTS idx_promotions_sheet ON promotions(sheet_id)`
+      );
+      // Add delivery_date column if it doesn't exist (migration for existing tables)
+      await db.query(
+        `ALTER TABLE promotions ADD COLUMN IF NOT EXISTS delivery_date DATE`
       );
     })().catch((error) => {
       ensurePromotionsTablePromise = null;
@@ -771,12 +776,12 @@ const rowToPromotion = (row: PromotionRow): Promotion => ({
   id: row.id,
   sheetId: row.sheet_id,
   hasPromoMaterial: row.has_promo_material ? 'yes' : 'no',
-  promoSample: row.promo_sample || undefined,
   specialFixture: row.special_fixture || undefined,
   promoWidth: row.promo_width || undefined,
   promoHeight: row.promo_height || undefined,
   promoDepth: row.promo_depth || undefined,
   promoImage: row.promo_image_url || undefined,
+  deliveryDate: row.delivery_date || undefined,
 });
 
 /**
@@ -955,8 +960,8 @@ const fetchPromotionsBySheetIds = async (
   const result = await db.query<PromotionRow>(
     `
     SELECT
-      id, sheet_id, has_promo_material, promo_sample, special_fixture,
-      promo_width, promo_height, promo_depth, promo_image_url
+      id, sheet_id, has_promo_material, special_fixture,
+      promo_width, promo_height, promo_depth, promo_image_url, delivery_date
     FROM promotions
     WHERE sheet_id = ANY($1)
     ORDER BY created_at ASC
@@ -1979,48 +1984,48 @@ export const upsert = async (
       const normalizedPromotions = promotions.map((promo) => ({
         id: String(promo.id || '').trim() || randomUUID(),
         hasPromoMaterial: promo.hasPromoMaterial === 'yes',
-        promoSample: String(promo.promoSample || '').trim() || null,
         specialFixture: String(promo.specialFixture || '').trim() || null,
         promoWidth: promo.promoWidth || null,
         promoHeight: promo.promoHeight || null,
         promoDepth: promo.promoDepth || null,
         promoImage: String(promo.promoImage || '').trim() || null,
+        deliveryDate: String(promo.deliveryDate || '').trim() || null,
       }));
 
       await db.query(
         `
-        INSERT INTO promotions (id, sheet_id, has_promo_material, promo_sample, special_fixture, promo_width, promo_height, promo_depth, promo_image_url)
+        INSERT INTO promotions (id, sheet_id, has_promo_material, special_fixture, promo_width, promo_height, promo_depth, promo_image_url, delivery_date)
         SELECT
           items.id,
           $1,
           items.has_promo_material,
-          items.promo_sample,
           items.special_fixture,
           items.promo_width,
           items.promo_height,
           items.promo_depth,
-          items.promo_image_url
+          items.promo_image_url,
+          items.delivery_date
         FROM unnest(
           $2::uuid[],
           $3::boolean[],
           $4::text[],
-          $5::text[],
+          $5::numeric[],
           $6::numeric[],
           $7::numeric[],
-          $8::numeric[],
-          $9::text[]
-        ) AS items(id, has_promo_material, promo_sample, special_fixture, promo_width, promo_height, promo_depth, promo_image_url)
+          $8::text[],
+          $9::date[]
+        ) AS items(id, has_promo_material, special_fixture, promo_width, promo_height, promo_depth, promo_image_url, delivery_date)
         `,
         [
           normalizedSheet.id,
           normalizedPromotions.map((p) => p.id),
           normalizedPromotions.map((p) => p.hasPromoMaterial),
-          normalizedPromotions.map((p) => p.promoSample),
           normalizedPromotions.map((p) => p.specialFixture),
           normalizedPromotions.map((p) => p.promoWidth),
           normalizedPromotions.map((p) => p.promoHeight),
           normalizedPromotions.map((p) => p.promoDepth),
           normalizedPromotions.map((p) => p.promoImage),
+          normalizedPromotions.map((p) => p.deliveryDate),
         ]
       );
     }
