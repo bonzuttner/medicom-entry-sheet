@@ -1,4 +1,4 @@
-import { isAdmin, requireUser } from '../_lib/auth.js';
+import { isAdmin, isRetailer, requireUser } from '../_lib/auth.js';
 import { getMethod, methodNotAllowed, sendError, sendJson } from '../_lib/http.js';
 import * as SheetRepository from '../_lib/repositories/sheets.js';
 import * as UserRepository from '../_lib/repositories/users.js';
@@ -29,11 +29,22 @@ export default async function handler(req: any, res: any) {
   ).trim();
   const limit = parseLimit(req.query?.limit);
 
-  const resolvedManufacturerId = isAdmin(currentUser)
-    ? requestedManufacturerName
+  let resolvedManufacturerId: string | null = null;
+
+  if (isAdmin(currentUser)) {
+    // Admin can search any manufacturer
+    resolvedManufacturerId = requestedManufacturerName
       ? await UserRepository.getManufacturerId(requestedManufacturerName)
-      : await UserRepository.getManufacturerIdByUserId(currentUser.id)
-    : await UserRepository.getManufacturerIdByUserId(currentUser.id);
+      : await UserRepository.getManufacturerIdByUserId(currentUser.id);
+  } else if (isRetailer(currentUser)) {
+    // Retailer can search products of their assigned manufacturers
+    if (requestedManufacturerName && currentUser.assignedManufacturerNames?.includes(requestedManufacturerName)) {
+      resolvedManufacturerId = await UserRepository.getManufacturerId(requestedManufacturerName);
+    }
+  } else {
+    // Manufacturer users can only search their own products
+    resolvedManufacturerId = await UserRepository.getManufacturerIdByUserId(currentUser.id);
+  }
 
   if (!resolvedManufacturerId) {
     sendError(res, 400, 'Manufacturer is required');
